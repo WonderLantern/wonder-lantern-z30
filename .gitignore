@@ -60,6 +60,7 @@ htmlcov/
 *.tmp
 Thumbs.db
 Desktop.ini
+.DS_Store
 
 # Private notes, credentials and publication exclusions.
 /docs/roadmap.md

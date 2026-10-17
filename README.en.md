@@ -51,6 +51,14 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 
 `.[sound]` installs the Keystone assembler required by `full`. The additional `liveview-dual` DISP page also requires Keystone. Standalone `m900` needs only the Python standard library. Sound, the module host, bitrate profiles, and MTP acceleration require Keystone. The bitrate preset includes the sound-menu framework, with sound disabled by default. For standalone video orientation, `.[video]` provides the same assembler dependency as `.[sound]`.
 
+On macOS, if installation still leaves `fail to load the dynamic library`, activate the Python environment used for building, then install and link the native library:
+
+```bash
+brew install keystone
+ln -s "$(brew --prefix keystone)/lib/libkeystone.dylib" "$(python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')/keystone/libkeystone.dylib"
+python -c "from keystone import Ks; print('Keystone OK')"
+```
+
 ### 3. Select presets
 
 Omitting presets in an interactive terminal displays a selection menu. Options **1–9** are `full`, followed by the eight presets in the table above. Enter numbers or names separated by spaces or commas; an empty response selects `full`.

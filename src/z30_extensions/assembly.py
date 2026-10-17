@@ -22,9 +22,14 @@ def jump(site, target, length=8):
 
 def assemble(source, address, capacity):
     try:
-        from keystone import Ks, KS_ARCH_ARM, KS_MODE_THUMB, KS_MODE_V8
+        from keystone import KS_ARCH_ARM, KS_MODE_THUMB, KS_MODE_V8, Ks
     except ImportError as error:
-        raise ValueError('This feature requires keystone-engine; install the sound optional dependency') from error
+        if isinstance(error, ModuleNotFoundError) and error.name == 'keystone':
+            message = 'Keystone is not installed; run python -m pip install ".[sound]".'
+        else:
+            message = ('Keystone is installed but failed to load; check its native library '
+                       f'and Python compatibility (see README). Original error: {error}')
+        raise ValueError(message) from error
     raw, _ = Ks(KS_ARCH_ARM, KS_MODE_THUMB | KS_MODE_V8).asm(source, addr=address, as_bytes=True)
     if raw is None or len(raw) > capacity:
         raise ValueError(f'Assembled function exceeds its {capacity}-byte slot')

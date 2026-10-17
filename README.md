@@ -49,6 +49,14 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 
 `.[sound]` 提供 `full` 所需的 Keystone 汇编依赖。`liveview-dual` 新增 DISP 页也需要 Keystone；单独构建 `m900` 只需要 Python 标准库；声音、模块宿主、码率档位和 MTP 加速需要 Keystone。码率预设自动包含声音菜单框架，但声音默认关闭。单独视频方向可安装 `.[video]`，与 `.[sound]` 提供相同的汇编依赖。
 
+macOS 若安装后仍报 `fail to load the dynamic library`，请激活构建所用的 Python 环境，再安装并链接原生库：
+
+```bash
+brew install keystone
+ln -s "$(brew --prefix keystone)/lib/libkeystone.dylib" "$(python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')/keystone/libkeystone.dylib"
+python -c "from keystone import Ks; print('Keystone OK')"
+```
+
 ### 3. 选择预设
 
 终端中省略预设时显示多选菜单：编号 **1–9** 依次为 `full` 和上表八项预设。输入编号或名称，以空格或逗号分隔；直接回车选择 `full`。
