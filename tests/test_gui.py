@@ -30,6 +30,7 @@ class GuiHelperTests(unittest.TestCase):
 
     def test_selected_presets(self):
         self.assertEqual(gui.selected_presets({'full': True, 'm900': True}), ['full'])
+        self.assertEqual(gui.selected_presets({'full': True, 'date-stamp': True}), ['full', 'date-stamp'])
         self.assertEqual(gui.selected_presets({'wifi-5ghz': True, 'm900': True}), ['m900', 'wifi-5ghz'])
         self.assertEqual(gui.selected_presets({}), [])
 

@@ -9,7 +9,7 @@ from .sound_audio import audio_code
 from .sound_ui import ui_code
 
 
-def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
+def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
     if precapture_probe and (wireless or bitrate):
@@ -38,9 +38,11 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
     sizes['dismiss_error'] = 96
     if aspect:
         sizes.update(ensure=1024, getter=512, route=448, row=384)
-    grouped = bool(modules or bitrate or aspect or zebra)
+    grouped = bool(modules or bitrate or aspect or zebra or stamp)
     if grouped:
         sizes.update(ensure=1280, getter=640, route=640, action=1280)
+    if stamp:
+        sizes.update(ensure=1536, getter=768, route=768, action=1536)
     f = {name: plan.alloc(bytes(size)) for name, size in sizes.items()}
     from . import ui_text
     text_resources = ui_text.prepare(plan, f)
@@ -52,7 +54,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
                  one='1.WAV', two='2.WAV', three='3.WAV', four='4.WAV', empty='', current='*',
                  missing='File not found', read='Read failed', invalid='Invalid WAV', close='Close failed',
                  busy='Sound busy', queue='Play failed', audio='Audio failed', ok='OK', save='Settings not saved')
-    if modules or bitrate or aspect or zebra:
+    if grouped:
         texts['entry'] = texts['title'] = 'Extensions'
     strings = {key: text_resources.alloc(text) for key, text in texts.items()}
     if grouped:
@@ -129,11 +131,22 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
                          if video else extension['allocation_size'] if extension else NEW_SIZE)
         zebra_extension = zu.prepare(plan, f, text_resources, previous_size)
         zebra_extension['template'] = child_templates[zu.PAGE_INDEX]
+    stamp_extension = None
+    if stamp:
+        from . import date_stamp_ui as su
+        tables[su.PAGE_INDEX], metas[su.PAGE_INDEX] = plan.alloc(bytes(32)), plan.alloc(bytes(28))
+        child_templates[su.PAGE_INDEX] = plan.alloc(struct.pack('<11I',
+            (su.PAGE_INDEX << 16) | 2, 0, 0, 0, tables[su.PAGE_INDEX], 0, 0, 0, 0, 0, metas[su.PAGE_INDEX]))
+        previous_size = (zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect
+                         else video['allocation_size'] if video else extension['allocation_size'] if extension else NEW_SIZE)
+        stamp_extension = su.prepare(plan, f, text_resources, previous_size)
+        stamp_extension['template'] = child_templates[su.PAGE_INDEX]
     group = None
     if grouped:
-        order = [key for key, enabled in (('aspect', aspect), ('zebra', zebra), ('bitrate', bitrate),
+        order = [key for key, enabled in (('aspect', aspect), ('zebra', zebra), ('stamp', stamp), ('bitrate', bitrate),
                                           ('sound', True), ('modules', modules)) if enabled]
-        previous_size = (zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect else video['allocation_size']
+        previous_size = (stamp_extension['allocation_size'] if stamp else
+                         zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect else video['allocation_size']
                          if video else extension['allocation_size'])
         tables[SOUND_GROUP_INDEX] = plan.alloc(bytes(32))
         metas[SOUND_GROUP_INDEX] = plan.alloc(bytes(28))
@@ -149,6 +162,9 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         if zebra:
             zebra_extension['root_row'] = order.index('zebra')
             group['labels']['zebra'], group['values']['zebra'] = zu.ROOT_SLOT, zu.CURRENT_SLOT
+        if stamp:
+            stamp_extension['root_row'] = order.index('stamp')
+            group['labels']['stamp'], group['values']['stamp'] = su.ROOT_SLOT, su.CURRENT_SLOT
         if bitrate:
             video['root_row'] = order.index('bitrate')
             group['labels']['bitrate'], group['values']['bitrate'] = bu.ROOT_SLOT, bu.CURRENT_SLOT
@@ -162,7 +178,8 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
     codes.update(settings_code(f, config_path))
     codes.update(ui_code(f, strings, fixed, file_names, errors, file_ids, switch_ids,
                          anchor_table, template, child_templates, extension, sidebar_parent=setup_parent,
-                         video=video, aspect=aspect_extension, zebra=zebra_extension, group=group))
+                         video=video, aspect=aspect_extension, zebra=zebra_extension, group=group,
+                         stamp=stamp_extension))
     c = constant
     call = lambda name: invoke(f[name])
     owned_pages = [PAGE_INDEX, FILES_INDEX, SWITCH_INDEX, POPUP_INDEX]
@@ -174,6 +191,8 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         owned_pages.append(au.PAGE_INDEX)
     if zebra:
         owned_pages.append(zu.PAGE_INDEX)
+    if stamp:
+        owned_pages.append(su.PAGE_INDEX)
     if grouped:
         owned_pages.append(SOUND_GROUP_INDEX)
     codes['row'] = ui_text.row_code(f, SETUP_OBJECT, ENTRY_ID, owned_pages)
@@ -310,6 +329,16 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[2],))
         page_specs.append((zu.PAGE_INDEX,2,zu.LABEL_SLOT,zu.MARK_SLOT,zu.TITLE_SLOT,ids[:2]))
         zu.finish(plan,f,zebra_extension,ids[:2])
+    if stamp:
+        occupied = used | {ident for spec in page_specs for ident in spec[-1]}
+        ids = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:4]
+        if len(ids) != 4:
+            raise ValueError('No free date stamp control IDs')
+        category_ids['stamp'] = ids[3]
+        root = page_specs[0]
+        page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[3],))
+        page_specs.append((su.PAGE_INDEX,3,su.LABEL_SLOT,su.MARK_SLOT,su.TITLE_SLOT,ids[:3]))
+        su.finish(plan,f,stamp_extension,ids[:3])
     if grouped:
         occupied = used | {ident for spec in page_specs for ident in spec[-1]}
         category_ids['sound'] = next(i for i in range(0x2400,0x3000) if i not in occupied)
@@ -400,9 +429,9 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         'pages': pages, 'state_anchor': hex(STATE_ANCHOR + 16), 'anchor_table': hex(anchor_table),
         'page_template': hex(template), 'persistent_state_size': (group['allocation_size'] if grouped else NEW_SIZE) + 31,
         'root_parent': hex(setup_parent),
-        'page_offsets': {str(PAGE_INDEX): PAGE_OFFSET, str(FILES_INDEX): FILES_OFFSET, str(SWITCH_INDEX): SWITCH_OFFSET, str(POPUP_INDEX): POPUP_OFFSET, **({str(mh.PAGE_INDEX): mh.PAGE_OFFSET} if modules else {}), **({str(bu.PAGE_INDEX):video['page_offset']} if video else {}), **({str(au.PAGE_INDEX):aspect_extension['page_offset']} if aspect else {}), **({str(zu.PAGE_INDEX):zebra_extension['page_offset']} if zebra else {}), **({str(SOUND_GROUP_INDEX):group['page_offset']} if grouped else {})},
+        'page_offsets': {str(PAGE_INDEX): PAGE_OFFSET, str(FILES_INDEX): FILES_OFFSET, str(SWITCH_INDEX): SWITCH_OFFSET, str(POPUP_INDEX): POPUP_OFFSET, **({str(mh.PAGE_INDEX): mh.PAGE_OFFSET} if modules else {}), **({str(bu.PAGE_INDEX):video['page_offset']} if video else {}), **({str(au.PAGE_INDEX):aspect_extension['page_offset']} if aspect else {}), **({str(zu.PAGE_INDEX):zebra_extension['page_offset']} if zebra else {}), **({str(su.PAGE_INDEX):stamp_extension['page_offset']} if stamp else {}), **({str(SOUND_GROUP_INDEX):group['page_offset']} if grouped else {})},
         'menu_categories': ([dict(key=key,row=row,control_id=category_ids[key],
-                                  page_index={'zebra':963,'aspect':961,'bitrate':960,'sound':SOUND_GROUP_INDEX,'modules':958}[key])
+                                  page_index={'stamp':964,'zebra':963,'aspect':961,'bitrate':960,'sound':SOUND_GROUP_INDEX,'modules':958}[key])
                              for row,key in enumerate(group['order'])] if grouped else []),
         'sound_settings_page': SOUND_GROUP_INDEX if grouped else PAGE_INDEX,
         'control_identifiers': {str(index): list(identifiers) for index, _, _, _, _, identifiers in page_specs},

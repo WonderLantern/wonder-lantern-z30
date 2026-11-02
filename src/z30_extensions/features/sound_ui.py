@@ -5,7 +5,7 @@
 from .sound_layout import *
 from ..assembly import constant, invoke
 
-def ui_code(f, strings, fixed, file_names, errors, file_ids, switch_ids, anchor_table, template, child_templates, extension=None, sidebar_parent=None, video=None, aspect=None, zebra=None, group=None):
+def ui_code(f, strings, fixed, file_names, errors, file_ids, switch_ids, anchor_table, template, child_templates, extension=None, sidebar_parent=None, video=None, aspect=None, zebra=None, group=None, stamp=None):
     code = {}
     allocation_size = NEW_SIZE
     module_copy = module_labels = getter_check = getter_result = route_extra = route_action = action_extra = ''
@@ -73,6 +73,22 @@ def ui_code(f, strings, fixed, file_names, errors, file_ids, switch_ids, anchor_
         route_action = f"""ldrh r2,[r4,#2];{constant('r12',zu.PAGE_INDEX)}cmp r2,r12;bne not_zebra;
             {invoke(f['zebra_action'])}b action_done;not_zebra:""" + route_action
         action_extra = f"cmp r5,#{zebra['root_row']};bne not_zebra_root;{invoke(f['zebra_open'])}b done;not_zebra_root:" + action_extra
+    if stamp:
+        from . import date_stamp_ui as su
+        allocation_size = stamp['allocation_size']
+        video_copy += f"""{constant('r5',stamp['page_offset'])}add r5,r4,r5;mov r0,r5;
+            {constant('r1',stamp['template'])}movs r2,#44;{invoke(0x10199bdc,thumb=False)}
+            add r0,r4,#{PAGE_OFFSET};str r0,[r5,#4];
+            {constant('r5',stamp['state_offset'])}add r5,r4,r5;mvn r0,#0;str r0,[r5,#4];"""
+        video_restore += invoke(f['stamp_restore'])
+        video_labels += invoke(f['stamp_labels'])
+        getter_check += f"{constant('r12',su.PAGE_INDEX)}cmp r1,r12;beq stamp_page;"
+        getter_result += f"""stamp_page:push {{r1-r3,lr}};{invoke(f['get'])}cmp r0,#0;beq ret;
+            {constant('r2',stamp['page_offset'])}b add_page;"""
+        route_extra += f"beq owned;{constant('r2',stamp['page_offset'])}add r2,r0,r2;cmp r4,r2;"
+        route_action = f"""ldrh r2,[r4,#2];{constant('r12',su.PAGE_INDEX)}cmp r2,r12;bne not_stamp;
+            {invoke(f['stamp_action'])}b action_done;not_stamp:""" + route_action
+        action_extra = f"cmp r5,#{stamp['root_row']};bne not_stamp_root;{invoke(f['stamp_open'])}b done;not_stamp_root:" + action_extra
     c = constant
     def call(name): return invoke(f[name])
     native = lambda address: invoke(address, thumb=address != 0x10199bdc)

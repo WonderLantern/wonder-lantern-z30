@@ -19,6 +19,15 @@ class PresetTests(unittest.TestCase):
         with patch('builtins.input', return_value='11'), patch('sys.stdout', new=io.StringIO()):
             self.assertEqual(choose_presets(), ['wifi-5ghz'])
 
+    def test_date_stamp_is_opt_in_and_brings_the_menu_framework(self):
+        self.assertIn('date-stamp', PRESETS)
+        self.assertNotIn('date-stamp', resolve_presets('full')[1])
+        self.assertEqual(resolve_presets('date-stamp')[1], ['shutter-sound', 'date-stamp'])
+        self.assertEqual(resolve_presets(['full', 'date-stamp'])[1],
+                         resolve_presets('full')[1] + ['date-stamp'])
+        with patch('builtins.input', return_value='12'), patch('sys.stdout', new=io.StringIO()):
+            self.assertEqual(choose_presets(), ['date-stamp'])
+
     def test_photo_zebra_is_in_full_and_composes_without_duplicates(self):
         self.assertIn('photo-zebra', PRESETS)
         self.assertIn('photo-zebra', resolve_presets('full')[1])

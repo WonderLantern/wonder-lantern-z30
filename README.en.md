@@ -13,7 +13,7 @@ The earlier general report of all features working was subsequently corrected by
 
 ## Features and presets
 
-`full` includes all ten features below, including Wi-Fi 5 GHz region unlocking. Select features individually or combine them; `module-host` automatically includes `shutter-sound`.
+`full` includes the ten features below other than `date-stamp`, including Wi-Fi 5 GHz region unlocking. Select features individually or combine them; `module-host` automatically includes `shutter-sound`.
 
 | Preset | Feature |
 | --- | --- |
@@ -27,6 +27,7 @@ The earlier general report of all features working was subsequently corrected by
 | `aspect-profiles` | Six photo ratios and a translucent live-view mask in one preset, preserving the interior stock grid. [Details](docs/aspect-profiles.md) |
 | `photo-zebra` | Photo live-view zebra with an independent switch and native pattern/threshold controls. [Details](docs/photo-zebra.md) |
 | `wifi-5ghz` | US/-1 country request on all 22 valid Wi-Fi profiles for 5 GHz STA; included in full and available separately. |
+| `date-stamp` | **Experimental**: film-style date or date-and-time stamp in the lower right of JPEGs, off by default; not part of `full`. [Details (Chinese)](docs/date-stamp.md) |
 
 Build with `python patch.py wifi-5ghz --source "Z_30_0120.bin" --output "output/EG209020-wifi-5ghz.BIN"`, or select `full` to include all features. Interactive option 11 selects this preset. Only the country and revision fields of profiles 1–10 and 14–25 (including the unset-index fallback) change; index fields and the 12 reserved slots are kept, and no persistent sales-region or NVRAM write is made. Initialization paths that bypass the table are unchanged. Bodies that previously allowed 2.4 GHz channels 12 and 13 may lose networks on them (inferred, not measured). This does not open all channels. Camera AP support, throughput and negotiated bandwidth remain unproven. Effective channels and power must suit the place of use. The standalone preset only needs the Python standard library.
 
@@ -87,7 +88,7 @@ python -c "from keystone import Ks; print('Keystone OK')"
 
 ### 3. Select presets
 
-Omitting presets in an interactive terminal displays a selection menu. Options **1–11** are `full`, followed by the ten presets in the table above (option **10** is `photo-zebra`; option **11** is `wifi-5ghz`). Enter numbers or names separated by spaces or commas; an empty response selects `full`.
+Omitting presets in an interactive terminal displays a selection menu. Options **1–12** are `full`, followed by the eleven presets in the table above (option **10** is `photo-zebra`; option **11** is `wifi-5ghz`; option **12** is `date-stamp`). Enter numbers or names separated by spaces or commas; an empty response selects `full`.
 
 - `2 4 5` or `liveview-dual,m900,mtp-fast`: combined display, M900, and MTP acceleration.
 - `6` or `module-host`: the experimental module host and its required sound framework.
@@ -228,6 +229,7 @@ Detailed documents are currently mainly in Chinese. The [Chinese README](README.
 | [Build guide](PATCH_GUIDE.md) | Inputs, menu selection, outputs, and common errors. |
 | [Build details](docs/build.md) | Identity, decoding, preset combinations, and patch workflow. |
 | [Photo live-view zebra](docs/photo-zebra.md) | Independent switch, native patterns/thresholds, preferences and validation scope. |
+| [Date stamp](docs/date-stamp.md) | Hook point, validation scope and camera test steps for the film-style JPEG date stamp. |
 | [Custom aspects and translucent mask](docs/aspect-profiles.md) | Six ratios, output dimensions, live-view behavior and evidence boundaries. |
 | [v42 playback fix](docs/aspect-lifecycle-v42.md) | Lifecycle gate, stale-mask retirement and user retest. |
 | [Sound details](docs/shutter-sound.md) | Menus, trigger conditions, format, and state. |

@@ -6,11 +6,12 @@ from .platform.z30_120 import BASE
 
 
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'module-host', 'video-rot',
-           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz')
+           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'module-host', 'video-rot',
-                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz')
-FULL_FEATURES = FEATURE_ORDER
+                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp')
+# date-stamp hooks the JPEG encoder and stays opt-in until it has hardware results.
+FULL_FEATURES = tuple(feature for feature in FEATURE_ORDER if feature != 'date-stamp')
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound', 'module-host')
 
 
@@ -30,7 +31,7 @@ def resolve_presets(preset='full'):
         else:
             features.add(name)
     # Module host and bitrate profiles share the sound menu/state framework.
-    if any(f in features for f in ('module-host', 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra')):
+    if any(f in features for f in ('module-host', 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp')):
         features.add('shutter-sound')
     return list(dict.fromkeys(selected)), [f for f in FEATURE_ORDER if f in features]
 
@@ -76,7 +77,8 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'shutter-sound' in features:
         from .features.shutter_sound import add
         add(plan, modules='module-host' in features, bitrate='bitrate-slowmo-uncap' in features,
-            zebra='photo-zebra' in features, aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
+            zebra='photo-zebra' in features, stamp='date-stamp' in features,
+            aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
             aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial)
     if 'mtp-fast' in features:
@@ -93,6 +95,9 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         add(plan)
     if 'wifi-5ghz' in features:
         from .features.wifi_5ghz import add
+        add(plan)
+    if 'date-stamp' in features:
+        from .features.date_stamp import add
         add(plan)
     output, report = plan.finish()
     for address, expected in VIDEO_STOCK_WINDOWS:

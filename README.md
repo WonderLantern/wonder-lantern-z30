@@ -10,7 +10,7 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的实验
 
 ## 功能与预设
 
-`full` 包含下面全部十项功能，包括 Wi-Fi 5 GHz 地区解锁。每项仍可独立选择或组合；`module-host` 自动包含 `shutter-sound`。
+`full` 包含下表除 `date-stamp` 外的十项功能，包括 Wi-Fi 5 GHz 地区解锁。每项仍可独立选择或组合；`module-host` 自动包含 `shutter-sound`。
 
 | 预设 | 功能 |
 | --- | --- |
@@ -24,6 +24,7 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的实验
 | `aspect-profiles` | 同一菜单切换六种照片比例，包含半透明取景遮幅并保留原厂内部网格。[说明](docs/aspect-profiles.md) |
 | `photo-zebra` | 照片取景斑马纹；独立照片开关，复用原厂图案与阈值。[说明](docs/photo-zebra.md) |
 | `wifi-5ghz` | Wi-Fi 5 GHz 地区解锁：全部 22 个有效无线配置请求 US/-1，包含在 full 中，也可单独选择。 |
+| `date-stamp` | **实验性**：在 JPEG 右下角打胶片风格的日期或日期时间水印，默认关闭；不含在 `full` 中。[说明](docs/date-stamp.md) |
 
 `wifi-5ghz` 替换无线配置 1–10、14–25（含未保存编号的回落）的国家代码和修订号，保留各自编号字段和 12 个保留槽，不写整机销售地区或 NVRAM。原厂绕过这张表的初始化路径保持原样。原本可用 2.4 GHz 第 12、13 信道的机身可能无法再连接这些信道的网络（此为推断，尚未实测）；不等于开放全部信道，也不保证相机自身建立 5 GHz 热点、提速或实际协商带宽。驱动的有效信道与功率需适合使用地点。单独构建只需 Python 标准库。
 
@@ -84,7 +85,7 @@ python -c "from keystone import Ks; print('Keystone OK')"
 
 ### 3. 选择预设
 
-终端中省略预设时显示多选菜单：编号 **1–11** 依次为 `full` 和上表十项预设（第 **10** 项为 `photo-zebra`，第 **11** 项为 `wifi-5ghz`）。输入编号或名称，以空格或逗号分隔；直接回车选择 `full`。
+终端中省略预设时显示多选菜单：编号 **1–12** 依次为 `full` 和上表十一项预设（第 **10** 项为 `photo-zebra`，第 **11** 项为 `wifi-5ghz`，第 **12** 项为 `date-stamp`）。输入编号或名称，以空格或逗号分隔；直接回车选择 `full`。
 
 - `2 4 5` 或 `liveview-dual,m900,mtp-fast`：同屏、M900、MTP 加速。
 - `6` 或 `module-host`：实验性模块宿主及其必需的声音框架。
@@ -227,6 +228,7 @@ python -m unittest discover -s tests -v
 | [离线构建指引](PATCH_GUIDE.md) | 图形界面与命令行步骤、产物与常见错误。 |
 | [构建说明](docs/build.md) | 输入身份、解码、预设组合与补丁流程。 |
 | [照片取景斑马纹](docs/photo-zebra.md) | 独立开关、原厂图案与阈值、偏好保存及验证范围。 |
+| [日期水印](docs/date-stamp.md) | 胶片风格 JPEG 日期水印的挂点、验证范围和上机步骤。 |
 | [画幅与半透明遮幅](docs/aspect-profiles.md) | 六种比例、输出尺寸、取景遮幅与验证边界。 |
 | [v42 回放修复](docs/aspect-lifecycle-v42.md) | 生命周期限制、旧遮幅清理及用户复测。 |
 | [声音说明](docs/shutter-sound.md) | 声音菜单、触发条件、文件格式和状态。 |

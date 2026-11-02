@@ -51,7 +51,7 @@ def verify(stock,image,report):
         assert fixture.call(functions['getter'],(2,index))==pointer
         assert int.from_bytes(fixture.u.mem_read(pointer+2,2),'little')==index
     categories=sound['menu_categories']
-    expected=[key for key,feature in (('aspect','aspect_profiles'),('zebra','photo_zebra_control'),('bitrate','bitrate_profiles'),
+    expected=[key for key,feature in (('aspect','aspect_profiles'),('zebra','photo_zebra_control'),('stamp','date_stamp_control'),('bitrate','bitrate_profiles'),
                                      ('sound','shutter_sound'),('modules','module_host'))
               if feature in report['features']]
     if len(expected)==1:expected=[]

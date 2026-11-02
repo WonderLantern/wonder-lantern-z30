@@ -8,12 +8,14 @@ import sys
 import threading
 from pathlib import Path
 
-from .build import PRESETS, resolve_presets
+from .build import FULL_FEATURES, PRESETS, resolve_presets
 from .cli import PRESET_LABELS, build_to_files
 from .container import CONTAINER_SHA256, CONTAINER_SIZE
 
 SOURCE_NAME = 'Z_30_0120.bin'
 OUTPUT_STEM = 'EG209020'
+# Selectable next to full instead of being implied by it.
+OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
     'full': 'All ten features, including aspect profiles and the experimental SD module host',
@@ -27,6 +29,7 @@ PRESET_LABELS_EN = {
     'aspect-profiles': 'Custom photo aspect ratios with a translucent mask, keeps stock grid',
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
+    'date-stamp': 'Experimental film-style date stamp on JPEGs, off by default; not part of full',
 }
 
 TEXT = {
@@ -100,9 +103,9 @@ def next_free_output(folder):
 
 
 def selected_presets(states):
-    """Map preset name to checkbox state; full stands for every other preset."""
+    """Map preset name to checkbox state; full stands for every preset it contains."""
     if states.get('full'):
-        return ['full']
+        return ['full'] + [name for name in OPT_IN_PRESETS if states.get(name)]
     return [name for name in PRESETS if states.get(name)]
 
 
@@ -168,7 +171,7 @@ def main(argv=None):
     def refresh_features(*_):
         full = checks['full'].get()
         for name, box in boxes.items():
-            if name != 'full':
+            if name != 'full' and name not in OPT_IN_PRESETS:
                 box.configure(state='disabled' if full else 'normal')
                 if full:
                     checks[name].set(True)

@@ -12,6 +12,9 @@
 - `src/z30_extensions/features/aspect_trace.py`
 - `src/z30_extensions/features/aspect_ui.py`
 - `src/z30_extensions/features/bitrate_ui.py`
+- `src/z30_extensions/date_stamp.py`
+- `src/z30_extensions/features/date_stamp.py`
+- `src/z30_extensions/features/date_stamp_ui.py`
 - `src/z30_extensions/features/shutter_sound.py`
 - `src/z30_extensions/features/sound_audio.py`
 - `src/z30_extensions/features/sound_layout.py`
