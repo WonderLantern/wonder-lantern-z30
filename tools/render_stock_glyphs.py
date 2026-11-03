@@ -1,6 +1,7 @@
 """Render text with the stock Z30 C 1.20 CJK UI fonts' decoded outlines.
 
   python tools/render_stock_glyphs.py --firmware Z_30_0120.bin --font hans 设定菜单 -o out.png
+  python tools/render_stock_glyphs.py --firmware Z_30_0120.bin --fill-from NotoSansCJKsc-Regular.otf 橙色光晕 -o out.png
 
 Offline preview of `platform.fonts.decode_glyph`: quadratic contours are
 flattened and filled even-odd (the camera's own rasterizer may differ in
@@ -57,6 +58,7 @@ def main():
     parser.add_argument('--firmware', required=True)
     parser.add_argument('--font', choices=('hans', 'hant'), default='hans')
     parser.add_argument('--size', type=int, default=64, help='pixels per em')
+    parser.add_argument('--fill-from', type=Path, help='OTF/TTF for characters the stock font lacks')
     parser.add_argument('-o', '--output', type=Path, required=True)
     args = parser.parse_args()
     from PIL import Image, ImageChops, ImageDraw
@@ -64,16 +66,22 @@ def main():
     font = HANS_FONT if args.font == 'hans' else HANT_FONT
     entries, records = character_map(image, font), glyph_addresses(image, font)
     advances = default_advances(image, font)
+    source = None
+    if args.fill_from:
+        from z30_extensions.platform.font_source import OutlineSource
+        source = OutlineSource(args.fill_from)
     supersample, scale = 4, args.size * 4 / EM
     canvas = Image.new('L', (int(len(args.text) * args.size * 4) + 32, args.size * 4 + 32), 0)
     pen = 16
     for char in args.text:
         glyph_id = next((glyph + ord(char) - first for first, glyph, run in entries
                          if first <= ord(char) < first + run), None)
-        if glyph_id is None:
+        if glyph_id is not None:
+            glyph, _ = decode_glyph(image.read(records[glyph_id], 4096))
+        elif source is not None and char in source:
+            glyph = source.glyph(char)
+        else:
             sys.exit(f'{char!r} is not in the stock font')
-        address = records[glyph_id]
-        glyph, _ = decode_glyph(image.read(address, 4096))
         mask = Image.new('1', canvas.size, 0)
         for contour in glyph.contours:
             shape = Image.new('1', canvas.size, 0)

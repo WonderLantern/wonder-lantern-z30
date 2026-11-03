@@ -21,6 +21,7 @@ def package():
         str(Path(PyInstaller.__file__).parent.parent / 'pyinstaller-*.dist-info' / '**' / 'COPYING.txt'), recursive=True))
     for source, name in ((ROOT / 'LICENSE', 'LICENSE-MIT.txt'),
                          (ROOT / 'licenses' / 'Wonder-Lantern.txt', 'LICENSE-Wonder-Lantern.txt'),
+                         (ROOT / 'licenses' / 'OFL-Noto-CJK.txt', 'OFL-Noto-CJK.txt'),
                          (ROOT / 'THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'),
                          (python / 'LICENSE.txt', 'Python-LICENSE.txt'),
                          (next(python.glob('tcl/tk*/demos/license.terms')), 'Tcl-Tk-license.terms'),
@@ -45,6 +46,7 @@ if __name__ == '__main__':
         '--add-data', f'{PACKAGE / "asm_cache.gz"}{os.pathsep}z30_extensions',
         '--add-data', f'{PACKAGE / "platform" / "z30_120_zero_samples.json"}{os.pathsep}z30_extensions/platform',
         '--add-data', f'{PACKAGE / "platform" / "z30_120_fonts.json"}{os.pathsep}z30_extensions/platform',
+        '--add-data', f'{PACKAGE / "platform" / "z30_120_extra_glyphs.json"}{os.pathsep}z30_extensions/platform',
         '--distpath', str(ROOT / 'dist'), '--workpath', str(ROOT / 'build' / 'pyinstaller'),
         '--specpath', str(ROOT / 'build' / 'pyinstaller'),
         str(ROOT / 'patch_gui.py'),

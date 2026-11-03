@@ -17,6 +17,8 @@ def main():
                    help='Seed diagnostic state and verify normal submenu export without property mutation')
     p.add_argument('--verify-area-sync',action='store_true',
                    help='Exercise native DX change followed by custom-submenu backend synchronization')
+    p.add_argument('--observe-fonts',action='store_true',
+                   help='Record style entries and font bytes read by native text objects (0x104B4862)')
     a=p.parse_args()
     sys.path.insert(0,str(a.qemu_root.resolve()/'tools'))
     from display_session import Session,png_from_ppm
@@ -24,6 +26,13 @@ def main():
     fixture=json.loads(a.fixture.read_text())
     sound=report['features']['shutter_sound'];aspect=report['features']['aspect_profiles']
     s=Session(str(a.output_dir.resolve()));observations=[]
+    if a.observe_fonts:
+        stock_input=s.input
+        def observed_input(function,args,**diagnostic):
+            diagnostic.setdefault('observe',[0x104b4862])
+            diagnostic.setdefault('capture',lambda remote,regs:{'entry':regs['r0'],'font':int(regs['r2'],16)})
+            return stock_input(function,args,**diagnostic)
+        s.input=observed_input
     s.audit.append({'candidate_sha256':hashlib.sha256(image).hexdigest(),
                     'selected_presets':report['selected_presets']})
     def write(address,data):

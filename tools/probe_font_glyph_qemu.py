@@ -26,6 +26,7 @@ def main():
     p.add_argument('--watch-start', type=lambda x: int(x, 0), default=HANS_CMAP)
     p.add_argument('--watch-bytes', type=lambda x: int(x, 0), default=HANS_CMAP_BYTES)
     p.add_argument('--watch-cap', type=int, default=CAPS['cmap-read'])
+    p.add_argument('--language', choices=('en', 'zh-Hans', 'zh-Hant'), default='zh-Hans')
     a = p.parse_args()
     sys.path.insert(0, str(a.qemu_root.resolve() / 'tools'))
     from display_session import Session
@@ -36,9 +37,10 @@ def main():
     try:
         s.input(0x102355ee, [0xc182e688, 1])
         s.run_for(2)
-        s.input(0x10465990, [0x1400, 26])
-        s.input(0x10452cc0, [8])
-        s.frame('01-stock-hans')
+        code, ui_font = {'en': (3, 1), 'zh-Hans': (26, 8), 'zh-Hant': (27, 9)}[a.language]
+        s.input(0x10465990, [0x1400, code])
+        s.input(0x10452cc0, [ui_font])
+        s.frame('01-stock-' + a.language)
         r = s.remote
         armed = []
         def arm(on):
@@ -121,7 +123,7 @@ def main():
             assert r.command('G' + saved) == 'OK'
         s.audit.append(dict(menu_call_returned=returned))
         s.run_for(1)
-        s.frame('02-setup-hans')
+        s.frame('02-setup-' + a.language)
         s.audit.append(dict(font_glyph_probe=records, counts=counts))
         s.write_audit()
         print(json.dumps(counts))

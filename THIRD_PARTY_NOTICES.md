@@ -34,6 +34,12 @@
 
 原厂固件和原厂资源由使用者自行提供。菜单模板在构建时从匹配输入读取，仓库不附完整固件或模板镜像。代码中的原字节窗口用于校验补丁目标，零填充位置用于匹配输入的解码。本项目许可证不授予 Nikon 固件、资源或商标的权利。
 
+## Noto CJK 字形
+
+中文菜单需要的、原厂字体缺少的字形（全部可打印 ASCII 和部分汉字）由 Noto Sans CJK SC/TC Regular 与 Noto Sans Mono CJK SC Regular（版本 2.004，© 2014-2021 Adobe，Reserved Font Name “Source”）的轮廓转换而来：缩放与平移到原厂字体坐标、三次曲线转二次曲线、套用原厂度量。转换结果为 `src/z30_extensions/platform/z30_120_extra_glyphs.json`，由 `tools/build_cjk_glyphs.py` 生成；构建时这些字形被加入原厂字体 0、2 的副本，写入输出固件。
+
+这些字形属于 Noto 字体的修改版本，按 [SIL Open Font License 1.1](licenses/OFL-Noto-CJK.txt) 授权，不适用本项目的 MIT 或 Wonder Lantern Community License；不得以 “Source” 为名，也不得单独出售。仓库不附 Noto 字体文件本身，生成数据时需自行下载到 `build/fonts/noto-cjk/`。
+
 ## 依赖
 
 Keystone 和 Unicorn 通过 Python 依赖安装，各自保留其许可证。本仓库不分发这些依赖的二进制，也不包含第三方固件工具的 XOR 表或密钥工具实现。

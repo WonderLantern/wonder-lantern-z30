@@ -4,14 +4,16 @@
 """Owned UI labels using the native Chinese language/font configuration."""
 import struct
 from ..assembly import assemble, constant, invoke
+from . import cjk_fonts
 from ..platform.fonts import HANS_FONT, HANT_FONT, missing_glyphs
 
 LANGUAGE_KEY = 0x1400
 SIMPLIFIED, TRADITIONAL = 26, 27
 # Native Unicode setters use style 120. Its default font 15 lacks CJK;
 # choose the stock Hans font 2 / Hant font 0 in the runtime style copy.
-# Those fonts cover only stock menu characters (see platform/fonts.py), so
-# every label is checked against them; `tools/font_coverage.py` finds wording.
+# Those fonts cover only stock menu characters; cjk_fonts adds the missing
+# label characters and ASCII (see platform/fonts.py), and every label is
+# checked against the extended fonts.
 UNICODE_STYLE = 120
 TRANSLATIONS = {
     'Photo LUT': ('照片 LUT', '照片 LUT'),
@@ -20,11 +22,11 @@ TRANSLATIONS = {
     'Disable and release': ('关闭并释放', '關閉並釋放'),
     'Disabled': ('已关闭', '已關閉'),
     'Embedded LUT': ('内置 LUT', '內建 LUT'),
-    'SD LUT ready': ('SD LUT 可用', 'SD LUT 可用'),
+    'SD LUT ready': ('SD LUT 已就绪', 'SD LUT 已就緒'),
     'Invalid LUT': ('无效的 LUT', '無效的 LUT'),
     'LUT too large': ('LUT 文件过大', 'LUT 檔案過大'),
-    'Cleanup pending': ('等待释放内存', '等待釋放資源'),
-    'Loaded; cleanup pending': ('已加载，等待释放内存', '已載入，等待釋放資源'),
+    'Cleanup pending': ('等待释放资源', '等待釋放資源'),
+    'Loaded; cleanup pending': ('已加载，等待释放资源', '已載入，等待釋放資源'),
     'File access failed': ('访问文件失败', '存取檔案失敗'),
     'Wi-Fi buffer': ('Wi-Fi \u53d1\u9001', 'Wi-Fi \u50b3\u9001'),
     '64 KiB (stock)': ('64 KiB (stock)', '64 KiB (stock)'),
@@ -37,14 +39,14 @@ TRANSLATIONS = {
     'D M Y': ('日 月 年', '日 月 年'),
     'D H:M': ('日 时:分', '日 時:分'),
     'Color': ('颜色', '色彩'),
-    'Orange': ('默认', '預設'),  # the stock CJK fonts have no glyph for 橙 or 橘
+    'Orange': ('橙色', '橙色'),
     'Red': ('红色', '紅色'),
     'Yellow': ('黄色', '黃色'),
     'White': ('白色', '白色'),
-    'Glow': ('柔光', '光暈'),  # the stock Hans font has no glyph for 晕
+    'Glow': ('光晕', '光暈'),
     'OFF (stock)': ('关闭', '關閉'),
     'Video bitrate': ('视频码率', '影片位元率'),
-    'Stock': ('原始', '原始'),
+    'Stock': ('原厂', '原廠'),
     'Balanced': ('均衡', '均衡'),
     'High quality': ('高质量', '高品質'),
     'OK': ('确定', '確定'),
@@ -59,8 +61,8 @@ TRANSLATIONS = {
     'Reload sound': ('重新加载', '重新載入'),
     'OFF': ('关闭', '關閉'), 'ON': ('开启', '開啟'),
     'None': ('未选择', '未選擇'),
-    'File not found': ('找不到文件', '檔案不存在'),
-    'Read failed': ('加载失败', '載入失敗'),
+    'File not found': ('找不到文件', '找不到檔案'),
+    'Read failed': ('读取失败', '讀取失敗'),
     'Invalid WAV': ('无效的 WAV 文件', '無效的 WAV 檔案'),
     'Close failed': ('关闭文件失败', '關閉檔案失敗'),
     'Sound busy': ('声音正在播放', '聲音正在播放'),
@@ -75,13 +77,13 @@ TRANSLATIONS = {
     'Loaded': ('已加载', '已載入'), 'Running': ('运行中', '執行中'),
     'Bad module': ('无效的功能', '無效的功能'),
     'No memory': ('内存不足', '記憶體不足'),
-    'Cache unavailable': ('暂存不可用', '快取無法使用'),
+    'Cache unavailable': ('缓存不可用', '快取無法使用'),
     'Init failed': ('初始化失败', '初始化失敗'),
-    'No handler': ('无处理程序', '無處理程式'),
+    'No handler': ('缺少事件处理函数', '缺少事件處理函式'),
     'Reboot to reload': ('请重启相机以重新加载', '請重啟相機以重新載入'),
     'Run failed': ('运行失败', '執行失敗'),
     'Host busy': ('功能正在运行', '功能正在執行'),
-    'Memory retained': ('内存仍被占用', '記憶體仍在使用'),
+    'Memory retained': ('内存仍被占用', '記憶體仍被占用'),
 }
 
 
@@ -119,6 +121,7 @@ class TextResources:
 def prepare(plan, functions):
     c = constant
     native = invoke
+    cjk_fonts.add(plan, functions)
     slot_base, style_base = plan.image.words(0x104552c4, 2)
     if plan.image.read(style_base + UNICODE_STYLE*16, 4) != bytes.fromhex('0f240264'):
         raise ValueError('Unexpected native Unicode style')

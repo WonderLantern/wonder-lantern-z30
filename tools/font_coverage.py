@@ -2,7 +2,7 @@
 
   python tools/font_coverage.py --firmware Z_30_0120.bin --write   # refresh the JSON
   python tools/font_coverage.py --firmware Z_30_0120.bin --check   # JSON matches firmware
-  python tools/font_coverage.py 橙色 光晕                          # which characters are missing
+  python tools/font_coverage.py 橙色 光晕                          # characters the stock fonts lack
 
 Reads the firmware only; writes nothing but the coverage JSON with --write.
 """
@@ -56,7 +56,7 @@ def main():
     failed = False
     for label in args.text:
         for name, font in (('Hans', HANS_FONT), ('Hant', HANT_FONT)):
-            missing = missing_glyphs(label, font)
+            missing = missing_glyphs(label, font, extended=False)
             failed |= bool(missing)
             print(f'{name} {label}: ' + (f'missing {" ".join(missing)}' if missing else 'ok'))
     sys.exit(1 if failed else 0)

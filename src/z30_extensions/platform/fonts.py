@@ -21,8 +21,15 @@ from importlib.resources import files
 
 FONT_TABLE_LITERAL = 0x104530F4
 FONT_TABLE = 0x109F62E4
+# The boot code at 0x10452F34 hands the engine 25 font pointers and, from a
+# second literal, the 25 matching font sizes (the language page uses font 24).
+FONT_COUNT = 25
+FONT_SIZES_LITERAL = 0x104530F8
+FONT_SIZES = 0x109F6348
 HANT_FONT, HANS_FONT = 0, 2
 CJK_FONTS = (HANT_FONT, HANS_FONT)
+# Glyphs added to fonts 0/2 at build time (tools/build_cjk_glyphs.py).
+EXTRA_GLYPHS = 'z30_120_extra_glyphs.json'
 _HEADER = 0x40          # u16 section count, u32 descriptor length, descriptors, u16 run count
 _MAX_HEADER = 0x80
 # Glyph record flags.
@@ -207,14 +214,103 @@ def encode_glyph(glyph):
     return bytes(out)
 
 
+def font_blob(image, font):
+    """Raw bytes of a stock CJK font, as long as its entry in the size table."""
+    address, _header = font_address(image, font)
+    if image.words(FONT_SIZES_LITERAL, 1)[0] != FONT_SIZES:
+        raise ValueError('Unexpected stock font size table reference')
+    size, = image.words(FONT_SIZES + font * 4, 1)
+    return image.read(address, size)
+
+
+def _runs(mapping):
+    """Character map entries from {code point: glyph}: runs of consecutive pairs."""
+    entries = []
+    for cp in sorted(mapping):
+        if entries and entries[-1][0] + entries[-1][2] == cp and entries[-1][1] + entries[-1][2] == mapping[cp]:
+            first, glyph, run = entries[-1]
+            entries[-1] = (first, glyph, run + 1)
+        else:
+            entries.append((cp, mapping[cp], 1))
+    return entries
+
+
+def extend_font(blob, glyphs):
+    """Font bytes with {code point: Glyph} added or replacing the primary mapping.
+
+    Layout: header, primary map at +0x40 (u16 sections, u32 descriptor length,
+    (tag, offset from +0x40) descriptors, u16 count, entries), the tagged
+    maps, glyph index (+0x2C), feature table (+0x3C) and glyph data (+0x30),
+    in that order. New glyphs get ids after the stock maximum, one new index
+    range and records appended to the glyph data; the header offsets and
+    section descriptors are shifted by the bytes inserted before them.
+    """
+    blob = bytes(blob)
+    if blob[:4] != b'hif\x01' or blob[6] != 6:
+        raise ValueError('Not a mapped hif font')
+    index, data = struct.unpack_from('<II', blob, 0x2C)
+    features, = struct.unpack_from('<I', blob, 0x3C)
+    sections, length = struct.unpack_from('<HI', blob, _HEADER)
+    descriptors = [(blob[_HEADER + 6 + 5 * i], struct.unpack_from('<I', blob, _HEADER + 7 + 5 * i)[0])
+                   for i in range(sections - 1)]
+    primary = _HEADER + 6 + 5 * (sections - 1)
+    count, = struct.unpack_from('<H', blob, primary)
+    primary_end = primary + 2 + 6 * count
+    if not (primary_end <= _HEADER + min(o for _t, o in descriptors) and index < features < data):
+        raise ValueError('Unexpected font section order')
+    stock = list(struct.iter_unpack('<3H', blob[primary + 2:primary_end]))
+    mapping = {cp: glyph + cp - first for first, glyph, run in stock for cp in range(first, first + run)}
+    ranges, = struct.unpack_from('<H', blob, index)
+    cursor, last = index + 2, 0
+    for _ in range(ranges):
+        first, _base, span = struct.unpack_from('<HIH', blob, cursor)
+        cursor += 8 + 2 * span
+        last = max(last, first + span)
+    if cursor != features:
+        raise ValueError('Glyph index does not end at the feature table')
+    first_new = last
+    records, offsets = bytearray(), []
+    for i, cp in enumerate(sorted(glyphs)):
+        offsets.append(len(records))
+        records += encode_glyph(glyphs[cp])
+        mapping[cp] = first_new + i
+    if first_new + len(glyphs) > 0xFFFF or len(records) > 0xFFFF:
+        raise ValueError('Too many added glyphs for one index range')
+    entries = [(0, 0, 0)] * (stock[0] == (0, 0, 0)) + _runs({cp: g for cp, g in mapping.items() if cp})
+    cmap = struct.pack('<H', len(entries)) + b''.join(struct.pack('<3H', *e) for e in entries)
+    grow_map = len(cmap) - (primary_end - primary)
+    base = len(blob) - data          # appended after every stock record
+    new_range = struct.pack('<HIH', first_new, base, len(glyphs)) + struct.pack(f'<{len(glyphs)}H', *offsets)
+    grow_index = len(new_range) if glyphs else 0
+    header = bytearray(blob[:primary])
+    struct.pack_into('<II', header, 0x2C, index + grow_map, data + grow_map + grow_index)
+    struct.pack_into('<I', header, 0x3C, features + grow_map + grow_index)
+    for i, (tag, offset) in enumerate(descriptors):
+        struct.pack_into('<I', header, _HEADER + 7 + 5 * i, offset + grow_map)
+    index_body = bytearray(blob[index:features])
+    if glyphs:
+        struct.pack_into('<H', index_body, 0, ranges + 1)
+        index_body += new_range
+    return (bytes(header) + cmap + blob[primary_end:index] + bytes(index_body)
+            + blob[features:] + bytes(records))
+
+
 @lru_cache(maxsize=None)
-def coverage(font):
-    """Frozen set of code points the stock font can draw."""
+def coverage(font, extended=True):
+    """Code points the font can draw, including the added glyphs if `extended`."""
     data = json.loads(files(__package__).joinpath('z30_120_fonts.json').read_text(encoding='utf-8'))
-    return frozenset(cp for first, run in data['fonts'][str(font)] for cp in range(first, first + run))
+    stock = frozenset(cp for first, run in data['fonts'][str(font)] for cp in range(first, first + run))
+    return stock | frozenset(map(ord, extra_glyphs(font))) if extended else stock
 
 
-def missing_glyphs(text, font):
-    """Characters of `text` the stock font cannot draw, in order of first use."""
-    covered = coverage(font)
+@lru_cache(maxsize=None)
+def extra_glyphs(font):
+    """{char: encoded record hex} added to `font` at build time."""
+    data = json.loads(files(__package__).joinpath(EXTRA_GLYPHS).read_text(encoding='utf-8'))
+    return data['fonts'].get(str(font), {})
+
+
+def missing_glyphs(text, font, extended=True):
+    """Characters of `text` the (extended) font cannot draw, in order of first use."""
+    covered = coverage(font, extended)
     return ''.join(dict.fromkeys(ch for ch in text if ord(ch) not in covered))
