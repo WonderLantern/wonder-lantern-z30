@@ -5,14 +5,13 @@ from .features.liveview_dual import build as build_dual, VIDEO_STOCK_WINDOWS
 from .platform.z30_120 import BASE
 
 
-PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'module-host', 'video-rot',
+PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot',
            'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp')
 LEGACY_PRESETS = ('modular',)
-FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'module-host', 'video-rot',
+FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
                  'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp')
-# date-stamp hooks the JPEG encoder and stays opt-in until it has hardware results.
-FULL_FEATURES = tuple(feature for feature in FEATURE_ORDER if feature != 'date-stamp')
-MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound', 'module-host')
+FULL_FEATURES = FEATURE_ORDER
+MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 
 
 def resolve_presets(preset='full'):
@@ -30,16 +29,20 @@ def resolve_presets(preset='full'):
             features.update(MODULAR_FEATURES)
         else:
             features.add(name)
-    # Module host and bitrate profiles share the sound menu/state framework.
-    if any(f in features for f in ('module-host', 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp')):
+    # These pages share the sound menu/state framework.
+    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp')):
         features.add('shutter-sound')
     return list(dict.fromkeys(selected)), [f for f in FEATURE_ORDER if f in features]
 
 
 def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
           aspect_border_diagnostic=False, aspect_border_lease=False,
-          aspect_mask=None, aspect_mask_trial=False):
+          aspect_mask=None, aspect_mask_trial=False, module_host=False):
+    # module_host is a research option only: the SD module host is no longer a
+    # patcher preset, but its tools still build it on top of the sound framework.
     selected, features = resolve_presets(preset)
+    if module_host and 'shutter-sound' not in features:
+        raise ValueError('The module host requires the shutter-sound framework')
     # Photo aspect and its live-view mask are one public preset. Historical
     # border/static-mask experiments keep their own explicitly selected path;
     # researchers may still pass False for a no-mask comparison build.
@@ -76,7 +79,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         add(plan)
     if 'shutter-sound' in features:
         from .features.shutter_sound import add
-        add(plan, modules='module-host' in features, bitrate='bitrate-slowmo-uncap' in features,
+        add(plan, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, stamp='date-stamp' in features,
             aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
@@ -105,6 +108,6 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
             raise ValueError('Video shutter differs from stock')
     report['preset'] = selected[0] if len(selected) == 1 else selected
     report['selected_presets'] = selected
-    report['enabled_features'] = features
+    report['enabled_features'] = features + (['module-host'] if module_host else [])
     report['video_shutter_stock'] = True
     return output, report

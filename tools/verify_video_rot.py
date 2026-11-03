@@ -44,7 +44,7 @@ def verify(source, *, combinations=False, execute=False):
             'Incorrect build report')
     checks = []
     if combinations:
-        for preset in ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'full', 'modular', 'module-host'):
+        for preset in ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'full', 'modular'):
             # full now includes rotation: derive its non-video baseline explicitly.
             _, enabled = resolve_presets(preset)
             baseline, baseline_report = build(source, [f for f in enabled if f != 'video-rot'])

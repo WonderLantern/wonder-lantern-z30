@@ -33,9 +33,17 @@ def main():
             packet=bytearray(60);struct.pack_into('<I',packet,0,1)
             packet[8],packet[9]=contact,1;struct.pack_into('<2H',packet,0x12,x,y)
             s.input(0x103ce7e6,[('scratch',0)],payload=packet);s.run_for(.5)
+    def built(page,row):
+        """The page's widget registry (+36) holds the row's widget once construction reached it."""
+        registry=word(page+36)
+        return registry and int(s.input(0x1045745e,[registry,1,row])['registers']['r0'],16)
     def activate(page,ident,row):
-        # The eight-row stamp page can still be building after .25 s; a touch then misses.
-        s.input(0x1045d54c,[page,ident]);s.run_for(1)
+        # The eight-row stamp page can still be building after a fixed wait; a touch then
+        # lands on a half-built list. Wait for the target row's widget instead.
+        s.input(0x1045d54c,[page,ident]);s.run_for(.25)
+        for _ in range(40):
+            if current()==page and built(page,row):break
+            s.run_for(.25)
         for _ in range(3):
             touch(250,86+row*52)
             if current()!=page:break

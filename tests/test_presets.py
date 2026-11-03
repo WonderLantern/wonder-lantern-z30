@@ -16,16 +16,15 @@ class PresetTests(unittest.TestCase):
         self.assertIn('wifi-5ghz', resolve_presets('full')[1])
         self.assertEqual(resolve_presets(['wifi-5ghz', 'full', 'wifi-5ghz'])[1],
                          resolve_presets('full')[1])
-        with patch('builtins.input', return_value='11'), patch('sys.stdout', new=io.StringIO()):
+        with patch('builtins.input', return_value='10'), patch('sys.stdout', new=io.StringIO()):
             self.assertEqual(choose_presets(), ['wifi-5ghz'])
 
-    def test_date_stamp_is_opt_in_and_brings_the_menu_framework(self):
+    def test_date_stamp_is_in_full_and_brings_the_menu_framework(self):
         self.assertIn('date-stamp', PRESETS)
-        self.assertNotIn('date-stamp', resolve_presets('full')[1])
+        self.assertIn('date-stamp', resolve_presets('full')[1])
         self.assertEqual(resolve_presets('date-stamp')[1], ['shutter-sound', 'date-stamp'])
-        self.assertEqual(resolve_presets(['full', 'date-stamp'])[1],
-                         resolve_presets('full')[1] + ['date-stamp'])
-        with patch('builtins.input', return_value='12'), patch('sys.stdout', new=io.StringIO()):
+        self.assertEqual(resolve_presets(['full', 'date-stamp'])[1], resolve_presets('full')[1])
+        with patch('builtins.input', return_value='11'), patch('sys.stdout', new=io.StringIO()):
             self.assertEqual(choose_presets(), ['date-stamp'])
 
     def test_photo_zebra_is_in_full_and_composes_without_duplicates(self):
@@ -41,31 +40,27 @@ class PresetTests(unittest.TestCase):
         self.assertEqual(resolve_presets('aspect-profiles')[1], ['shutter-sound', 'aspect-profiles'])
         self.assertEqual(resolve_presets(['aspect-profiles','full'])[1],
                          resolve_presets('full')[1])
-    def test_module_host_selection_builds_its_required_framework(self):
-        self.assertEqual(PRESETS[5], 'module-host')
+    def test_module_host_is_not_a_patcher_preset(self):
+        self.assertNotIn('module-host', PRESETS)
         self.assertNotIn('modular', PRESETS)
-        self.assertEqual(resolve_presets('module-host'),
-                         (['module-host'], ['shutter-sound', 'module-host']))
-        self.assertEqual(resolve_presets(['module-host', 'shutter-sound', 'module-host'])[1],
-                         ['shutter-sound', 'module-host'])
-        self.assertEqual(resolve_presets(['module-host', 'video-rot'])[1],
-                         ['shutter-sound', 'module-host', 'video-rot'])
-        with patch('builtins.input', return_value='6'), patch('sys.stdout', new=io.StringIO()):
-            self.assertEqual(choose_presets(), ['module-host'])
+        for selection in ('module-host', ['full', 'module-host']):
+            with self.subTest(selection=selection), self.assertRaises(ValueError):
+                resolve_presets(selection)
+        self.assertNotIn('module-host', resolve_presets('full')[1])
 
     def test_aliases_and_duplicates_have_stable_order(self):
         selected, features = resolve_presets(['shutter-sound', 'full', 'm900', 'full'])
         self.assertEqual(selected, ['shutter-sound', 'full', 'm900'])
-        self.assertEqual(features, ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'module-host', 'video-rot',
-                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz'])
+        self.assertEqual(features, ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
+                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp'])
         self.assertEqual(resolve_presets(['modular', 'full'])[1], features)
 
     def test_full_enables_all_features_and_modular_keeps_its_scope(self):
         self.assertEqual(resolve_presets('full')[1],
-                         ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'module-host', 'video-rot',
-                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz'])
+                         ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
+                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp'])
         self.assertEqual(resolve_presets('modular')[1],
-                         ['liveview-dual', 'm900', 'shutter-sound', 'module-host'])
+                         ['liveview-dual', 'm900', 'shutter-sound'])
         self.assertEqual(resolve_presets(['full', 'mtp-fast', 'modular'])[1],
                          resolve_presets('full')[1])
 
@@ -73,8 +68,8 @@ class PresetTests(unittest.TestCase):
         self.assertEqual(resolve_presets(['m900', 'liveview-dual'])[1],
                          ['liveview-dual', 'm900'])
         self.assertEqual(resolve_presets(['mtp-fast', 'full'])[1],
-                         ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'module-host', 'video-rot',
-                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz'])
+                         ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
+                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp'])
 
     def test_invalid_and_empty_selection(self):
         for selection in ([], 'unknown', ['full', 'unknown']):
@@ -89,7 +84,7 @@ class PresetTests(unittest.TestCase):
                          resolve_presets('full')[1])
         self.assertEqual(resolve_presets(['full', 'video-rot'])[1],
                          resolve_presets(['video-rot', 'full'])[1])
-        with patch('builtins.input', return_value='7'), patch('sys.stdout', new=io.StringIO()):
+        with patch('builtins.input', return_value='6'), patch('sys.stdout', new=io.StringIO()):
             self.assertEqual(choose_presets(), ['video-rot'])
 
     def test_bitrate_slowmo_uncap_is_in_full_and_composes_in_stable_order(self):
@@ -98,7 +93,7 @@ class PresetTests(unittest.TestCase):
         self.assertEqual(resolve_presets('bitrate-slowmo-uncap')[1], ['shutter-sound', 'bitrate-slowmo-uncap'])
         self.assertEqual(resolve_presets(['bitrate-slowmo-uncap', 'video-rot'])[1],
                          ['shutter-sound', 'video-rot', 'bitrate-slowmo-uncap'])
-        with patch('builtins.input', return_value='8'), patch('sys.stdout', new=io.StringIO()):
+        with patch('builtins.input', return_value='7'), patch('sys.stdout', new=io.StringIO()):
             self.assertEqual(choose_presets(), ['bitrate-slowmo-uncap'])
 
     def test_interactive_numbers_names_and_retry(self):
@@ -108,7 +103,7 @@ class PresetTests(unittest.TestCase):
             self.assertEqual(choose_presets(), ['full'])
 
     def test_cli_combination_and_noninteractive_default(self):
-        for selection in ([], ['liveview-dual', 'm900'], ['module-host'], ['video-rot'], ['full', 'video-rot']):
+        for selection in ([], ['liveview-dual', 'm900'], ['date-stamp'], ['video-rot'], ['full', 'video-rot']):
             with self.subTest(selection=selection), tempfile.TemporaryDirectory() as folder:
                 source = Path(folder) / 'stock.bin'
                 output = Path(folder) / 'EG209020.BIN'

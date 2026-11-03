@@ -203,7 +203,7 @@ def main():
     args = parser.parse_args()
     supplied = args.source.read_bytes()
     stock = supplied if args.extracted_eg else extract_eg(supplied)
-    image, report = build(stock, 'modular')
+    image, report = build(stock, 'modular', module_host=True)
     print(json.dumps(verify(stock, image, report), indent=2))
 
 

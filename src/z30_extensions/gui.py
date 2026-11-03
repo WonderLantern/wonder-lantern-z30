@@ -18,18 +18,17 @@ OUTPUT_STEM = 'EG209020'
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
-    'full': 'All ten features, including aspect profiles and the experimental SD module host',
+    'full': 'All ten features, including aspect profiles and the film-style date stamp',
     'liveview-dual': 'Histogram and level together on a new full-info DISP page',
     'shutter-sound': 'Custom electronic shutter sound',
     'm900': '900-second exposure in M mode',
     'mtp-fast': 'Faster MTP property list queries',
-    'module-host': 'Experimental SD module host; includes the shutter sound framework',
     'video-rot': 'Automatic video orientation, locked when recording starts',
     'bitrate-slowmo-uncap': 'In-camera bitrate profiles; longer slow-motion recording',
     'aspect-profiles': 'Custom photo aspect ratios with a translucent mask, keeps stock grid',
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
-    'date-stamp': 'Experimental film-style date stamp on JPEGs, five formats, four colors and an optional glow, off by default; not part of full',
+    'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
 }
 
 TEXT = {
@@ -39,7 +38,7 @@ TEXT = {
         'source': '原厂固件', 'browse': '浏览…', 'features': '功能',
         'output': '输出文件', 'build': '开始构建', 'building': '正在构建，请稍候…',
         'open_folder': '打开输出文件夹', 'enabled': '将启用：{}', 'none': '（未选择）',
-        'notes': '注意：module-host 为实验性功能。wifi-5ghz（包含在 full 中）可能影响 2.4 GHz 第 12、13 信道的网络，'
+        'notes': '注意：wifi-5ghz（包含在 full 中）可能影响 2.4 GHz 第 12、13 信道的网络，'
                  '可用信道与功率规定因使用地点而异。',
         'source_empty': '请选择原版 Z_30_0120.bin（Z30 C 1.20）。',
         'source_ok': '已校验：原版 Z30 C 1.20 固件。',
@@ -60,7 +59,7 @@ TEXT = {
         'source': 'Stock firmware', 'browse': 'Browse…', 'features': 'Features',
         'output': 'Output file', 'build': 'Build', 'building': 'Building, please wait…',
         'open_folder': 'Open output folder', 'enabled': 'Enabled: {}', 'none': '(none selected)',
-        'notes': 'Note: module-host is experimental. wifi-5ghz (included in full) may affect 2.4 GHz channel 12/13 '
+        'notes': 'Note: wifi-5ghz (included in full) may affect 2.4 GHz channel 12/13 '
                  'networks, and channel and power rules vary by location.',
         'source_empty': 'Select the original Z_30_0120.bin (Z30 C 1.20).',
         'source_ok': 'Verified: original Z30 C 1.20 firmware.',

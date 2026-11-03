@@ -13,7 +13,7 @@ The earlier general report of all features working was subsequently corrected by
 
 ## Features and presets
 
-`full` includes the ten features below other than `date-stamp`, including Wi-Fi 5 GHz region unlocking. Select features individually or combine them; `module-host` automatically includes `shutter-sound`.
+`full` includes all ten features below, including Wi-Fi 5 GHz region unlocking and the date stamp. Select features individually or combine them; aspect, zebra, bitrate and date stamp bring the `shutter-sound` menu framework with them.
 
 | Preset | Feature |
 | --- | --- |
@@ -21,19 +21,18 @@ The earlier general report of all features working was subsequently corrected by
 | `shutter-sound` | Read a custom electronic-shutter WAV from SD, with enable/disable, selection, preview, and reload. |
 | `m900` | Enable the existing stock M-mode extended-exposure path, up to 900 seconds, retaining the M-mode check. |
 | `mtp-fast` | Accelerate MTP property-list queries while preserving response semantics. |
-| `module-host` | **Experimental** native SD module host that loads and runs ZMOD modules using the sound-menu framework. |
 | `video-rot` | Write orientation metadata for new recordings and lock the orientation captured at recording start. |
 | `bitrate-slowmo-uncap` | Select and remember Stock, Balanced, or High quality bitrates with raised 4K and 1080p high-quality rates; extend slow-motion recording to 25 minutes with FAT32 splitting or large exFAT files. |
 | `aspect-profiles` | Six photo ratios and a translucent live-view mask in one preset, preserving the interior stock grid. [Details](docs/aspect-profiles.md) |
 | `photo-zebra` | Photo live-view zebra with an independent switch and native pattern/threshold controls. [Details](docs/photo-zebra.md) |
 | `wifi-5ghz` | US/-1 country request on all 22 valid Wi-Fi profiles for 5 GHz STA; included in full and available separately. |
-| `date-stamp` | **Experimental**: film-style date stamp in the lower right of JPEGs, with five formats, four colors and an optional glow, turned with portrait shots, off by default; not part of `full`. [Details (Chinese)](docs/date-stamp.md) |
+| `date-stamp` | Film-style date stamp in the lower right of JPEGs, with five formats, four colors and an optional glow, turned with portrait shots; included in `full`, off in the camera menu by default. [Details (Chinese)](docs/date-stamp.md) |
 
-Build with `python patch.py wifi-5ghz --source "Z_30_0120.bin" --output "output/EG209020-wifi-5ghz.BIN"`, or select `full` to include all features. Interactive option 11 selects this preset. Only the country and revision fields of profiles 1–10 and 14–25 (including the unset-index fallback) change; index fields and the 12 reserved slots are kept, and no persistent sales-region or NVRAM write is made. Initialization paths that bypass the table are unchanged. Bodies that previously allowed 2.4 GHz channels 12 and 13 may lose networks on them (inferred, not measured). This does not open all channels. Camera AP support, throughput and negotiated bandwidth remain unproven. Effective channels and power must suit the place of use. The standalone preset only needs the Python standard library.
+Build with `python patch.py wifi-5ghz --source "Z_30_0120.bin" --output "output/EG209020-wifi-5ghz.BIN"`, or select `full` to include all features. Interactive option 10 selects this preset. Only the country and revision fields of profiles 1–10 and 14–25 (including the unset-index fallback) change; index fields and the 12 reserved slots are kept, and no persistent sales-region or NVRAM write is made. Initialization paths that bypass the table are unchanged. Bodies that previously allowed 2.4 GHz channels 12 and 13 may lose networks on them (inferred, not measured). This does not open all channels. Camera AP support, throughput and negotiated bandwidth remain unproven. Effective channels and power must suit the place of use. The standalone preset only needs the Python standard library.
 
 `photo-zebra` reuses native highlight patterns and eight threshold levels in photo live view. It is included in `full` and can also be selected individually. Extensions → Photo zebra → OFF/ON controls photo live view independently (default OFF). Photo zebra, native controls and JPEG/NEF integrity have hardware coverage; the independent switch still requires hardware validation. [Implementation and evidence](docs/photo-zebra.md).
 
-Sound and module menus support Simplified Chinese, Traditional Chinese, and English fallback. Current builds do not add a Camera Status page.
+Sound and extension menus support Simplified Chinese, Traditional Chinese, and English fallback. Current builds do not add a Camera Status page.
 
 `aspect-profiles` combines custom photo crops and a translucent live-view mask in one preset; the default `full` includes it. The mask dims the region outside the selected crop at `128/255` opacity (about 50%), preserving interior grid lines and stock icons. It remains visible with the stock grid off. Selecting OFF restores the preceding stock image area and clears the mask.
 
@@ -76,7 +75,7 @@ New-Item -ItemType Directory -Force output | Out-Null
 python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 ```
 
-`.[sound]` installs the Keystone assembler required by `full`. The additional `liveview-dual` DISP page also requires Keystone. Standalone `m900` needs only the Python standard library. Sound, the module host, bitrate profiles, and MTP acceleration require Keystone. The bitrate preset includes the sound-menu framework, with sound disabled by default. For standalone video orientation, `.[video]` provides the same assembler dependency as `.[sound]`.
+`.[sound]` installs the Keystone assembler required by `full`. The additional `liveview-dual` DISP page also requires Keystone. Standalone `m900` needs only the Python standard library. Sound, bitrate profiles, the date stamp and MTP acceleration require Keystone. The bitrate preset includes the sound-menu framework, with sound disabled by default. For standalone video orientation, `.[video]` provides the same assembler dependency as `.[sound]`.
 
 On macOS, if installation still leaves `fail to load the dynamic library`, activate the Python environment used for building, then install and link the native library:
 
@@ -88,11 +87,11 @@ python -c "from keystone import Ks; print('Keystone OK')"
 
 ### 3. Select presets
 
-Omitting presets in an interactive terminal displays a selection menu. Options **1–12** are `full`, followed by the eleven presets in the table above (option **10** is `photo-zebra`; option **11** is `wifi-5ghz`; option **12** is `date-stamp`). Enter numbers or names separated by spaces or commas; an empty response selects `full`.
+Omitting presets in an interactive terminal displays a selection menu. Options **1–11** are `full`, followed by the ten presets in the table above (option **9** is `photo-zebra`; option **10** is `wifi-5ghz`; option **11** is `date-stamp`). Enter numbers or names separated by spaces or commas; an empty response selects `full`.
 
 - `2 4 5` or `liveview-dual,m900,mtp-fast`: combined display, M900, and MTP acceleration.
-- `6` or `module-host`: the experimental module host and its required sound framework.
-- `1` or `full`: all ten features, including orientation and bitrate/slow-motion changes.
+- `11` or `date-stamp`: the date stamp alone, with its required menu framework.
+- `1` or `full`: all ten features, including orientation, bitrate/slow-motion changes and the date stamp.
 
 Alternatively, specify presets directly on the command line, separated by spaces:
 
@@ -103,7 +102,7 @@ python patch.py full --source "Z_30_0120.bin" --output "output/EG209020-full.BIN
 
 Each feature is applied once, in a fixed build order. `full video-rot` and `full bitrate-slowmo-uncap` enable the same feature set as `full` alone. With redirected input or a noninteractive script, omission defaults to `full`; `--interactive` forces the menu.
 
-The legacy alias `modular` is still accepted on the command line or when typed into the menu, but has no numbered entry. It includes only `liveview-dual`, `m900`, `shutter-sound`, and `module-host`. It excludes MTP acceleration, video orientation, and bitrate/slow-motion changes. Use `full` for the current complete bundle.
+The legacy alias `modular` is still accepted on the command line or when typed into the menu, but has no numbered entry. It includes only `liveview-dual`, `m900`, and `shutter-sound`. It excludes MTP acceleration, video orientation, and bitrate/slow-motion changes. Use `full` for the current complete bundle.
 
 ### 4. Inspect the output
 
@@ -123,18 +122,17 @@ Menus follow the stock **Language** setting. Simplified and Traditional Chinese 
 | Build content | English entry | Simplified Chinese entry | Traditional Chinese entry |
 | --- | --- | --- | --- |
 | Sound framework only | `Shutter sound` | 快门声音 | 快門聲音 |
-| Photo, bitrate or module features included, such as `full` | `Extensions` | 自定义菜单 | 自訂選單 |
-| Module page | `SD Modules` | SD 卡功能 | SD 卡功能 |
+| Photo, bitrate or date stamp features included, such as `full` | `Extensions` | 自定义菜单 | 自訂選單 |
 
 Photo aspect, Photo zebra and Date stamp are also listed at the end of the **photo shooting menu**, and Video bitrate at the end of the **movie shooting menu**. One press of up from the first row reaches them, and features missing from a build do not appear. These rows are entries only: the right column always shows `--`, so open the page to see the current value. The same entries remain in the custom menu. The direct rows have QEMU verification only and are not yet confirmed on a camera.
 
 Fixes cover missing titles, clipping by empty value columns, disappearing sidebars, back-button residue after returning, and corrupted entry labels in non-Chinese languages or on the first menu entry after reboot. The user reported the preceding drawing and language fixes working on hardware; the new message page and preferences still need separate hardware validation. Native QEMU and constructor comparisons are in the [UI verification record](docs/ui-qemu.md).
 
-WAV filenames, paths, and module output remain ASCII. Stock Chinese fonts contain a limited character set, and menu wording uses checked characters. Arbitrary Chinese text input and a complete new font set are not provided.
+WAV filenames and paths remain ASCII. Stock Chinese fonts contain a limited character set, and menu wording uses checked characters. Arbitrary Chinese text input and a complete new font set are not provided.
 
 ## Custom shutter sound
 
-With photo, video or module features, the root menu is grouped by purpose and these operations live under Shutter sound. Sound-only builds show enable/disable, file selection, preview and reload directly. Selection pages mark the current choice with `*`; press OK once to apply and return to the sound menu. Selecting a file does not automatically enable sound or play it.
+With photo, video or date stamp features, the root menu is grouped by purpose and these operations live under Shutter sound. Sound-only builds show enable/disable, file selection, preview and reload directly. Selection pages mark the current choice with `*`; press OK once to apply and return to the sound menu. Selecting a file does not automatically enable sound or play it.
 
 Supported SD paths:
 
@@ -159,20 +157,6 @@ python tools/prepare_wav.py input.wav SHUTTER.WAV
 The converter uses linear interpolation; consider an anti-aliasing resampler first for high-rate audio. Firmware updates do not require replacing your existing WAV files. No third-party audio is included; `example(slot)` in the script generates original synthetic samples.
 
 Sound defaults to OFF without a valid saved record. It plays for silent still-photo captures only when both this feature and stock silent photography are enabled; video and nonsilent photos do not trigger it, and preview works while OFF. Successful file selections and switch changes are saved to `WL-SOUND.CFG` in the SD-card root. After reboot, the previous selection and enabled state are restored on the first menu entry or photo trigger, without opening the menu first. The sound file must remain at its original path; the first photo may incur an extra SD read. Corrupt preferences or a failed startup sound load leave sound OFF. Save failures report that the current setting was not saved. Failed loads preserve the previous valid sample and switch state. Errors appear in a separate message page body while menu titles remain unchanged. The new message page and preferences have instruction-level and assisted QEMU coverage; the user has also confirmed physical-camera testing. See [sound details](docs/shutter-sound.md).
-
-## SD module host (experimental)
-
-`module-host` and `full` load one native module from **`Z30/CORE.ZMOD`**. Modules do not start automatically: load first, then run. A successful module and its RAM state remain until shutdown. The maintainer has reported hardware loading and execution.
-
-Generate the counter example:
-
-```powershell
-python tools/prepare_module.py --example counter --output "output/CORE.ZMOD"
-```
-
-Copy it to `Z30/CORE.ZMOD` on the SD card. Open **Setup menu → Extensions / 自定义菜单 → SD Modules / SD 卡功能**, select `Load CORE.ZMOD`, then `Run module`. See [module documentation](docs/modules.md) for other examples, replacement procedures, and the historical pagination adapter for the original host.
-
-The interface is **ABI 2**, with a **16 KiB** payload limit and **64-byte** private context. The output contract accepts up to **40 printable ASCII characters**; Chinese menus currently display the first **24** at most. Modules are trusted native ARM Thumb code. CRC32 detects damage, not authenticity; there is no signature verification or sandbox. Hot unloading and automatic startup are not implemented; replacing a successfully loaded module requires a reboot. Missing cross-core cache-service responses can cause an indefinite wait. A Lua interpreter is not integrated.
 
 ## Automatic video orientation
 
@@ -202,10 +186,11 @@ Offline results and user hardware reports are separate. Evidence for one preset 
 
 | Scope | Recorded evidence |
 | --- | --- |
-| Builds and regressions | 54 unit tests pass. The aspect integration has six build-combination checks; see [integration details](docs/aspect-preset-integration.md). Historical CRC and byte-for-byte reproducibility passed for `shutter-sound`, `module-host`, and `full`. |
+| Builds and regressions | 54 unit tests pass. The aspect integration has six build-combination checks; see [integration details](docs/aspect-preset-integration.md). Historical CRC and byte-for-byte reproducibility passed for `shutter-sound` and `full`. |
 | Menus and language | Native QEMU pages/constructors and Unicorn instruction checks; the user reported the preceding drawing/language version working on hardware. New message-page and preferences behavior still needs hardware validation. |
 | Custom aspects and mask | Hardware feedback covers specific capture, live-view, boundary/grid and mask fixes; the latest v42 playback retest was reported normal. See [current details](docs/aspect-profiles.md). |
-| EG installation and SD host | Maintainer confirmation of Z30 C 1.20 installation and ZMOD loading/execution. |
+| EG installation | Maintainer confirmation of Z30 C 1.20 installation. |
+| Date stamp | Five formats, four colors, the glow and both portrait sides confirmed by the user on the camera; Unicorn checks ARM against the host reference pixel for pixel. |
 | Video orientation | Hardware feedback for the standalone preset's orientation and recording-time lock; see the dedicated coverage notes. |
 | MTP acceleration | 590 property-list responses matched stock, with reduced query times; conditions and numbers are in the verification document. |
 | Photo zebra | Photo live view, native controls and JPEG/NEF integrity have hardware coverage. The independent photo switch has ARM and three-language native QEMU menu checks; its hardware validation is pending. |
@@ -236,7 +221,6 @@ Detailed documents are currently mainly in Chinese. The [Chinese README](README.
 | [Custom aspects and translucent mask](docs/aspect-profiles.md) | Six ratios, output dimensions, live-view behavior and evidence boundaries. |
 | [v42 playback fix](docs/aspect-lifecycle-v42.md) | Lifecycle gate, stale-mask retirement and user retest. |
 | [Sound details](docs/shutter-sound.md) | Menus, trigger conditions, format, and state. |
-| [Module documentation](docs/modules.md) | Host operation, ABI 2, examples, and experimental limits. |
 | [Video orientation](docs/video-rotation.md) | Locking, metadata, and hardware records. |
 | [Bitrates and slow motion](docs/bitrate-slowmo-uncap.md) | Parameters, index capacity, and hardware file checks. |
 | [4K 60p feasibility](docs/uhd-4k60-feasibility.md) | Evidence chain and verdict for unlocking 4K 50p/60p, plus the 4K rate rationale. |

@@ -7,18 +7,17 @@ from .build import build, PRESETS, resolve_presets
 from .container import extract_eg, CONTAINER_SHA256
 
 PRESET_LABELS = {
-    'full': '全部十项功能，包含自定义画幅与半透明遮幅及实验性 SD 模块宿主',
+    'full': '全部十项功能，包含自定义画幅与半透明遮幅及胶片风格日期水印',
     'liveview-dual': '直方图与水平仪同屏，新增全信息 DISP 页',
     'shutter-sound': '自定义电子快门声音',
     'm900': 'M 档 900 秒曝光',
     'mtp-fast': 'MTP 属性列表加速',
-    'module-host': '实验性 SD 模块宿主；自动包含快门声音框架',
     'video-rot': '视频自动方向；锁定开始录制时的方向',
     'bitrate-slowmo-uncap': '机内码率档位与记忆；放宽慢动作时长和文件限制',
     'aspect-profiles': '自定义照片画幅与半透明遮幅，保留原厂内部网格',
     'photo-zebra': '照片取景斑马纹；独立开关，复用原厂样式和阈值',
     'wifi-5ghz': 'Wi-Fi 5 GHz 地区解锁；全部有效配置请求 US/-1，包含在 full 中',
-    'date-stamp': '实验性：在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，默认关闭；不含在 full 中，需单独选择',
+    'date-stamp': '在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，竖拍自动转向，默认关闭；包含在 full 中',
 }
 
 
@@ -66,9 +65,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('feature', nargs='*', metavar='PRESET',
                         help='Combine presets with spaces: ' + ', '.join(PRESETS) +
-                             '; full enables ten features including wifi-5ghz (all valid profiles US/-1); aspect-profiles includes a translucent live-view mask; experimental module-host includes shutter-sound; '
+                             '; full enables ten features including wifi-5ghz (all valid profiles US/-1) and date-stamp; '
+                             'aspect-profiles includes a translucent live-view mask; '
                              'photo-zebra includes an independent photo live-view switch; '
-                             'date-stamp is experimental and not part of full; legacy alias: modular')
+                             'date-stamp is off until chosen in the camera menu; legacy alias: modular')
     parser.add_argument('--interactive', action='store_true', help='Prompt for presets even when stdin is redirected')
     parser.add_argument('--source', type=Path, required=True, help='Original Z_30_0120.bin, SHA-256 checked before decoding')
     parser.add_argument('--extracted-eg', action='store_true', help='Developer mode: input is an extracted stock EG module')

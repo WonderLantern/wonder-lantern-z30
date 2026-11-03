@@ -1,13 +1,15 @@
 # 从原始固件包构建功能扩展
 
-2026-11-02 新增实验性 `date-stamp`（JPEG 胶片风格日期水印），不含在 `full` 中，需单独选择，见[日期水印说明](date-stamp.md)。
+2026-11-03 `date-stamp`（JPEG 胶片风格日期水印）纳入 `full`，机内默认关闭；SD 模块宿主不再作为构建预设提供，`full` 不再包含它。见[日期水印说明](date-stamp.md)。
+
+2026-11-02 新增 `date-stamp`。
 
 2026-10-20 `photo-zebra` 已纳入 `full` 默认组合，当前共十项功能，也可单独选择。机内照片高光显示开关默认关闭。
 照片斑马纹复用原厂图案与阈值；机内独立开关及保存方式见[照片斑马纹说明](photo-zebra.md)。
 
 各功能的机身验证覆盖范围见专题文档，离线结果与硬件验证分别记录。
 
-当前用户流程只需准备原始 Z30 C 1.20 固件包和本项目 patch 程序。默认 full 包含同屏、自定义电子快门声音、M 档 900 秒曝光、MTP 加速、实验性 SD 模块宿主、视频自动方向、高码率与慢动作扩展、多画幅和照片斑马纹，不包含状态页面。
+当前用户流程只需准备原始 Z30 C 1.20 固件包和本项目 patch 程序。默认 full 包含同屏、自定义电子快门声音、M 档 900 秒曝光、MTP 加速、视频自动方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz 和日期水印，不包含状态页面。
 
 ## 发布 Windows 图形界面程序
 
@@ -33,13 +35,13 @@ New-Item -ItemType Directory -Force output | Out-Null
 python patch.py --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 ```
 
-可自由组合 `full`、`liveview-dual`、`shutter-sound`、`m900`、`mtp-fast`、`module-host`、`video-rot` 和 `bitrate-slowmo-uncap`。菜单第 6 项为 SD 模块宿主，自动包含其依赖 `shutter-sound`；第 7 项为视频方向，第 8 项为高码率与慢动作扩展。旧别名 `modular` 保留命令行和手动输入兼容，不在菜单中显示。终端中省略预设会显示多选菜单，输入编号或名称（空格或逗号分隔）；直接回车选择 full。非交互脚本省略预设时仍默认 full，可用 `--interactive` 强制显示菜单。命令行的多个预设用空格分隔：
+可自由组合 `full`、`liveview-dual`、`shutter-sound`、`m900`、`mtp-fast`、`video-rot`、`bitrate-slowmo-uncap`、`aspect-profiles`、`photo-zebra`、`wifi-5ghz` 和 `date-stamp`。菜单第 6 项为视频方向，第 7 项为高码率与慢动作扩展，第 11 项为日期水印。旧别名 `modular` 保留命令行和手动输入兼容，不在菜单中显示。终端中省略预设会显示多选菜单，输入编号或名称（空格或逗号分隔）；直接回车选择 full。非交互脚本省略预设时仍默认 full，可用 `--interactive` 强制显示菜单。命令行的多个预设用空格分隔：
 
 ```powershell
 python patch.py liveview-dual m900 mtp-fast --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 ```
 
-`full` 展开为全部九项功能：同屏、M900、快门声音、MTP 加速、实验性 SD 模块宿主、视频方向、高码率与慢动作扩展、多画幅和照片斑马纹。保留 `modular` 原有范围：同屏、M900、快门声音和实验性 SD 模块宿主；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra` 与 full 启用同一功能集合。`module-host` 仍为实验性功能，菜单及 full 的说明均明确标注。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
+`full` 展开为全部十项功能：同屏、M900、快门声音、MTP 加速、视频方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz 和日期水印。`modular` 现为同屏、M900 和快门声音；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra wifi-5ghz date-stamp` 与 full 启用同一功能集合。SD 模块宿主的代码保留给研究工具，通过 `build(..., module_host=True)` 构建，不再出现在 patch 程序和图形界面中。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
 
 ### 视频码率与慢动作限制
 
@@ -77,7 +79,7 @@ python patch.py video-rot --source path/to/Z_30_0120.bin --output output/EG20902
 
 只改新视频的元数据，不改像素或已有文件，播放器需尊重方向矩阵。锁定点是封装对象成功配置时，不是实测的 REC 按钮硬件时间；跨文件分段会创建新对象时重新采样。第二阶段已有横拍、两侧竖拍、录制中方向锁定以及机身/电脑播放的实机反馈；倒置、分段时机及未列出的模式仍需独立验证，具体边界见 [视频方向说明](video-rotation.md)。
 
-单独 M900 只需要标准库。同屏新增全信息 DISP 页，需要 Keystone，详见[全信息 DISP 页](liveview-full-info.md)。同屏、声音、模块宿主、码率档位和 `mtp-fast` 通过 `.[sound]` 安装 Keystone 汇编，视频方向可使用 `.[video]` 或 `.[sound]`。输出和同名 JSON 必须不存在，程序拒绝覆盖。CLI 通过 Python 运行。
+单独 M900 只需要标准库。同屏新增全信息 DISP 页，需要 Keystone，详见[全信息 DISP 页](liveview-full-info.md)。同屏、声音、码率档位、日期水印和 `mtp-fast` 通过 `.[sound]` 安装 Keystone 汇编，视频方向可使用 `.[video]` 或 `.[sound]`。输出和同名 JSON 必须不存在，程序拒绝覆盖。CLI 通过 Python 运行。
 
 原始包大小为 34,496,798 字节，SHA-256 为：
 
@@ -96,7 +98,7 @@ python patch.py video-rot --source path/to/Z_30_0120.bin --output output/EG20902
 5. 对需要代码钩子的功能，在原 EG 尾部 CRC 前追加代码并修补跳转地址；纯数据补丁不追加。所有构建均重建 CRC 并验证残差为零。
 6. 输出 EG209020.BIN 和报告，列出修改 offset、原字节、替换字节、追加地址和输入/输出摘要。
 
-offset 使用**解包后的 EG 模块**坐标，不是编码外层包的同一位置。输出是独立 EG 模块，不重新封装 Z_30_0120.bin。维护者已确认该 EG 模块在 Z30 C 1.20 上可安装，并已实机测试 SD 宿主与 ZMOD 加载、运行；具体记录见[验证说明](verification.md)。
+offset 使用**解包后的 EG 模块**坐标，不是编码外层包的同一位置。输出是独立 EG 模块，不重新封装 Z_30_0120.bin。维护者已确认该 EG 模块在 Z30 C 1.20 上可安装；具体记录见[验证说明](verification.md)。
 
 本解码器仅支持哈希匹配的原始包。已知零位置索引是一组版本限定的观察数据；列/行/高位掩码通过 XOR 方程恢复，所得掩码不要求与任何上游表逐项相同，只需整体解码等价。解码后的 EG 大小为 33,939,514 字节，SHA-256：
 
@@ -127,11 +129,11 @@ python tools/verify_extended_features.py --source path/to/Z_30_0120.bin
 
 ## 输出与功能范围
 
-输出为独立 EG 模块，不重建外层 Z_30_0120.bin。固件版本菜单保留原厂 1.20，构建身份通过 JSON 报告的 SHA-256 核对。该模块的机身安装以及 SD 宿主/ZMOD 加载运行已完成实机测试。
+输出为独立 EG 模块，不重建外层 Z_30_0120.bin。固件版本菜单保留原厂 1.20，构建身份通过 JSON 报告的 SHA-256 核对。该模块的机身安装已完成实机测试。
 
-默认组合包含同屏、自定义声音、M900、MTP 加速、SD 模块宿主、视频自动方向、高码率与慢动作扩展、多画幅和照片斑马纹。900 秒补丁改变扩展标志读取，不写入其保存值；原厂模式判断和曝光路径保留。视频快门窗口在构建后核对为原厂字节。
+默认组合包含同屏、自定义声音、M900、MTP 加速、视频自动方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz 和日期水印。900 秒补丁改变扩展标志读取，不写入其保存值；原厂模式判断和曝光路径保留。视频快门窗口在构建后核对为原厂字节。
 
-默认 `full` 构建包含 SD 模块宿主，不添加状态页、计数、CFW 版本标记或视频慢快门。离线检查不能保证真实显示、声音或曝光行为。
+默认 `full` 构建不包含 SD 模块宿主，不添加状态页、计数、CFW 版本标记或视频慢快门。离线检查不能保证真实显示、声音或曝光行为。
 
 ## 预设整合更新
 
