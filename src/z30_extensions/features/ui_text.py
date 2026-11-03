@@ -4,11 +4,14 @@
 """Owned UI labels using the native Chinese language/font configuration."""
 import struct
 from ..assembly import assemble, constant, invoke
+from ..platform.fonts import HANS_FONT, HANT_FONT, missing_glyphs
 
 LANGUAGE_KEY = 0x1400
 SIMPLIFIED, TRADITIONAL = 26, 27
 # Native Unicode setters use style 120. Its default font 15 lacks CJK;
 # choose the stock Hans font 2 / Hant font 0 in the runtime style copy.
+# Those fonts cover only stock menu characters (see platform/fonts.py), so
+# every label is checked against them; `tools/font_coverage.py` finds wording.
 UNICODE_STYLE = 120
 TRANSLATIONS = {
     'Photo LUT': ('照片 LUT', '照片 LUT'),
@@ -17,11 +20,11 @@ TRANSLATIONS = {
     'Disable and release': ('关闭并释放', '關閉並釋放'),
     'Disabled': ('已关闭', '已關閉'),
     'Embedded LUT': ('内置 LUT', '內建 LUT'),
-    'SD LUT ready': ('SD LUT 已就绪', 'SD LUT 已就緒'),
+    'SD LUT ready': ('SD LUT 可用', 'SD LUT 可用'),
     'Invalid LUT': ('无效的 LUT', '無效的 LUT'),
     'LUT too large': ('LUT 文件过大', 'LUT 檔案過大'),
-    'Cleanup pending': ('等待释放资源', '等待釋放資源'),
-    'Loaded; cleanup pending': ('已加载，等待释放资源', '已載入，等待釋放資源'),
+    'Cleanup pending': ('等待释放内存', '等待釋放資源'),
+    'Loaded; cleanup pending': ('已加载，等待释放内存', '已載入，等待釋放資源'),
     'File access failed': ('访问文件失败', '存取檔案失敗'),
     'Wi-Fi buffer': ('Wi-Fi \u53d1\u9001', 'Wi-Fi \u50b3\u9001'),
     '64 KiB (stock)': ('64 KiB (stock)', '64 KiB (stock)'),
@@ -56,8 +59,8 @@ TRANSLATIONS = {
     'Reload sound': ('重新加载', '重新載入'),
     'OFF': ('关闭', '關閉'), 'ON': ('开启', '開啟'),
     'None': ('未选择', '未選擇'),
-    'File not found': ('找不到文件', '找不到檔案'),
-    'Read failed': ('读取失败', '讀取失敗'),
+    'File not found': ('找不到文件', '檔案不存在'),
+    'Read failed': ('加载失败', '載入失敗'),
     'Invalid WAV': ('无效的 WAV 文件', '無效的 WAV 檔案'),
     'Close failed': ('关闭文件失败', '關閉檔案失敗'),
     'Sound busy': ('声音正在播放', '聲音正在播放'),
@@ -72,13 +75,13 @@ TRANSLATIONS = {
     'Loaded': ('已加载', '已載入'), 'Running': ('运行中', '執行中'),
     'Bad module': ('无效的功能', '無效的功能'),
     'No memory': ('内存不足', '記憶體不足'),
-    'Cache unavailable': ('缓存不可用', '快取無法使用'),
+    'Cache unavailable': ('暂存不可用', '快取無法使用'),
     'Init failed': ('初始化失败', '初始化失敗'),
-    'No handler': ('缺少事件处理函数', '缺少事件處理函式'),
+    'No handler': ('无处理程序', '無處理程式'),
     'Reboot to reload': ('请重启相机以重新加载', '請重啟相機以重新載入'),
     'Run failed': ('运行失败', '執行失敗'),
     'Host busy': ('功能正在运行', '功能正在執行'),
-    'Memory retained': ('内存仍被占用', '記憶體仍被占用'),
+    'Memory retained': ('内存仍被占用', '記憶體仍在使用'),
 }
 
 
@@ -89,6 +92,14 @@ def utf16_label(text):
     return raw + b'\0\0'
 
 
+def check_glyphs(english, hans, hant):
+    problems = [f'{name} {text!r} lacks {missing}'
+                for text, font, name in ((hans, HANS_FONT, 'Simplified'), (hant, HANT_FONT, 'Traditional'))
+                if (missing := missing_glyphs(text, font))]
+    if problems:
+        raise ValueError(f'Label {english!r} needs glyphs the stock fonts lack: ' + '; '.join(problems))
+
+
 class TextResources:
     def __init__(self, plan):
         self.plan = plan
@@ -97,6 +108,7 @@ class TextResources:
     def alloc(self, english):
         if english not in self.records:
             hans, hant = TRANSLATIONS.get(english, (english, english))
+            check_glyphs(english, hans, hant)
             pointers = [self.plan.alloc(english.encode('ascii') + b'\0'),
                         self.plan.alloc(utf16_label(hans)), self.plan.alloc(utf16_label(hant)),
                         self.plan.alloc(utf16_label(english))]
@@ -132,8 +144,8 @@ def prepare(plan, functions):
         {c('r0',LANGUAGE_KEY)} {native(0x10465984)}
         cmp r0,#{SIMPLIFIED}; beq hans; cmp r0,#{TRADITIONAL}; beq hant;
         ldr r0,[r4]; mov r1,r5; mov r2,r6; {native(0x10454efe)} b done;
-        hans: movs r6,#2; ldr r0,[r4,#4]; b chinese;
-        hant: movs r6,#0; ldr r0,[r4,#8];
+        hans: movs r6,#{HANS_FONT}; ldr r0,[r4,#4]; b chinese;
+        hant: movs r6,#{HANT_FONT}; ldr r0,[r4,#8];
         chinese: mov r1,r5; movs r2,#{UNICODE_STYLE}; {native(0x10454f5a)}
         {c('r0',runtime_style)} strb r6,[r0];
         done: pop {{r4-r6,pc}};
@@ -146,8 +158,8 @@ def prepare(plan, functions):
         {c('r0',LANGUAGE_KEY)} {native(0x10465984)}
         cmp r0,#{SIMPLIFIED}; beq hans; cmp r0,#{TRADITIONAL}; beq hant;
         mov r0,r4; mov r1,r5; mov r2,r6; {native(0x10454efe)} b done;
-        hans: movs r6,#2; b chinese;
-        hant: movs r6,#0;
+        hans: movs r6,#{HANS_FONT}; b chinese;
+        hant: movs r6,#{HANT_FONT};
         chinese: mov r0,sp; movs r2,#24;
         copy: ldrb r1,[r4],#1; strh r1,[r0],#2; cmp r1,#0; beq put;
         subs r2,#1; bne copy; movs r1,#0; strh r1,[r0];

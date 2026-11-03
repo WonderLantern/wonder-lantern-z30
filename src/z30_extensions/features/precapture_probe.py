@@ -23,7 +23,7 @@ STATE_BYTES = capture.STATE_BYTES
 PROFILES = ('Off', 'Half press one e-JPG', 'Export copy and log')
 STATUS = ('Off', 'Waiting for JPG', 'Copy ready', 'Saved to SD', 'No memory',
           'Too large', 'Unsupported segments', 'Invalid JPG', 'Export failed', 'Busy', 'Log saved',
-          'Enable silent photo', 'Worker unavailable', 'Capture rejected', 'Capture pending')
+          'Enable silent photo', 'Worker unavailable', 'Capture refused', 'Capture pending')
 SIZES = dict(bitrate_get=96, bitrate_labels=384, bitrate_open=192,
              bitrate_action=256, bitrate_restore=96, pre_arm=640, pre_copy=1536,
              pre_log=256, pre_hook_1=192, pre_hook_0=192, pre_input=256, pre_keys=256,

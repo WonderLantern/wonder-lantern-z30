@@ -25,4 +25,4 @@ timing = ["comtypes>=1.4; sys_platform == 'win32'"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"z30_extensions.platform" = ["z30_120_zero_samples.json"]
+"z30_extensions.platform" = ["z30_120_zero_samples.json", "z30_120_fonts.json"]

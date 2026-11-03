@@ -8,7 +8,7 @@ MAGIC = 0x31504A57
 SIZE = 64 + 64*24 + 6*16
 STATUS_NAMES = ('Off', 'Waiting for JPG', 'Copy ready', 'Saved to SD', 'No memory',
                 'Too large', 'Unsupported segments', 'Invalid JPG', 'Export failed', 'Busy', 'Log saved',
-                'Enable silent photo', 'Worker unavailable', 'Capture rejected', 'Capture pending')
+                'Enable silent photo', 'Worker unavailable', 'Capture refused', 'Capture pending')
 
 
 def decode(data):

@@ -116,6 +116,19 @@ QEMU 报告 `build/ui-qemu/entry-language-fix-en-verified/` 和 `entry-language-
 
 模块输出仍为 ASCII；中文模式转换为有界 UTF-16，最多显示 24 个字符。英文模式保留原有 50 字节上限。
 
+### 字库覆盖表
+
+原厂字体是 `hif` 数据块，指针数组位于 `0x109F62E4`（字面量 `0x104530F4` 引用），下标即样式中的字体号。字体 `0`（繁体，`0x107646D1`）和 `2`（简体，`0x107D06B3`）的头部 `+0x40` 依次是 u16 段数 n、u32 描述长度 `5(n-1)+6`、n-1 个 5 字节段描述、u16 条目数，之后是按码点排序的 `(首码点, 字形, 连续个数)` 条目，各约 750 条。不在任何区间内的码点会画成方框占位。
+
+`src/z30_extensions/platform/z30_120_fonts.json` 只保存这两种字体的码点区间，不含字形位图。`TextResources.alloc` 在构建时检查每个标签：简繁译文以及无译文时回退使用的英文都必须在对应字体内，否则构建报错并列出缺字。`tests/test_fonts.py` 检查全部译文，并在仓库根目录有 `Z_30_0120.bin` 时确认 JSON 与固件一致。
+
+```
+python tools/font_coverage.py 橙色 光暈                                # 查哪些字缺失，用于挑选用词
+python tools/font_coverage.py --firmware Z_30_0120.bin --check          # 核对 JSON
+```
+
+提取结果与此前截图发现的缺字一致（简体缺“橙、橘、晕、厂、扩、展、听、块”，繁体缺“橙、橘、找”）；`sound-dialog-delivery-hant/error-dialog-0-1.png` 中“找不到檔案”的“找”即为方框。检查还发现已有 11 处标签含缺字，现已改为可显示的用词：简体“SD LUT 可用”“等待释放内存”“已加载，等待释放内存”“加载失败”“暂存不可用”“无处理程序”，繁体“SD LUT 可用”“檔案不存在”“載入失敗”“無處理程式”“記憶體仍在使用”。两种字体的 ASCII 也不完整，均缺 ``$ & ' , < = @ Q Y \ ^ _ ` j q w { | } ~``（繁体另缺 `?`），因此中文模式下的英文回退文字和模块输出同样受影响；预捕获诊断状态 “Capture rejected” 改为 “Capture refused”。
+
 构建与报告：`output/ui-chinese/`，包括 `shutter-sound`、`module-host` 和 `full`。三种预设 CRC 残差为零、重复构建逐字节一致；34 项单元测试通过，包含 Unicorn 执行语言分支、控件类型切换和模块文字边界测试。
 
 最终页面证据：`build/ui-qemu/chinese-entry2-hans/`（简体），`build/ui-qemu/chinese-full-pages-final/`（繁体 full），`build/ui-qemu/chinese-en-final2/`（英文）。QEMU 使用 `--language` 设置原厂配置和字体，真实相机只需在原厂“语言 (Language)”中选择中文；用户后续实机反馈见本文开头。
