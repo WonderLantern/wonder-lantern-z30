@@ -3,6 +3,7 @@
 # See licenses/Wonder-Lantern.txt and THIRD_PARTY_NOTICES.md.
 """Private sound page and state contracts; no Camera Status UI is included."""
 from ..platform.z30_120 import BASE
+from .menu_slots import BLOCKS
 
 STATE_ANCHOR = 0xC1832D24  # Unused page-0 RAM pointer anchors sound state.
 SETUP_OBJECT = 0xC1837160
@@ -32,4 +33,25 @@ FILE_IDS = (0x2250, 0x2265, 0x22B1, 0x1810, 0x1844)
 SWITCH_IDS = (0x1846, 0x23F6)
 ENTRY_ID = 0x2333
 SOUND_GROUP_INDEX = 962
-SOUND_GROUP_TITLE_SLOT = 117
+SOUND_GROUP_TITLE_SLOT = BLOCKS['sound_group'][0]
+# Row order of the fixed label table; ROOT_LABEL_SLOT..POPUP_OK_SLOT stay contiguous.
+ENTRY_SLOT = BLOCKS['sound'][0]
+TITLE_SLOT = ENTRY_SLOT + 1
+ROOT_LABEL_SLOT = ENTRY_SLOT + 2
+SWITCH_LABEL_SLOT = ENTRY_SLOT + 6
+FILE_LABEL_SLOT = ENTRY_SLOT + 8
+SWITCH_TITLE_SLOT = ENTRY_SLOT + 13
+FILES_TITLE_SLOT = ENTRY_SLOT + 14
+ENABLED_VALUE_SLOT = ENTRY_SLOT + 15
+FILE_VALUE_SLOT = ENTRY_SLOT + 16
+EMPTY_SLOT = ENTRY_SLOT + 17
+CURRENT_SLOT = ENTRY_SLOT + 18
+SWITCH_MARK_SLOT = ENTRY_SLOT + 19
+FILE_MARK_SLOT = ENTRY_SLOT + 21
+POPUP_BODY_SLOT = ENTRY_SLOT + 26
+POPUP_OK_SLOT = ENTRY_SLOT + 27
+# Native list geometry: rows start below the title and an eighth row is the last that fits.
+ROW_TOP, ROW_PITCH, MAX_ROWS = 62, 52, 8
+# Native shooting menus that take direct rows: name, page object, stock rows, feature pages.
+NATIVE_MENUS = (('photo', 0xC18333D8, 34, ('aspect', 'zebra', 'stamp')),
+                ('movie', 0xC1834FDC, 26, ('bitrate',)))

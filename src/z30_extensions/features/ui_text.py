@@ -27,9 +27,18 @@ TRANSLATIONS = {
     '64 KiB (stock)': ('64 KiB (stock)', '64 KiB (stock)'),
     'Photo zebra': ('照片高光显示', '照片高光顯示'),
     'Photo aspect': ('照片画幅', '照片畫幅'),
-    'Date stamp': ('日期水印', '日期浮水印'),
-    'Date': ('日期', '日期'),
-    'Date and time': ('日期和时间', '日期和時間'),
+    'Date stamp': ('日期水印', '日期水印'),
+    'Y M D': ('年 月 日', '年 月 日'),
+    'Y M D H:M': ('年 月 日 时:分', '年 月 日 時:分'),
+    'M D Y': ('月 日 年', '月 日 年'),
+    'D M Y': ('日 月 年', '日 月 年'),
+    'D H:M': ('日 时:分', '日 時:分'),
+    'Color': ('颜色', '色彩'),
+    'Orange': ('默认', '預設'),  # the stock CJK fonts have no glyph for 橙 or 橘
+    'Red': ('红色', '紅色'),
+    'Yellow': ('黄色', '黃色'),
+    'White': ('白色', '白色'),
+    'Glow': ('柔光', '光暈'),  # the stock Hans font has no glyph for 晕
     'OFF (stock)': ('关闭', '關閉'),
     'Video bitrate': ('视频码率', '影片位元率'),
     'Stock': ('原始', '原始'),
@@ -150,7 +159,7 @@ def prepare(plan, functions):
     return TextResources(plan)
 
 
-def configure_entry(plan, functions, ascii_controls, unicode_controls):
+def configure_entry(plan, functions, ascii_controls, unicode_controls, name='entry_select'):
     """Select matching row metadata before stock setup creates its widgets."""
     c = constant
     code = f'''
@@ -162,26 +171,39 @@ def configure_entry(plan, functions, ascii_controls, unicode_controls):
         put: ldr r0,[r4,#40]; str r1,[r0,#12]; mov r0,r4;
         pop {{r4,pc}};
     '''
-    plan.put(functions['entry_select'], assemble(code, functions['entry_select'], 128))
+    plan.put(functions[name], assemble(code, functions[name], 128))
 
 
-def row_code(functions, setup_object, entry_id, owned_pages):
+def row_code(functions, setup_object, entry_id, owned_pages, native=()):
     """Replace a prefetched setup entry descriptor before native construction.
 
     Setup's initialization callback can run after the caller has fetched the
     row pointer. Updating metadata alone only fixes subsequent refreshes.
     Replace saved r1 for this call; both descriptor tables remain read-only.
+    Direct rows in `native` shooting menus get the same treatment by row number.
     """
     c = constant
     call = lambda name: invoke(functions[name])
     owned = ''.join(f"{c('r4', (page << 16) | 2)} cmp r3,r4; beq labels;"
                     for page in owned_pages)
+    menus = ''
+    for number, menu in enumerate(native):
+        following = f'native{number+1}' if number + 1 < len(native) else 'owned'
+        matches = ''.join(f"{c('r4',ident)} cmp r3,r4; bne skip{number}_{row}; movs r4,#{menu['first_row']+row}; b fix{number}; skip{number}_{row}:"
+                          for row, ident in enumerate(menu['ids']))
+        menus += f'''native{number}: {c('r4',menu['object'])} cmp r0,r4; bne {following};
+            ldrh r3,[r1,#24]; {matches} b restore;
+            fix{number}: {call(menu['select'])} {call('labels')}
+            ldr r0,[sp]; ldr r1,[r0,#40]; ldr r1,[r1,#12];
+            movs r3,#28; mla r1,r4,r3,r1; str r1,[sp,#4]; b restore;'''
+    first = 'native0' if native else 'owned'
     return f'''
-        push {{r0-r4,lr}}; {c('r4',setup_object)} cmp r0,r4; bne owned;
+        push {{r0-r4,lr}}; {c('r4',setup_object)} cmp r0,r4; bne {first};
         ldrh r3,[r1,#24]; {c('r4',entry_id)} cmp r3,r4; bne restore;
         {call('entry_select')} {call('labels')}
         ldr r0,[sp]; ldr r1,[r0,#40]; ldr r1,[r1,#12];
         {c('r4',38*28)} add r1,r4; str r1,[sp,#4]; b restore;
+        {menus}
         owned: ldr r3,[r0]; {owned} b restore;
         labels: {call('labels')}
         restore: pop {{r0-r4,lr}}; push.w {{r0-r11,lr}};

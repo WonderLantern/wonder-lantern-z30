@@ -4,10 +4,11 @@
 """Owned bitrate selector and versioned SD preferences for native movie records."""
 import struct
 from ..assembly import constant as c, invoke as n, assemble, jump
+from .menu_slots import page_slots
 from .sound_layout import RESULT
 
 PAGE_INDEX = 960
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 82, 83, 84, 87, 90
+TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('video', 3)
 MAGIC = 0x31424C57  # WLB1: magic, profile, reserved zero, complemented XOR.
 PROFILES = ('Stock', 'Balanced', 'High quality')
 BALANCED_MBPS = {
@@ -75,7 +76,7 @@ def prepare(plan, f, resources, allocation_size):
         {call('bitrate_get')}cmp r0,#0;beq done;str r5,[r0];dmb ish;
         {call('bitrate_save')}cmp r0,#1;beq root;
         mov r0,r4;{call('show_error')}b done;
-        root:movs r0,#2;movw r1,#955;{n(0x1045f732)}
+        root:mov r0,r4;{call('page_return')}
         done:movs r0,#0;pop {{r4-r6,pc}};'''
     # Reproduce the native record getter, then replace only the two rate words.
     # Width, height, timing and GOP come from the native table unchanged.

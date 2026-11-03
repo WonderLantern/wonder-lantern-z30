@@ -91,7 +91,7 @@ def main():
             frame(f'03-selected-{value}')
             activate(root,zebra_control,zebra_row);assert current()==page
             marks=[]
-            for slot in (122,123):
+            for slot in range(sound['text_slots']['963']['value'],sound['text_slots']['963']['value']+2):
                 length,ptr,style=struct.unpack('<3I',s.remote.memory(0xc2013368+slot*12,12))
                 data=s.remote.memory(ptr,length*(2 if lang in (26,27) else 1)) if length else b''
                 marks.append(data.decode('utf-16-le' if lang in (26,27) else 'ascii'))

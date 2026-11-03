@@ -129,7 +129,7 @@ def main():
                 flags = int.from_bytes(s.remote.memory(controls+38*28+16,4),'little')
                 chinese = a.language.startswith('zh-')
                 assert flags == (0x3001 if chinese else 0x1201), hex(flags)
-                length, pointer, style = struct.unpack('<3I',s.remote.memory(0xc2013368+39*12,12))
+                length, pointer, style = struct.unpack('<3I',s.remote.memory(0xc2013368+sound['entry_slot']*12,12))
                 raw = s.remote.memory(pointer,length*(2 if chinese else 1))
                 label = raw.decode('utf-16-le' if chinese else 'ascii')
                 expected = ('自定义菜单' if a.language == 'zh-Hans' else '自訂選單') if chinese else 'Extensions'
@@ -149,7 +149,7 @@ def main():
                 s.audit.append({'prefetched_entry_descriptor': hex(descriptor),
                                 'constructed_entry_slot': slot, 'constructed_entry_kind': kind})
                 s.write_audit()
-                assert (slot,kind) == (39,3 if chinese else 2), (slot,kind)
+                assert (slot,kind) == (sound['entry_slot'],3 if chinese else 2), (slot,kind)
             if a.entry_only:
                 return
             s.input(int(sound['functions']['ensure'], 16) & ~1, [])
@@ -203,7 +203,7 @@ def main():
                             box=sound['pages']['955']['label_rectangles'][module_row]
                             count = white_text(captured[f'error-dialog-{cycle}-{error}-closed'],*box)
                             s.audit.append({'dialog_closed_module_label_pixels':count,'error':error,'cycle':cycle})
-                            length, pointer, style = struct.unpack('<3I',s.remote.memory(0xc2013368+74*12,12))
+                            length, pointer, style = struct.unpack('<3I',s.remote.memory(0xc2013368+sound['root_label_slots']['modules']*12,12))
                             label = s.remote.memory(pointer,length*(2 if a.language.startswith('zh-') else 1)) if length else b''
                             registry = int.from_bytes(s.remote.memory(root+36,4),'little')
                             row = s.input(0x1045745e,[registry,1,module_row])

@@ -12,13 +12,14 @@ from .. import lut
 from ..assembly import assemble, constant as c, invoke as n, jump
 from . import lut_core, lut_session
 from .lut_retouch import GATE
+from .menu_slots import page_slots
 from .sound_layout import STATE_ANCHOR
 
 PAGE_INDEX = 960
 # Owned word inside the unused page-zero descriptor: +16 anchors the host block
 # and +20 is its open lock, so +24 stays free for the committed session pointer.
 ACTIVATION_CELL = STATE_ANCHOR + 24
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 82, 83, 84, 88, 92
+TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('video', 4)
 SIZES = dict(bitrate_get=96, bitrate_labels=768, bitrate_open=128,
              bitrate_action=384, bitrate_restore=128)
 ACTIONS = ('Load SD LUT', 'Use embedded LUT', 'Disable and release', 'State')

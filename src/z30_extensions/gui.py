@@ -29,7 +29,7 @@ PRESET_LABELS_EN = {
     'aspect-profiles': 'Custom photo aspect ratios with a translucent mask, keeps stock grid',
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
-    'date-stamp': 'Experimental film-style date stamp on JPEGs, off by default; not part of full',
+    'date-stamp': 'Experimental film-style date stamp on JPEGs, five formats, four colors and an optional glow, off by default; not part of full',
 }
 
 TEXT = {

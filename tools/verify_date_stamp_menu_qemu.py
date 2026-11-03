@@ -34,7 +34,8 @@ def main():
             packet[8],packet[9]=contact,1;struct.pack_into('<2H',packet,0x12,x,y)
             s.input(0x103ce7e6,[('scratch',0)],payload=packet);s.run_for(.5)
     def activate(page,ident,row):
-        s.input(0x1045d54c,[page,ident]);s.run_for(.25)
+        # The eight-row stamp page can still be building after .25 s; a touch then misses.
+        s.input(0x1045d54c,[page,ident]);s.run_for(1)
         for _ in range(3):
             touch(250,86+row*52)
             if current()!=page:break
@@ -79,7 +80,8 @@ def main():
         assert current()==root
         frame('01-root')
         assert word(state+stamp['state_offset']) == 0
-        for value in (2,1,0,2):
+        color=0
+        for value in (5,2,3,4,1,0,2):
             activate(root,stamp_control,stamp_row);assert current()==page
             frame(f'02-choices-{value}')
             activate(page,ids[value],value);s.run_for(.5)
@@ -87,21 +89,54 @@ def main():
             assert word(state+stamp['state_offset'])==value
             config=s.remote.memory(fixture['config'],16)
             magic,reserved,selected,check=struct.unpack('<4I',config)
-            assert (magic,reserved,selected,check)==(0x31544457,0,value,~(0x31544457^value)&0xffffffff)
+            assert (magic,reserved,selected,check)==(0x31544457,color,value,~(0x31544457^color^value)&0xffffffff)
             frame(f'03-selected-{value}')
             activate(root,stamp_control,stamp_row);assert current()==page
             marks=[]
-            for slot in (131,132,133):
+            for slot in range(sound['text_slots']['964']['value'],sound['text_slots']['964']['value']+6):
                 length,ptr,style=struct.unpack('<3I',s.remote.memory(0xc2013368+slot*12,12))
                 data=s.remote.memory(ptr,length*(2 if lang in (26,27) else 1)) if length else b''
                 marks.append(data.decode('utf-16-le' if lang in (26,27) else 'ascii'))
-            assert marks==['*' if i==value else '' for i in range(3)]
+            assert marks==['*' if i==value else '' for i in range(6)]
             frame(f'04-marker-{value}')
             for attempt in range(3):
                 touch(675,28)
                 if current()==root:break
             assert current()==root,(hex(current()),hex(root),hex(word(page+4)))
             observations.append(dict(selected=value,config=config.hex(),marks=marks))
+        # The color and glow rows stay on the page, step their value and save it.
+        activate(root,stamp_control,stamp_row);assert current()==page
+        # The page must finish constructing, or the focus request below is dropped.
+        frame('05-color-start')
+        color_row,glow_row,glow=stamp['color_row'],stamp['glow_row'],stamp['glow_flag']
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
+        from z30_extensions.features.ui_text import TRANSLATIONS
+        def shown(slot):
+            length,ptr,_=struct.unpack('<3I',s.remote.memory(0xc2013368+slot*12,12))
+            data=s.remote.memory(ptr,length*(2 if lang in (26,27) else 1)) if length else b''
+            return data.decode('utf-16-le' if lang in (26,27) else 'ascii')
+        def local(text):return text if lang==3 else TRANSLATIONS[text][lang==27]
+        for row,expected in ((color_row,1),(color_row,2),(color_row,3),(color_row,0),
+                             (glow_row,glow),(color_row,glow|1),(glow_row,1)):
+            # activate() retries while the page is unchanged, which these rows never leave.
+            s.input(0x1045d54c,[page,ids[row]]);s.run_for(.25)
+            previous=word(state+stamp['color_offset'])
+            for _ in range(3):
+                touch(250,86+row*52);s.run_for(.5)
+                if word(state+stamp['color_offset'])!=previous:break
+            actual=word(state+stamp['color_offset'])
+            assert current()==page and actual==expected,(hex(current()),hex(page),row,actual,expected)
+            assert struct.unpack('<4I',s.remote.memory(fixture['config'],16))[1]==expected
+            mark=sound['text_slots']['964']['value']
+            assert shown(mark+color_row)==local(stamp['colors'][expected%glow]),shown(mark+color_row)
+            assert shown(mark+glow_row)==local('ON' if expected&glow else 'OFF'),shown(mark+glow_row)
+            frame(f'05-{"glow" if row==glow_row else "color"}-{expected}')
+            observations.append(dict(row=row,style=expected))
+        # Reopening the page for each step must not bury the way back.
+        for attempt in range(3):
+            touch(675,28)
+            if current()==root:break
+        assert current()==root,(hex(current()),hex(root))
         s.audit.append(dict(date_stamp_menu=observations,language=a.language,
                             diagnostic_sd_services=True,physical_verified=False))
         s.write_audit()

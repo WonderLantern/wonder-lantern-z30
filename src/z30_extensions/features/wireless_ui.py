@@ -3,10 +3,11 @@ No early-loader I/O, cross-CPU shared state or live instruction writes.
 """
 import struct
 from ..assembly import constant as c, invoke as n, assemble, jump
+from .menu_slots import page_slots
 from .sound_settings import settings_code
 
 PAGE_INDEX = 960
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 82, 83, 84, 88, 92
+TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('video', 4)
 MAGIC = 0x31464C57
 NAMES = ('64 KiB (stock)', '128 KiB', '256 KiB', '512 KiB')
 SIZES = dict(bitrate_get=96, bitrate_labels=384, bitrate_open=192,

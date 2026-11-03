@@ -10,6 +10,7 @@ from ..assembly import assemble, constant, invoke
 from ..modules import ABI, API_BYTES, MAX_CODE, CONTEXT_BYTES, MAX_TEXT
 from .module_validator import validator_code
 from .module_cache import sync_shared_code
+from .menu_slots import BLOCKS
 from .sound_layout import NEW_SIZE, SWITCH_INDEX, SUCCESS
 
 PAGE_INDEX = SWITCH_INDEX + 1
@@ -24,7 +25,8 @@ HEADER = 96
 CONTEXT = 160
 TEXT = 224
 TEMP = 288
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, EMPTY_SLOT, STATUS_SLOT = 75, 74, 76, 80, 81
+ROOT_SLOT = BLOCKS['modules'][0]
+TITLE_SLOT, LABEL_SLOT, EMPTY_SLOT, STATUS_SLOT = ROOT_SLOT + 1, ROOT_SLOT + 2, ROOT_SLOT + 6, ROOT_SLOT + 7
 STATUS_TEXT = ('Not loaded', 'Loading', 'Loaded', 'Running')
 ERROR_TEXT = ('', 'File not found', 'Read failed', 'Bad module', 'Close failed',
               'No memory', 'Cache unavailable', 'Init failed', 'No handler',
@@ -217,4 +219,5 @@ def prepare(plan, f, text_resources):
         loading='Explicit menu action after card and menu services are ready',
         unloading='None; successful modules remain allocated until shutdown',
         shared_cache_service=True, camera_sd_module_execution_verified=True)
-    return dict(api=api, allocation_size=ALLOCATION_SIZE)
+    return dict(api=api, page_offset=PAGE_OFFSET, state_offset=STATE_OFFSET, fd_offset=FD,
+                allocation_size=ALLOCATION_SIZE)

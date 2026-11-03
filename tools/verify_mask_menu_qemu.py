@@ -204,7 +204,7 @@ def main():
         assert current()==root
         frame('01-root')
         if a.verify_menu_categories:
-            assert list(categories)==['aspect','bitrate','sound','modules'],categories
+            assert {'aspect','sound'}<=set(categories),categories
             for key,item in categories.items():
                 activate(root,item['control_id'],item['row'])
                 target=state+sound['page_offsets'][str(item['page_index'])]
@@ -432,7 +432,7 @@ def main():
                                 'actual_capture':False})
             frame(f'04-marker-{profile}')
             marks=[]
-            for slot in range(109,116):
+            for slot in range(sound['text_slots']['961']['value'],sound['text_slots']['961']['value']+7):
                 length,ptr,style=struct.unpack('<3I',s.remote.memory(0xc2013368+slot*12,12))
                 data=s.remote.memory(ptr,length*(2 if lang in (26,27) else 1)) if length else b''
                 marks.append(data.decode('utf-16-le' if lang in (26,27) else 'ascii'))

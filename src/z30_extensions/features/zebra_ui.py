@@ -4,9 +4,10 @@
 """Independent photo eligibility switch; native movie settings remain shared."""
 import struct
 from ..assembly import constant as c, invoke as n, assemble
+from .menu_slots import page_slots
 
 PAGE_INDEX = 963
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 118, 119, 120, 122, 124
+TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('zebra', 2)
 MAGIC = 0x315A4C57  # WLZ1
 SIZES = dict(zebra_get=96, zebra_labels=320, zebra_open=160,
              zebra_action=384, zebra_save=640, zebra_restore=640, zebra_close=128)
@@ -57,7 +58,7 @@ def prepare(plan, f, resources, allocation_size):
         movw r0,#0x1182;mov r1,r6;{n(0x10465990)}
         save:{call('zebra_save')}cmp r0,#1;beq root;
         mov r0,r4;{call('show_error')}b done;
-        root:movs r0,#2;movw r1,#955;{n(0x1045f732)}
+        root:mov r0,r4;{call('page_return')}
         done:movs r0,#0;pop {{r4-r6,pc}};'''
     return dict(page_offset=page_offset, state_offset=state_offset,
                 allocation_size=state_offset+16, codes=codes)

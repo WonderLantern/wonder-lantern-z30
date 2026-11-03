@@ -5,9 +5,10 @@
 import struct
 from ..assembly import constant as c, invoke as n, assemble, jump
 from .aspect_geometry import PROFILES, build_trial, preview_dimensions
+from .menu_slots import page_slots
 
 PAGE_INDEX = 961
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 100, 101, 102, 109, 116
+TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('aspect', 7)
 MAGIC = 0x32414C57  # WLA2: previous-area field now refers to the user setting.
 AREA_KEY = 0x501
 CAPTURE_AREA_KEY = 0x189E  # Derived state; never substitute for the user setting.
@@ -149,7 +150,7 @@ def prepare(plan, f, resources, allocation_size, *, trace=False, border=False, b
         {call('aspect_save')}cmp r0,#1;beq root;
         mov r0,r4;{call('show_error')}b done;
         rollback:str r7,[r6];str r9,[r6,#8];dmb ish;b done;
-        root:movs r0,#2;movw r1,#955;{n(0x1045f732)}
+        root:mov r0,r4;{call('page_return')}
         done:movs r0,#0;add sp,#4;pop {{r4-r9,pc}};'''
     # Pure address translation to immutable per-profile tables. No ROM/RAM
     # geometry table is edited when the user changes the selected profile.

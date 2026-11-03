@@ -27,7 +27,7 @@ The earlier general report of all features working was subsequently corrected by
 | `aspect-profiles` | Six photo ratios and a translucent live-view mask in one preset, preserving the interior stock grid. [Details](docs/aspect-profiles.md) |
 | `photo-zebra` | Photo live-view zebra with an independent switch and native pattern/threshold controls. [Details](docs/photo-zebra.md) |
 | `wifi-5ghz` | US/-1 country request on all 22 valid Wi-Fi profiles for 5 GHz STA; included in full and available separately. |
-| `date-stamp` | **Experimental**: film-style date or date-and-time stamp in the lower right of JPEGs, off by default; not part of `full`. [Details (Chinese)](docs/date-stamp.md) |
+| `date-stamp` | **Experimental**: film-style date stamp in the lower right of JPEGs, with five formats, four colors and an optional glow, turned with portrait shots, off by default; not part of `full`. [Details (Chinese)](docs/date-stamp.md) |
 
 Build with `python patch.py wifi-5ghz --source "Z_30_0120.bin" --output "output/EG209020-wifi-5ghz.BIN"`, or select `full` to include all features. Interactive option 11 selects this preset. Only the country and revision fields of profiles 1–10 and 14–25 (including the unset-index fallback) change; index fields and the 12 reserved slots are kept, and no persistent sales-region or NVRAM write is made. Initialization paths that bypass the table are unchanged. Bodies that previously allowed 2.4 GHz channels 12 and 13 may lose networks on them (inferred, not measured). This does not open all channels. Camera AP support, throughput and negotiated bandwidth remain unproven. Effective channels and power must suit the place of use. The standalone preset only needs the Python standard library.
 
@@ -125,6 +125,8 @@ Menus follow the stock **Language** setting. Simplified and Traditional Chinese 
 | Sound framework only | `Shutter sound` | 快门声音 | 快門聲音 |
 | Photo, bitrate or module features included, such as `full` | `Extensions` | 自定义菜单 | 自訂選單 |
 | Module page | `SD Modules` | SD 卡功能 | SD 卡功能 |
+
+Photo aspect, Photo zebra and Date stamp are also listed at the end of the **photo shooting menu**, and Video bitrate at the end of the **movie shooting menu**. One press of up from the first row reaches them, and features missing from a build do not appear. These rows are entries only: the right column always shows `--`, so open the page to see the current value. The same entries remain in the custom menu. The direct rows have QEMU verification only and are not yet confirmed on a camera.
 
 Fixes cover missing titles, clipping by empty value columns, disappearing sidebars, back-button residue after returning, and corrupted entry labels in non-Chinese languages or on the first menu entry after reboot. The user reported the preceding drawing and language fixes working on hardware; the new message page and preferences still need separate hardware validation. Native QEMU and constructor comparisons are in the [UI verification record](docs/ui-qemu.md).
 

@@ -18,7 +18,7 @@ PRESET_LABELS = {
     'aspect-profiles': '自定义照片画幅与半透明遮幅，保留原厂内部网格',
     'photo-zebra': '照片取景斑马纹；独立开关，复用原厂样式和阈值',
     'wifi-5ghz': 'Wi-Fi 5 GHz 地区解锁；全部有效配置请求 US/-1，包含在 full 中',
-    'date-stamp': '实验性：在 JPEG 上打胶片风格日期水印，默认关闭；不含在 full 中，需单独选择',
+    'date-stamp': '实验性：在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，默认关闭；不含在 full 中，需单独选择',
 }
 
 

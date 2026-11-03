@@ -118,7 +118,7 @@ def main():
             # Reopen and require exactly one selection marker in guest text slots.
             select(root,bitrate_control);activate(root);s.run_for(1);frame('profile-mark-'+str(profile))
             marks=[]
-            for slot in range(87,90):
+            for slot in range(sound['text_slots']['960']['value'],sound['text_slots']['960']['value']+3):
                 length,ptr,style=struct.unpack('<3I',s.remote.memory(0xc2013368+slot*12,12))
                 text=s.remote.memory(ptr,length*(2 if lang in (26,27) else 1)) if length else b''
                 marks.append(text.decode('utf-16-le' if lang in (26,27) else 'ascii'))

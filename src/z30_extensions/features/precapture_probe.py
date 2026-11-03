@@ -6,11 +6,12 @@ The original save BL and subsequent original pool return remain in place.
 """
 import struct
 from ..assembly import assemble, constant as c, invoke as n, jump
+from .menu_slots import page_slots
 from .sound_layout import SUCCESS
 from . import precapture_capture as capture
 
 PAGE_INDEX = 960
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 82, 83, 84, 87, 90
+TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('video', 3)
 MAGIC = 0x31504A57  # WJP1
 MAX_FRAME = 8 * 1024 * 1024
 FILLER, MAX_PADDING = 0xC2897B20, 512

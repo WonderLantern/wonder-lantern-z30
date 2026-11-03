@@ -2,11 +2,14 @@
 # Copyright (c) 2026 Wonder Lantern Z30 contributors
 # See licenses/Wonder-Lantern.txt and THIRD_PARTY_NOTICES.md.
 """Build owned sound menus and native SD-WAV audio hooks from stock templates."""
+import itertools
 import struct
 from ..assembly import assemble, constant, invoke, jump
 from .sound_layout import *
 from .sound_audio import audio_code
 from .sound_ui import ui_code
+
+ROOT_ORDER = ('aspect', 'zebra', 'stamp', 'bitrate', 'sound', 'modules')
 
 
 def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
@@ -36,6 +39,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
                  save_settings=640, restore_settings=640)
     sizes['settings_close'] = 128
     sizes['dismiss_error'] = 96
+    sizes['page_return'] = 96
     if aspect:
         sizes.update(ensure=1024, getter=512, route=448, row=384)
     grouped = bool(modules or bitrate or aspect or zebra or stamp)
@@ -43,6 +47,15 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
         sizes.update(ensure=1280, getter=640, route=640, action=1280)
     if stamp:
         sizes.update(ensure=1536, getter=768, route=768, action=1536)
+    # Research builds keep their single-purpose page inside the custom menu only.
+    native_menus = () if wireless or lut_sd or precapture_probe else tuple(
+        menu for menu in NATIVE_MENUS if any(dict(aspect=aspect, zebra=zebra, stamp=stamp, bitrate=bitrate)[key] for key in menu[3]))
+    if native_menus:
+        sizes.update(row=768)
+        for name, _, _, keys in native_menus:
+            sizes[f'select_{name}'] = 128
+            sizes[f'init_{name}'] = 128
+            sizes.update({f'direct_{key}': 96 for key in keys})
     f = {name: plan.alloc(bytes(size)) for name, size in sizes.items()}
     from . import ui_text
     text_resources = ui_text.prepare(plan, f)
@@ -75,18 +88,30 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
                                     tables[PAGE_INDEX], 0, 0, 0, 0, 0, metas[PAGE_INDEX]))
     child_templates = {i: plan.alloc(struct.pack('<11I', (i << 16) | 2, 0, 0, 0, tables[i],
                                                 0, 0, 0, 0, 0, metas[i])) for i in (FILES_INDEX, SWITCH_INDEX, POPUP_INDEX)}
-    extension = None
+    def declare(index):
+        tables[index], metas[index] = plan.alloc(bytes(32)), plan.alloc(bytes(28))
+        child_templates[index] = plan.alloc(struct.pack('<11I',
+            (index << 16) | 2, 0, 0, 0, tables[index], 0, 0, 0, 0, 0, metas[index]))
+    # The one place a feature page is registered. Each entry names its module,
+    # how many rows it shows and how its state restores; the state block,
+    # control IDs, root row and all native routing derive from this list.
+    pages = []
+    allocation_size = NEW_SIZE
+    def register(key, module, rows, prefix=None, restore=(), value_slot=None, prepare=None, **options):
+        nonlocal allocation_size
+        declare(module.PAGE_INDEX)
+        page = prepare() if prepare else module.prepare(plan, f, text_resources, allocation_size, **options)
+        page.update(key=key, module=module, rows=rows, index=module.PAGE_INDEX, functions=prefix or key,
+                    restore=restore, template=child_templates[module.PAGE_INDEX],
+                    fd_offset=page.get('fd_offset', 4), root_slot=module.ROOT_SLOT,
+                    value_slot=value_slot or module.CURRENT_SLOT)
+        allocation_size = page['allocation_size']
+        pages.append(page)
+        return page
     if modules:
         from . import module_host as mh
-        module_table = plan.alloc(bytes(32))
-        module_meta = plan.alloc(bytes(28))
-        tables[mh.PAGE_INDEX] = module_table
-        metas[mh.PAGE_INDEX] = module_meta
-        child_templates[mh.PAGE_INDEX] = plan.alloc(struct.pack('<11I',
-            (mh.PAGE_INDEX << 16) | 2, 0, 0, 0, module_table, 0, 0, 0, 0, 0, module_meta))
-        extension = mh.prepare(plan, f, text_resources)
-        extension['template'] = child_templates[mh.PAGE_INDEX]
-    video = None
+        register('modules', mh, 4, prefix='module', value_slot=mh.STATUS_SLOT,
+                 prepare=lambda: mh.prepare(plan, f, text_resources))
     if bitrate:
         if lut_sd:
             from . import lut_ui as bu
@@ -96,109 +121,78 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
             from . import wireless_ui as bu
         else:
             from . import bitrate_ui as bu
-        bt = plan.alloc(bytes(32))
-        bm = plan.alloc(bytes(28))
-        tables[bu.PAGE_INDEX], metas[bu.PAGE_INDEX] = bt, bm
-        child_templates[bu.PAGE_INDEX] = plan.alloc(struct.pack('<11I',
-            (bu.PAGE_INDEX << 16) | 2, 0, 0, 0, bt, 0, 0, 0, 0, 0, bm))
-        if lut_sd:
-            video = bu.prepare(plan, f, text_resources, extension['allocation_size'] if extension else NEW_SIZE,
-                               cube_text=lut_cube_text, size=lut_size)
-        else:
-            video = bu.prepare(plan, f, text_resources, extension['allocation_size'] if extension else NEW_SIZE)
-        video['template'] = child_templates[bu.PAGE_INDEX]
-        video['root_row'] = 5 if modules else 4
-    aspect_extension = None
+        video = register('bitrate', bu, 4 if wireless or lut_sd else 3, restore=('bitrate_restore',),
+                         **(dict(cube_text=lut_cube_text, size=lut_size) if lut_sd else {}))
+        video['default'] = video.get('default', 2)
     if aspect:
         from . import aspect_ui as au
-        at, am = plan.alloc(bytes(32)), plan.alloc(bytes(28))
-        tables[au.PAGE_INDEX], metas[au.PAGE_INDEX] = at, am
-        child_templates[au.PAGE_INDEX] = plan.alloc(struct.pack('<11I',
-            (au.PAGE_INDEX << 16) | 2, 0, 0, 0, at, 0, 0, 0, 0, 0, am))
-        previous_size = video['allocation_size'] if video else extension['allocation_size'] if extension else NEW_SIZE
-        aspect_extension = au.prepare(plan, f, text_resources, previous_size, trace=aspect_trace,
-                                      border=aspect_border, border_diagnostic=aspect_border_diagnostic,border_lease=aspect_border_lease,
-                                      mask=aspect_mask, mask_trial=aspect_mask_trial)
-        aspect_extension['template'] = child_templates[au.PAGE_INDEX]
-        aspect_extension['root_row'] = 4 + int(modules) + int(bitrate)
-    zebra_extension = None
+        register('aspect', au, 7, restore=('aspect_restore', 'aspect_sync'), trace=aspect_trace,
+                 border=aspect_border, border_diagnostic=aspect_border_diagnostic, border_lease=aspect_border_lease,
+                 mask=aspect_mask, mask_trial=aspect_mask_trial)
     if zebra:
         from . import zebra_ui as zu
-        tables[zu.PAGE_INDEX], metas[zu.PAGE_INDEX] = plan.alloc(bytes(32)), plan.alloc(bytes(28))
-        child_templates[zu.PAGE_INDEX] = plan.alloc(struct.pack('<11I',
-            (zu.PAGE_INDEX << 16) | 2, 0, 0, 0, tables[zu.PAGE_INDEX], 0, 0, 0, 0, 0, metas[zu.PAGE_INDEX]))
-        previous_size = (aspect_extension['allocation_size'] if aspect else video['allocation_size']
-                         if video else extension['allocation_size'] if extension else NEW_SIZE)
-        zebra_extension = zu.prepare(plan, f, text_resources, previous_size)
-        zebra_extension['template'] = child_templates[zu.PAGE_INDEX]
-    stamp_extension = None
+        register('zebra', zu, 2, restore=('zebra_restore',))
     if stamp:
         from . import date_stamp_ui as su
-        tables[su.PAGE_INDEX], metas[su.PAGE_INDEX] = plan.alloc(bytes(32)), plan.alloc(bytes(28))
-        child_templates[su.PAGE_INDEX] = plan.alloc(struct.pack('<11I',
-            (su.PAGE_INDEX << 16) | 2, 0, 0, 0, tables[su.PAGE_INDEX], 0, 0, 0, 0, 0, metas[su.PAGE_INDEX]))
-        previous_size = (zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect
-                         else video['allocation_size'] if video else extension['allocation_size'] if extension else NEW_SIZE)
-        stamp_extension = su.prepare(plan, f, text_resources, previous_size)
-        stamp_extension['template'] = child_templates[su.PAGE_INDEX]
+        register('stamp', su, su.ROWS, restore=('stamp_restore',))
+    by_key = {page['key']: page for page in pages}
+    # Scan stock row IDs now: direct rows need theirs before the row hook assembles.
+    used = set()
+    for index in range(955):
+        page = im.words(0xC1832D24 + index * 44, 11)
+        if not any(page):
+            continue
+        meta = im.words(page[10], 7)
+        for row in range(meta[5] & 65535):
+            used.add(struct.unpack('<H', im.read(meta[3] + row * 28 + 24, 2))[0])
+    # Direct rows take IDs from the top so page IDs do not depend on which menus exist.
+    native_ids = (i for i in range(0x2FFF,0x2400,-1) if i not in used)
+    native = []
+    for name, page_object, stock_rows, keys in native_menus:
+        present = tuple(key for key in keys if key in by_key)
+        for key in present:
+            by_key[key]['direct'] = True
+        native.append(dict(name=name, object=page_object, first_row=stock_rows, keys=present,
+                           select=f'select_{name}', ids=tuple(itertools.islice(native_ids, len(present)))))
     group = None
     if grouped:
-        order = [key for key, enabled in (('aspect', aspect), ('zebra', zebra), ('stamp', stamp), ('bitrate', bitrate),
-                                          ('sound', True), ('modules', modules)) if enabled]
-        previous_size = (stamp_extension['allocation_size'] if stamp else
-                         zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect else video['allocation_size']
-                         if video else extension['allocation_size'])
-        tables[SOUND_GROUP_INDEX] = plan.alloc(bytes(32))
-        metas[SOUND_GROUP_INDEX] = plan.alloc(bytes(28))
-        child_templates[SOUND_GROUP_INDEX] = plan.alloc(struct.pack('<11I',
-            (SOUND_GROUP_INDEX << 16) | 2, 0, 0, 0, tables[SOUND_GROUP_INDEX],
-            0, 0, 0, 0, 0, metas[SOUND_GROUP_INDEX]))
-        group = dict(order=order, page_offset=previous_size, allocation_size=previous_size+44,
+        order = [key for key in ROOT_ORDER if key == 'sound' or key in by_key]
+        declare(SOUND_GROUP_INDEX)
+        group = dict(order=order, page_offset=allocation_size, allocation_size=allocation_size+44,
                      template=child_templates[SOUND_GROUP_INDEX],
-                     labels={'sound': SOUND_GROUP_TITLE_SLOT}, values={'sound': 54})
-        if aspect:
-            aspect_extension['root_row'] = order.index('aspect')
-            group['labels']['aspect'], group['values']['aspect'] = au.ROOT_SLOT, au.CURRENT_SLOT
-        if zebra:
-            zebra_extension['root_row'] = order.index('zebra')
-            group['labels']['zebra'], group['values']['zebra'] = zu.ROOT_SLOT, zu.CURRENT_SLOT
-        if stamp:
-            stamp_extension['root_row'] = order.index('stamp')
-            group['labels']['stamp'], group['values']['stamp'] = su.ROOT_SLOT, su.CURRENT_SLOT
-        if bitrate:
-            video['root_row'] = order.index('bitrate')
-            group['labels']['bitrate'], group['values']['bitrate'] = bu.ROOT_SLOT, bu.CURRENT_SLOT
+                     labels={'sound': SOUND_GROUP_TITLE_SLOT}, values={'sound': ENABLED_VALUE_SLOT})
+        for page in pages:
+            page['root_row'] = order.index(page['key'])
+            group['labels'][page['key']], group['values'][page['key']] = page['root_slot'], page['value_slot']
         if modules:
-            extension['root_row'] = order.index('modules')
-            group['labels']['modules'], group['values']['modules'] = mh.ROOT_SLOT, mh.STATUS_SLOT
-            plan.features['module_host']['root_row'] = extension['root_row']
+            plan.features['module_host']['root_row'] = by_key['modules']['root_row']
     codes = audio_code(f, path_table, anchor_table)
     from .sound_settings import settings_code
     config_path = plan.alloc(b'A:\\WL-SOUND.CFG\0')
     codes.update(settings_code(f, config_path))
     codes.update(ui_code(f, strings, fixed, file_names, errors, file_ids, switch_ids,
-                         anchor_table, template, child_templates, extension, sidebar_parent=setup_parent,
-                         video=video, aspect=aspect_extension, zebra=zebra_extension, group=group,
-                         stamp=stamp_extension))
+                         anchor_table, template, child_templates, pages, sidebar_parent=setup_parent,
+                         group=group))
     c = constant
     call = lambda name: invoke(f[name])
-    owned_pages = [PAGE_INDEX, FILES_INDEX, SWITCH_INDEX, POPUP_INDEX]
-    if modules:
-        owned_pages.append(mh.PAGE_INDEX)
-    if bitrate:
-        owned_pages.append(bu.PAGE_INDEX)
-    if aspect:
-        owned_pages.append(au.PAGE_INDEX)
-    if zebra:
-        owned_pages.append(zu.PAGE_INDEX)
-    if stamp:
-        owned_pages.append(su.PAGE_INDEX)
+    owned_pages = [PAGE_INDEX, FILES_INDEX, SWITCH_INDEX, POPUP_INDEX] + [page['index'] for page in pages]
     if grouped:
         owned_pages.append(SOUND_GROUP_INDEX)
-    codes['row'] = ui_text.row_code(f, SETUP_OBJECT, ENTRY_ID, owned_pages)
+    codes['row'] = ui_text.row_code(f, SETUP_OBJECT, ENTRY_ID, owned_pages, native)
+    for menu in native:
+        # Stock menu leaves parent to the tab container, whose current child is the
+        # menu the row was opened from, so back and a confirmed choice both return there.
+        for key in menu['keys']:
+            page = by_key[key]
+            codes[f'direct_{key}'] = f"""push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;
+                {c('r1',page['page_offset'])}add r0,r0,r1;{c('r1',setup_parent)}str r1,[r0,#4];
+                {call(page['functions']+'_open')}done:movs r0,#0;pop {{r4,pc}};"""
+        original = im.words(im.words(menu['object'] + 16, 1)[0], 1)[0]
+        codes[f"init_{menu['name']}"] = f"""push {{r0-r4,lr}};{call(menu['select'])}{call('labels')}
+            pop {{r0-r4,lr}};{c('r12',original|1)}bx r12;"""
     setup_controls = im.read(setup_header[3], 38 * 28)
     entry = bytearray(setup_controls[-28:])
-    struct.pack_into('<I', entry, 0, 39)
+    struct.pack_into('<I', entry, 0, ENTRY_SLOT)
     # Row bit 9 selects ASCII kind 2; bit 13 selects Unicode kind 3.
     struct.pack_into('<I', entry, 16, 0x3001)
     struct.pack_into('<I', entry, 24, ENTRY_ID)
@@ -247,6 +241,31 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     plan.edit(SETUP_META_SOURCE + 12, struct.pack('<2I', controls_address, dispatch_address), 'Sound settings entry tables')
     plan.edit(SETUP_META_SOURCE + 20, struct.pack('<I', (setup_header[5] & 0xFFFF0000) | 39), 'Settings row count with sound only')
     plan.edit(im.words(SETUP_OBJECT + 16, 1)[0], struct.pack('<I', f['setup_init'] | 1), 'Seed sound entry before settings rows')
+    for menu in native:
+        source = im.rom(im.words(menu['object'] + 40, 1)[0])
+        header = im.words(source, 7)
+        count = header[5] & 65535
+        if count != menu['first_row'] or im.words(menu['object'] + 4, 1)[0] != setup_parent:
+            raise ValueError(f"Unexpected native {menu['name']} menu")
+        stock_controls = im.read(header[3], count * 28)
+        def direct_rows(flags):
+            added = bytearray()
+            for key, ident in zip(menu['keys'], menu['ids']):
+                # The settings entry row has an empty value column; stock rows here carry real values.
+                row = bytearray(entry)
+                struct.pack_into('<I', row, 0, by_key[key]['root_slot'])
+                struct.pack_into('<I', row, 16, flags)
+                struct.pack_into('<I', row, 24, ident)
+                added += row
+            return bytes(added)
+        unicode_table = plan.alloc(stock_controls + direct_rows(0x3001))
+        ascii_table = plan.alloc(stock_controls + direct_rows(0x1201))
+        ui_text.configure_entry(plan, f, ascii_table, unicode_table, menu['select'])
+        row_events = [events(f[f'direct_{key}']) for key in menu['keys']]
+        dispatch = plan.alloc(im.read(header[4], count * 4) + struct.pack(f'<{len(row_events)}I', *row_events))
+        plan.edit(source + 12, struct.pack('<2I', ascii_table, dispatch), f"Native {menu['name']} menu direct rows")
+        plan.edit(source + 20, struct.pack('<I', (header[5] & 0xFFFF0000) | (count + len(row_events))), f"Native {menu['name']} menu row count")
+        plan.edit(im.words(menu['object'] + 16, 1)[0], struct.pack('<I', f[f"init_{menu['name']}"] | 1), f"Seed native {menu['name']} menu rows")
 
     # Stock leaf page 0x18f contains both a header and the native back bitmap.
     # Copy those records from the caller's stock, then use dynamic header text.
@@ -265,87 +284,40 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     # string selector; the render callback supplies that selector separately.
     struct.pack_into('<I', base_layout, 28, 0xA18 << 16)
 
-    used = set()
-    for index in range(955):
-        page = im.words(0xC1832D24 + index * 44, 11)
-        if not any(page):
-            continue
-        meta = im.words(page[10], 7)
-        for row in range(meta[5] & 65535):
-            used.add(struct.unpack('<H', im.read(meta[3] + row * 28 + 24, 2))[0])
     if set(ROOT_IDS + FILE_IDS + SWITCH_IDS + (ENTRY_ID, POPUP_ID)) & used:
         raise ValueError('Custom control identifiers conflict with stock')
-    pages = {}
+    page_report = {}
     page_specs = [
-        (PAGE_INDEX, 4, 41, 54, 40, ROOT_IDS),
-        (FILES_INDEX, 5, 47, 60, 53, FILE_IDS),
-        (SWITCH_INDEX, 2, 45, 58, 52, SWITCH_IDS),
-        (POPUP_INDEX, 1, 66, 56, 40, (POPUP_ID,)),
+        (PAGE_INDEX, 4, ROOT_LABEL_SLOT, ENABLED_VALUE_SLOT, TITLE_SLOT, ROOT_IDS),
+        (FILES_INDEX, 5, FILE_LABEL_SLOT, FILE_MARK_SLOT, FILES_TITLE_SLOT, FILE_IDS),
+        (SWITCH_INDEX, 2, SWITCH_LABEL_SLOT, SWITCH_MARK_SLOT, SWITCH_TITLE_SLOT, SWITCH_IDS),
+        (POPUP_INDEX, 1, POPUP_OK_SLOT, EMPTY_SLOT, TITLE_SLOT, (POPUP_ID,)),
     ]
+    free_ids = (i for i in range(0x2400,0x3000) if i not in used)
+    def claim_ids(count):
+        ids = tuple(itertools.islice(free_ids, count))
+        if len(ids) != count:
+            raise ValueError('No free control IDs for owned menu pages')
+        return ids
     category_ids = {}
-    if modules:
-        available = [i for i in range(0x2400,0x3000) if i not in used and i not in ROOT_IDS + FILE_IDS + SWITCH_IDS + (ENTRY_ID,)]
-        if len(available) < 5:
-            raise ValueError('No free module control IDs')
-        module_ids = tuple(available[:4])
-        category_ids['modules'] = available[4]
-        page_specs[0] = (PAGE_INDEX, 5, 41, 54, 40, ROOT_IDS + (available[4],))
-        page_specs.append((mh.PAGE_INDEX, 4, mh.LABEL_SLOT, mh.EMPTY_SLOT, mh.TITLE_SLOT, module_ids))
-        plan.features['module_host']['controls'] = list(module_ids)
-    if bitrate:
-        occupied = used | {ident for spec in page_specs for ident in spec[-1]}
-        ids = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:4]
-        if len(ids) != 4:
-            raise ValueError('No free bitrate control IDs')
-        category_ids['bitrate'] = ids[3]
-        root = page_specs[0]
-        page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[3],))
-        # Wireless research uses four choices, while the video selector has three.
-        choice_count = 4 if wireless or lut_sd else 3
-        if wireless or lut_sd:
-            occupied = used | {ident for spec in page_specs for ident in spec[-1]}
-            choices = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:4]
+    for page in pages:
+        ids = claim_ids(page['rows'] + 1)
+        category_ids[page['key']] = ids[-1]
+        module = page['module']
+        marks = mh.EMPTY_SLOT if page['key'] == 'modules' else module.MARK_SLOT
+        page_specs.append((page['index'], page['rows'], module.LABEL_SLOT, marks, module.TITLE_SLOT, ids[:-1]))
+        if page['key'] == 'modules':
+            plan.features['module_host']['controls'] = list(ids[:-1])
         else:
-            choices = ids[:3]
-        page_specs.append((bu.PAGE_INDEX,choice_count,bu.LABEL_SLOT,bu.MARK_SLOT,bu.TITLE_SLOT,choices))
-        bu.finish(plan,f,video,choices)
-    if aspect:
-        occupied = used | {ident for spec in page_specs for ident in spec[-1]}
-        ids = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:8]
-        if len(ids) != 8:
-            raise ValueError('No free aspect control IDs')
-        category_ids['aspect'] = ids[7]
-        root = page_specs[0]
-        page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[7],))
-        page_specs.append((au.PAGE_INDEX,7,au.LABEL_SLOT,au.MARK_SLOT,au.TITLE_SLOT,ids[:7]))
-        au.finish(plan,f,aspect_extension,ids[:7])
-    if zebra:
-        occupied = used | {ident for spec in page_specs for ident in spec[-1]}
-        ids = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:3]
-        if len(ids) != 3:
-            raise ValueError('No free zebra control IDs')
-        category_ids['zebra'] = ids[2]
-        root = page_specs[0]
-        page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[2],))
-        page_specs.append((zu.PAGE_INDEX,2,zu.LABEL_SLOT,zu.MARK_SLOT,zu.TITLE_SLOT,ids[:2]))
-        zu.finish(plan,f,zebra_extension,ids[:2])
-    if stamp:
-        occupied = used | {ident for spec in page_specs for ident in spec[-1]}
-        ids = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:4]
-        if len(ids) != 4:
-            raise ValueError('No free date stamp control IDs')
-        category_ids['stamp'] = ids[3]
-        root = page_specs[0]
-        page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[3],))
-        page_specs.append((su.PAGE_INDEX,3,su.LABEL_SLOT,su.MARK_SLOT,su.TITLE_SLOT,ids[:3]))
-        su.finish(plan,f,stamp_extension,ids[:3])
+            module.finish(plan, f, page, ids[:-1])
     if grouped:
-        occupied = used | {ident for spec in page_specs for ident in spec[-1]}
-        category_ids['sound'] = next(i for i in range(0x2400,0x3000) if i not in occupied)
-        page_specs[0] = (PAGE_INDEX,len(group['order']),41,54,40,
+        category_ids['sound'] = claim_ids(1)[0]
+        page_specs[0] = (PAGE_INDEX,len(group['order']),ROOT_LABEL_SLOT,ENABLED_VALUE_SLOT,TITLE_SLOT,
                          tuple(category_ids[key] for key in group['order']))
-        page_specs.append((SOUND_GROUP_INDEX,4,41,54,SOUND_GROUP_TITLE_SLOT,ROOT_IDS))
+        page_specs.append((SOUND_GROUP_INDEX,4,ROOT_LABEL_SLOT,ENABLED_VALUE_SLOT,SOUND_GROUP_TITLE_SLOT,ROOT_IDS))
     for index, count, label, value, title, identifiers in page_specs:
+        if count > MAX_ROWS:
+            raise ValueError(f'Owned menu page {index} has {count} rows; only {MAX_ROWS} fit one screen')
         is_root = index == PAGE_INDEX
         is_sound_group = grouped and index == SOUND_GROUP_INDEX
         is_module = modules and index == mh.PAGE_INDEX
@@ -360,7 +332,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
             elif is_module:
                 value_slot = mh.STATUS_SLOT if i == 2 else mh.EMPTY_SLOT
             elif is_root or is_sound_group:
-                value_slot = value+i if i<2 else 56
+                value_slot = value+i if i<2 else EMPTY_SLOT
             else:
                 value_slot = value+i
             struct.pack_into('<I', control, 20, value_slot)
@@ -374,7 +346,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
             # Preserve the normal header/back geometry; put messages in an
             # independent body widget, never in the shared title widget.
             body = bytearray(base_layout[:32])
-            struct.pack_into('<I', body, 0, 65)
+            struct.pack_into('<I', body, 0, POPUP_BODY_SLOT)
             struct.pack_into('<4h', body, 16, 150, 150, 620, 260)
             struct.pack_into('<I', body, 28, 0xA19 << 16)
             layout = layout[:64] + body + bytes(32)
@@ -383,7 +355,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
         # value column; choices use a compact '*' marker in a 126 px column.
         boxes, labels, values = [], [], []
         for row in range(count):
-            y = 62 + row * 52
+            y = ROW_TOP + row * ROW_PITCH
             boxes.extend((72, y, 702, y + 48))
             if is_root or is_sound_group:
                 has_value = bool(grouped and is_root) or row < 2
@@ -413,7 +385,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
         plan.put(metas[index], struct.pack('<7I', *header))
         plan.put(tables[index], struct.pack('<8I', f['render'] | 1, (f['dismiss_error'] if index == POPUP_INDEX else zero) | 1, 0x1045FDA1,
                                            (zero + 4) | 1, zero | 1, zero | 1, zero | 1, 0x1045FDA1))
-        pages[str(index)] = {'metadata': hex(metas[index]), 'functions': hex(tables[index]),
+        page_report[str(index)] = {'metadata': hex(metas[index]), 'functions': hex(tables[index]),
                              'count': count, 'controls': hex(control_address), 'layout': hex(layout_address),
                              'geometry': hex(geometry), 'label_rectangles': [labels[i:i+4] for i in range(0, len(labels), 4)],
                              'value_rectangles': [values[i:i+4] for i in range(0, len(values), 4)],
@@ -426,13 +398,22 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
         plan.edit(site, jump(site, f[name], length), 'Sound hook: ' + name)
     plan.features['shutter_sound'] = {
         'functions': {k: hex(v | 1) for k, v in f.items()}, 'code_sizes': code_sizes,
-        'pages': pages, 'state_anchor': hex(STATE_ANCHOR + 16), 'anchor_table': hex(anchor_table),
+        'pages': page_report, 'state_anchor': hex(STATE_ANCHOR + 16), 'anchor_table': hex(anchor_table),
         'page_template': hex(template), 'persistent_state_size': (group['allocation_size'] if grouped else NEW_SIZE) + 31,
         'root_parent': hex(setup_parent),
-        'page_offsets': {str(PAGE_INDEX): PAGE_OFFSET, str(FILES_INDEX): FILES_OFFSET, str(SWITCH_INDEX): SWITCH_OFFSET, str(POPUP_INDEX): POPUP_OFFSET, **({str(mh.PAGE_INDEX): mh.PAGE_OFFSET} if modules else {}), **({str(bu.PAGE_INDEX):video['page_offset']} if video else {}), **({str(au.PAGE_INDEX):aspect_extension['page_offset']} if aspect else {}), **({str(zu.PAGE_INDEX):zebra_extension['page_offset']} if zebra else {}), **({str(su.PAGE_INDEX):stamp_extension['page_offset']} if stamp else {}), **({str(SOUND_GROUP_INDEX):group['page_offset']} if grouped else {})},
+        'page_offsets': {str(PAGE_INDEX): PAGE_OFFSET, str(FILES_INDEX): FILES_OFFSET, str(SWITCH_INDEX): SWITCH_OFFSET, str(POPUP_INDEX): POPUP_OFFSET, **{str(page['index']): page['page_offset'] for page in pages}, **({str(SOUND_GROUP_INDEX):group['page_offset']} if grouped else {})},
         'menu_categories': ([dict(key=key,row=row,control_id=category_ids[key],
-                                  page_index={'stamp':964,'zebra':963,'aspect':961,'bitrate':960,'sound':SOUND_GROUP_INDEX,'modules':958}[key])
+                                  page_index=by_key[key]['index'] if key in by_key else SOUND_GROUP_INDEX)
                              for row,key in enumerate(group['order'])] if grouped else []),
+        'text_slots': {str(index): dict(title=title, label=label, value=value)
+                       for index, _, label, value, title, _ in page_specs},
+        'entry_slot': ENTRY_SLOT, 'root_label_slots': group['labels'] if grouped else {},
+        'native_rows': {menu['name']: dict(object=hex(menu['object']), first_row=menu['first_row'],
+                                           rows=[dict(key=key, row=menu['first_row']+i, control_id=menu['ids'][i],
+                                                      label_slot=by_key[key]['root_slot'], page_index=by_key[key]['index'],
+                                                      direct=hex(f[f'direct_{key}'] | 1))
+                                                 for i, key in enumerate(menu['keys'])])
+                        for menu in native},
         'sound_settings_page': SOUND_GROUP_INDEX if grouped else PAGE_INDEX,
         'control_identifiers': {str(index): list(identifiers) for index, _, _, _, _, identifiers in page_specs},
         'setup_entry_id': hex(ENTRY_ID), 'settings_count': 39,

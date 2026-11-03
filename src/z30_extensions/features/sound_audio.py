@@ -150,8 +150,12 @@ def audio_code(addresses, path_table, anchor_table):
             done: movs r0,#1; pop {{r4-r6,pc}};
         """
 
+    # The root page object persists, and its list cursor (+22) and first visible row
+    # (+24) with it. The camera can draw a re-entered list from the top while the
+    # cursor stays on the old row, so each entry starts both at the first row.
     codes['open']=f"""
-            push {{r4,lr}}; {call('ensure')} cmp r0,#0; beq done; {call('labels')}
+            push {{r4,lr}}; {call('ensure')} cmp r0,#0; beq done;
+            movs r1,#0; strh r1,[r0,#{PAGE_OFFSET + 22}]; strh r1,[r0,#{PAGE_OFFSET + 24}]; {call('labels')}
             movs r0,#2; {c('r1',PAGE_INDEX)} {native(0x1045f732)}
             done: movs r0,#0; pop {{r4,pc}};
         """
