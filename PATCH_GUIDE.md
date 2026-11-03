@@ -42,7 +42,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 | 5 | `mtp-fast` | MTP 属性列表加速 |
 | 6 | `module-host` | 实验性 SD 模块宿主，自动包含快门声音框架 |
 | 7 | `video-rot` | 实验性自动视频方向元数据，在新录像对象配置时锁定姿态 |
-| 8 | `bitrate-slowmo-uncap` | 提高 1080p 高画质码率；慢动作录制上限 25 分钟，支持分段或大文件 |
+| 8 | `bitrate-slowmo-uncap` | 提高 4K 与 1080p 高画质码率；慢动作录制上限 25 分钟，支持分段或大文件 |
 | 9 | `aspect-profiles` | 自定义画幅与半透明取景遮幅；包含在 full 中，具体实机范围见专题 |
 | 10 | `photo-zebra` | 照片取景斑马纹和独立照片开关；包含在 full 中，也可单独选择，新增开关待机身复验 |
 | 11 | `wifi-5ghz` | 全部 22 个有效配置请求 US/-1，5 GHz 地区解锁；包含在 full 中，也可单独选择 |
@@ -56,7 +56,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 
 `full` 已包含 `video-rot`，旧别名 `modular` 不包含它。第二阶段读取原厂姿态，为每个新录像封装对象锁定方向；不改像素或已有文件，未知姿态回退横向。播放器需支持方向元数据；用户已反馈横拍、两侧竖拍及录制期间方向锁定实机正常。单独使用先安装 `python -m pip install '.[video]'`；原有 `.[sound]` 也包含所需汇编依赖。
 
-选择 `full` 或菜单第 8 项也会改变录像行为：1080p 60/50p 高画质平均码率提高到 90 Mbps，30/25/24p 提高到 60 Mbps；慢动作录制上限从 3 分钟延长到 25 分钟，FAT32 最多生成 8 个文件，exFAT 使用单个大文件。码率菜单及设置保存需要 Keystone，可通过 `.[sound]` 安装。作者报告的实机测试使用包含该功能的 `full`；独立预设、普通模式 MP4、MP4/FAT32 分段和其他码率尚未单独验证，详见[视频码率与慢动作限制](docs/bitrate-slowmo-uncap.md)。
+选择 `full` 或菜单第 8 项也会改变录像行为：4K 30/25/24p 高画质平均码率提高到 168 Mbps（最大 200），1080p 60/50p 提高到 90 Mbps，30/25/24p 提高到 60 Mbps；4K 200 Mbps 需要持续写入 25 MB/s 以上的卡（V60 及以上）。慢动作录制上限从 3 分钟延长到 25 分钟，FAT32 最多生成 8 个文件，exFAT 使用单个大文件。码率菜单及设置保存需要 Keystone，可通过 `.[sound]` 安装。作者报告的实机测试使用包含该功能的 `full`；独立预设、普通模式 MP4、MP4/FAT32 分段、4K 码率行和其他码率尚未单独验证，详见[视频码率与慢动作限制](docs/bitrate-slowmo-uncap.md)。4K 50p/60p 帧率解锁的可行性结论见[专题分析](docs/uhd-4k60-feasibility.md)。
 
 也可跳过菜单，在命令里写出所需组合：
 

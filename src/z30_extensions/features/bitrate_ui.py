@@ -12,6 +12,8 @@ TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('video',
 MAGIC = 0x31424C57  # WLB1: magic, profile, reserved zero, complemented XOR.
 PROFILES = ('Stock', 'Balanced', 'High quality')
 BALANCED_MBPS = {
+    '4K 30p HIGH': (168, 140), '4K 25p HIGH': (168, 140),
+    '4K 24p HIGH': (168, 140),
     '1080 60p HIGH': (84, 70), '1080 50p HIGH': (84, 70),
     '1080 30p HIGH': (48, 40), '1080 25p HIGH': (48, 40),
     '1080 24p HIGH': (48, 40),

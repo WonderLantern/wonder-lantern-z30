@@ -6,7 +6,12 @@ the keys of STOCK_MBPS.
 import struct
 
 # (maximum, average) in Mbps for a movie mode and Movie quality setting.
+# 4K rows stay inside the H.264 Level 5.1 ceiling (240 Mbps) the encoder
+# configures for 4K, and inside the proven range of the uncap mechanism.
 BITRATES_MBPS = {
+    '4K 30p HIGH': (200, 168),
+    '4K 25p HIGH': (200, 168),
+    '4K 24p HIGH': (200, 168),
     '1080 60p HIGH': (108, 90),
     '1080 50p HIGH': (108, 90),
     '1080 30p HIGH': (72, 60),

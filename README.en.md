@@ -23,7 +23,7 @@ The earlier general report of all features working was subsequently corrected by
 | `mtp-fast` | Accelerate MTP property-list queries while preserving response semantics. |
 | `module-host` | **Experimental** native SD module host that loads and runs ZMOD modules using the sound-menu framework. |
 | `video-rot` | Write orientation metadata for new recordings and lock the orientation captured at recording start. |
-| `bitrate-slowmo-uncap` | Select and remember Stock, Balanced, or High quality bitrates; extend slow-motion recording to 25 minutes with FAT32 splitting or large exFAT files. |
+| `bitrate-slowmo-uncap` | Select and remember Stock, Balanced, or High quality bitrates with raised 4K and 1080p high-quality rates; extend slow-motion recording to 25 minutes with FAT32 splitting or large exFAT files. |
 | `aspect-profiles` | Six photo ratios and a translucent live-view mask in one preset, preserving the interior stock grid. [Details](docs/aspect-profiles.md) |
 | `photo-zebra` | Photo live-view zebra with an independent switch and native pattern/threshold controls. [Details](docs/photo-zebra.md) |
 | `wifi-5ghz` | US/-1 country request on all 22 valid Wi-Fi profiles for 5 GHz STA; included in full and available separately. |
@@ -188,10 +188,11 @@ Rates are in **Mbps, maximum / average**:
 
 | High-quality mode | Stock | Balanced | High quality (default) |
 | --- | --- | --- | --- |
+| 4K 30p, 25p, 24p | 144 / 120 | 168 / 140 | 200 / 168 |
 | 1080p 60p, 50p | 56 / 48 | 84 / 70 | 108 / 90 |
 | 1080p 30p, 25p, 24p | 28 / 24 | 48 / 40 | 72 / 60 |
 
-The slow-motion **recording-time** limit rises from 3 to **25 minutes**. FAT32 allows up to 8 files; exFAT uses one large file. Bitrates for 4K, 120p/100p, slow motion, and standard quality remain stock. Resolution, frame rate, GOP, and the 125-minute limit for other modes remain stock. The 25-minute limit accounts for fixed-capacity index tables; recording is not unlimited.
+The slow-motion **recording-time** limit rises from 3 to **25 minutes**. FAT32 allows up to 8 files; exFAT uses one large file. Bitrates for 120p/100p, slow motion, and standard quality remain stock. Resolution, frame rate, GOP, and the 125-minute limit for other modes remain stock. The 25-minute limit accounts for fixed-capacity index tables; recording is not unlimited. The 4K rate rationale and the [4K 50p/60p feasibility](docs/uhd-4k60-feasibility.md) conclusions are covered separately.
 
 Profiles affect subsequent native movie configurations and do not write to an active encoder. Stock restores bitrates only; the 25-minute slow-motion extension remains enabled. Earlier hardware tests covered fixed High quality rates and slow-motion file integrity. Runtime switching, Balanced, and persisted profile selection still need camera validation. See [bitrate and slow-motion details](docs/bitrate-slowmo-uncap.md) for parameters, QEMU boundaries, and earlier hardware records.
 
@@ -238,6 +239,7 @@ Detailed documents are currently mainly in Chinese. The [Chinese README](README.
 | [Module documentation](docs/modules.md) | Host operation, ABI 2, examples, and experimental limits. |
 | [Video orientation](docs/video-rotation.md) | Locking, metadata, and hardware records. |
 | [Bitrates and slow motion](docs/bitrate-slowmo-uncap.md) | Parameters, index capacity, and hardware file checks. |
+| [4K 60p feasibility](docs/uhd-4k60-feasibility.md) | Evidence chain and verdict for unlocking 4K 50p/60p, plus the 4K rate rationale. |
 | [Verification instructions](docs/verification.md) | Tests, stock-instruction execution, MTP, and hardware evidence. |
 | [UI verification record](docs/ui-qemu.md) | Chinese menus, rendering, return behavior, and first-entry fixes. |
 | [Licenses and third-party notices](THIRD_PARTY_NOTICES.md) | File-specific licenses and resource provenance. |
