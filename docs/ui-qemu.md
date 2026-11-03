@@ -129,6 +129,18 @@ python tools/font_coverage.py --firmware Z_30_0120.bin --check          # 核对
 
 提取结果与此前截图发现的缺字一致（简体缺“橙、橘、晕、厂、扩、展、听、块”，繁体缺“橙、橘、找”）；`sound-dialog-delivery-hant/error-dialog-0-1.png` 中“找不到檔案”的“找”即为方框。检查还发现已有 11 处标签含缺字，现已改为可显示的用词：简体“SD LUT 可用”“等待释放内存”“已加载，等待释放内存”“加载失败”“暂存不可用”“无处理程序”，繁体“SD LUT 可用”“檔案不存在”“載入失敗”“無處理程式”“記憶體仍在使用”。两种字体的 ASCII 也不完整，均缺 ``$ & ' , < = @ Q Y \ ^ _ ` j q w { | } ~``（繁体另缺 `?`），因此中文模式下的英文回退文字和模块输出同样受影响；预捕获诊断状态 “Capture rejected” 改为 “Capture refused”。
 
+### 字形格式（为补字做准备）
+
+`tools/probe_font_glyph_qemu.py` 在原厂固件、简体中文下打开设定菜单，打开调用期间监视字体读取。原厂有完整的字体引擎：经字节流读取器（`0x10507E52`，虚表 `+0x18` u32、`+0x1C` u16、`+0x20` u8、`+0x30` 定位、`+0x38` 跳过）解析 `hif`，字体对象经 getter `0x104ED66E` 取得，轮廓在机内栅格化后由 `0x104785EC` 经 `vgDrawImage`/`vgDrawPath` 绘制。证据在 `build/ui-qemu/font-glyph-probe*/session.json`。
+
+- **字符表**（`0x105071CA` 二分查找）：字形号 = 字形字段 + (码点 − 首码点)。未命中且对象 `+0x58` bit 2 置位时，以 `码点 | 0x800000` 查第二张表；“橙、展”等缺字在第二张表中，但仍显示方框。
+- **字形索引**（`0x10506D6E`）：位于字体头 `+0x2C` 偏移处。u16 区段数，每段 u16 首字形、u32 基址、u16 个数、个数 × u16 偏移；记录地址 = 字体 + 头 `+0x30` 数据偏移 + 基址 + 偏移，偏移为 0 表示空（区段首个除外）。
+- **字形记录**（`0x10507288`）：u16 标志；bit 1 时 u16 轮廓数；bits 7–8 为 0–2 时取头 `+0x18` 的默认步进（2048/1024，简体另有 1170），为 3 时读 int16；bits 5–6 为 3 时多一个 int16；随后总有包围盒 u16 宽、u16 高、int16 x_min、int16 y_max，bit 10 未置位时再有竖排方位 `(x_min − 步进/2, 1760 − y_max)`；bit 9 时多一个 int16。轮廓：u16 点数、除最后一个外的轮廓终点（点数 > 255 用 u16，否则 u8）、按 LSB 优先打包的 on-curve 位、u16 描述符数与描述符。每个描述符覆盖 `(d & 0x3F) + 1` 个点，bit `0x80`/`0x40` 分别表示 x/y 增量为 int8，否则为 int16；首点相对 (0, 0)。坐标为二次曲线（TrueType 规则），每 em 2048 单位，y 向上。
+
+`platform/fonts.py` 的 `decode_glyph`/`encode_glyph` 实现上述格式。字体 0、2 共 1663 条记录全部恰好首尾相接，并逐字节重新编码一致（`tests/test_fonts.py`，需仓库根目录的固件）。`tools/render_stock_glyphs.py` 用解码出的轮廓离线渲染文字，结果与 QEMU 中的设定菜单和自订选单一致。
+
+补字尚未实现。还需要：重建字体数据块（字符表插入条目会使后续偏移移动，需更新头部偏移字段；第二张字符表和 `kana`/`JAN `/`vert` 特性表的作用未解码），从 OFL 字体生成二次曲线轮廓，改写字体指针字面量 `0x104530F4` 指向新数组，再经 QEMU 与实机确认。
+
 构建与报告：`output/ui-chinese/`，包括 `shutter-sound`、`module-host` 和 `full`。三种预设 CRC 残差为零、重复构建逐字节一致；34 项单元测试通过，包含 Unicorn 执行语言分支、控件类型切换和模块文字边界测试。
 
 最终页面证据：`build/ui-qemu/chinese-entry2-hans/`（简体），`build/ui-qemu/chinese-full-pages-final/`（繁体 full），`build/ui-qemu/chinese-en-final2/`（英文）。QEMU 使用 `--language` 设置原厂配置和字体，真实相机只需在原厂“语言 (Language)”中选择中文；用户后续实机反馈见本文开头。
