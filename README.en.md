@@ -1,73 +1,59 @@
 # Wonder Lantern Z30
 
-> Status (2026-10-18): After the [v42](docs/aspect-lifecycle-v42.md) playback fix, the user reported normal behavior in the camera retest. This confirms the reported issue within that retest; no per-profile or exhaustive lifecycle coverage was supplied. The v37/v40 failures and v41 diagnostic history remain documented.
-
-
 [简体中文](README.md) · **English**
 
-Wonder Lantern Z30 is an experimental low-level host and firmware-extension research project by **WonderLantern**, specifically for **Nikon Z30 C 1.20**. It explores camera-side extensions similar to Magic Lantern. The current implementation is a Z30-specific prototype, not a general framework for other cameras. Nikon does not endorse or support this project.
+Wonder Lantern Z30 is the WonderLantern organization's experimental firmware extension project for the **Nikon Z30 C 1.20**, exploring Magic Lantern-style on-camera extensions. The builder applies byte-verified patches to stock firmware that you supply, and writes a modified **EG module** plus a JSON build report. It is a Z30-specific prototype, not a cross-model framework, and it is not supported or endorsed by Nikon.
 
-The project applies patches with expected-byte checks to user-supplied stock firmware and produces a standalone **EG module** and a JSON build report. The maintainer has reported installation on a Z30 C 1.20. The builder does not recreate a complete Nikon update package, connect to a camera, or write to an SD card. Feature-specific coverage is listed under Verification status below.
-The earlier general report of all features working was subsequently corrected by narrow-aspect and playback regressions. Crop, live-view and mask fixes have separate hardware feedback; the latest v42 playback retest was reported normal. Offline checks and camera feedback retain their individual scope.
+> [!WARNING]
+> Modified firmware carries risk. Before flashing:
+> - keep the unmodified `Z_30_0120.bin`;
+> - know how to update again from **Setup menu → Firmware version**.
+>
+> As long as the update page opens, you can return to stock firmware. Every test build the project hands out is checked for this first. The builder itself never connects to the camera or writes to an SD card.
 
+## Features
 
-## Features and presets
+`full` enables all ten features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate and date stamp automatically include the `shutter-sound` menu framework.
 
-`full` includes all ten features below, including Wi-Fi 5 GHz region unlocking and the date stamp. Select features individually or combine them; aspect, zebra, bitrate and date stamp bring the `shutter-sound` menu framework with them.
+| Preset | What it does | Notes |
+| --- | --- | --- |
+| `liveview-dual` | Adds a full-information DISP page (top info + histogram + level) after the level page | [Doc](docs/liveview-full-info.md) |
+| `shutter-sound` | Custom electronic-shutter sound from the SD card, with on/off, file choice, preview and reload | [Doc](docs/shutter-sound.md) |
+| `m900` | Enables the stock M-mode long-exposure path, up to 900 s | — |
+| `mtp-fast` | Faster MTP property-list queries with identical replies | [Verification](docs/verification.md) |
+| `video-rot` | Writes orientation metadata for new videos, locked when recording starts | [Doc](docs/video-rotation.md) |
+| `bitrate-slowmo-uncap` | Three in-camera bitrate profiles with memory, higher 4K/1080p high-quality bitrates, 25-minute slow-motion limit | [Doc](docs/bitrate-slowmo-uncap.md) |
+| `aspect-profiles` | Six photo aspect ratios with a translucent live-view mask; the stock grid stays | [Doc](docs/aspect-profiles.md) |
+| `photo-zebra` | Extends the stock zebra pattern to photo live view, with its own switch | [Doc](docs/photo-zebra.md) |
+| `wifi-5ghz` | Requests the US/-1 country code on every valid wireless profile to unlock 5 GHz connections | See note¹ |
+| `date-stamp` | Film-style date stamp in the lower right of JPEGs: five formats, four colors, optional glow, follows portrait orientation | [Doc](docs/date-stamp.md) |
 
-| Preset | Feature |
-| --- | --- |
-| `liveview-dual` | Keep existing DISP pages and insert a full-information page (top information, histogram and level) after the horizon page. [Details](docs/liveview-full-info.md) |
-| `shutter-sound` | Read a custom electronic-shutter WAV from SD, with enable/disable, selection, preview, and reload. |
-| `m900` | Enable the existing stock M-mode extended-exposure path, up to 900 seconds, retaining the M-mode check. |
-| `mtp-fast` | Accelerate MTP property-list queries while preserving response semantics. |
-| `video-rot` | Write orientation metadata for new recordings and lock the orientation captured at recording start. |
-| `bitrate-slowmo-uncap` | Select and remember Stock, Balanced, or High quality bitrates with raised 4K and 1080p high-quality rates; extend slow-motion recording to 25 minutes with FAT32 splitting or large exFAT files. |
-| `aspect-profiles` | Six photo ratios and a translucent live-view mask in one preset, preserving the interior stock grid. [Details](docs/aspect-profiles.md) |
-| `photo-zebra` | Photo live-view zebra with an independent switch and native pattern/threshold controls. [Details](docs/photo-zebra.md) |
-| `wifi-5ghz` | US/-1 country request on all 22 valid Wi-Fi profiles for 5 GHz STA; included in full and available separately. |
-| `date-stamp` | Film-style date stamp in the lower right of JPEGs, with five formats, four colors and an optional glow, turned with portrait shots; included in `full`, off in the camera menu by default. [Details (Chinese)](docs/date-stamp.md) |
-
-Build with `python patch.py wifi-5ghz --source "Z_30_0120.bin" --output "output/EG209020-wifi-5ghz.BIN"`, or select `full` to include all features. Interactive option 10 selects this preset. Only the country and revision fields of profiles 1–10 and 14–25 (including the unset-index fallback) change; index fields and the 12 reserved slots are kept, and no persistent sales-region or NVRAM write is made. Initialization paths that bypass the table are unchanged. Bodies that previously allowed 2.4 GHz channels 12 and 13 may lose networks on them (inferred, not measured). This does not open all channels. Camera AP support, throughput and negotiated bandwidth remain unproven. Effective channels and power must suit the place of use. The standalone preset only needs the Python standard library.
-
-`photo-zebra` reuses native highlight patterns and eight threshold levels in photo live view. It is included in `full` and can also be selected individually. Extensions → Photo zebra → OFF/ON controls photo live view independently (default OFF). Photo zebra, native controls and JPEG/NEF integrity have hardware coverage; the independent switch still requires hardware validation. [Implementation and evidence](docs/photo-zebra.md).
-
-Sound and extension menus support Simplified Chinese, Traditional Chinese, and English fallback. Current builds do not add a Camera Status page.
-
-`aspect-profiles` combines custom photo crops and a translucent live-view mask in one preset; the default `full` includes it. The mask dims the region outside the selected crop at `128/255` opacity (about 50%), preserving interior grid lines and stock icons. It remains visible with the stock grid off. Selecting OFF restores the preceding stock image area and clears the mask.
+¹ `wifi-5ghz` only changes the wireless country request; it does not write the camera's sales region or NVRAM. Cameras that could use 2.4 GHz channels 12 and 13 may no longer connect on them (inferred, not tested). It does not promise a 5 GHz access point from the camera itself or faster transfers, and the channels and power in use must suit local rules.
 
 ## Quick start
 
-### Graphical app (recommended, Windows)
+### Stock firmware
 
-No Python installation or commands are needed:
+Bring your own firmware: the repository ships neither stock firmware nor a modified update package. The builder accepts exactly this file:
 
-1. Download `WonderLanternZ30-windows-x64.zip` from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract the whole archive**; do not run it from inside the zip.
-2. Supply an unmodified `Z_30_0120.bin` (requirements below). Put it in the extracted folder or select it in the app.
+| Item | Value |
+| --- | --- |
+| Camera / firmware | Nikon Z30 / C 1.20 |
+| File | `Z_30_0120.bin`, 34,496,798 bytes |
+| SHA-256 | `1a5449ef505f1f347ed4e066a6a3f588ea542240680e83f4ebcae3b16da3434a` |
+
+### Graphical app (Windows, recommended)
+
+1. Download `WonderLanternZ30-windows-x64.zip` from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract all files** before running.
+2. Put `Z_30_0120.bin` in the extracted folder, or choose it in the app.
 3. Open `WonderLanternZ30.exe` and wait for the firmware check to pass. The interface switches between Chinese and English.
-4. Tick features (`full` by default) and click Build. Output goes to the `output` folder beside the app and never overwrites existing files.
+4. Tick the features (default `full`) and click Build. Output goes to the `output` folder next to the app; existing files are never overwritten.
 
-The app is not code-signed, so Windows SmartScreen may warn about it; you can compare it with the SHA-256 on the Release page first. It uses the same checks and patch flow as the command line, and does not connect to a camera or write to an SD card.
-
-On other systems, or to modify the source, run `python patch_gui.py` or use the command line below.
+The app is not code-signed, so Windows SmartScreen may warn; compare the SHA-256 listed on the Release page first. On other systems, run `python patch_gui.py` or use the command line.
 
 ### Command line
 
-See the [build guide](PATCH_GUIDE.md) (Chinese) for details. Run these commands in PowerShell from the project root.
-
-### 1. Prepare the source and stock firmware
-
-You need Python **3.10+**, the complete project source including `src/`, and an unmodified **`Z_30_0120.bin`**. Supply the firmware yourself; the repository does not include stock firmware or complete modified update packages.
-
-The builder accepts this exact stock input:
-
-| Property | Value |
-| --- | --- |
-| Camera / firmware | Nikon Z30 / C 1.20 |
-| File size | 34,496,798 bytes |
-| SHA-256 | `1a5449ef505f1f347ed4e066a6a3f588ea542240680e83f4ebcae3b16da3434a` |
-
-### 2. Install dependencies and build
+Needs Python **3.10+** and the full source tree. From the project root (PowerShell):
 
 ```powershell
 python -m pip install '.[sound]'
@@ -75,100 +61,65 @@ New-Item -ItemType Directory -Force output | Out-Null
 python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 ```
 
-`.[sound]` installs the Keystone assembler required by `full`. The additional `liveview-dual` DISP page also requires Keystone. Standalone `m900` needs only the Python standard library. Sound, bitrate profiles, the date stamp and MTP acceleration require Keystone. The bitrate preset includes the sound-menu framework, with sound disabled by default. For standalone video orientation, `.[video]` provides the same assembler dependency as `.[sound]`.
+- `.[sound]` installs the Keystone assembler. Every feature except `m900` or `wifi-5ghz` built on their own needs it.
+- Without presets, a multi-select menu lists `full` and the ten features as entries 1–11; press Enter for `full`.
+- Or name the presets directly, separated by spaces; repeated features apply once:
 
-On macOS, if installation still leaves `fail to load the dynamic library`, activate the Python environment used for building, then install and link the native library:
+```powershell
+python patch.py liveview-dual m900 mtp-fast --source "Z_30_0120.bin" --output "output/EG209020-custom.BIN"
+```
+
+- **macOS:** if installation is followed by `fail to load the dynamic library`, run this in the Python environment you build with:
 
 ```bash
 brew install keystone
 ln -s "$(brew --prefix keystone)/lib/libkeystone.dylib" "$(python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')/keystone/libkeystone.dylib"
-python -c "from keystone import Ks; print('Keystone OK')"
 ```
 
-### 3. Select presets
+Step-by-step instructions and common errors are in the [offline build guide](PATCH_GUIDE.md) (Chinese).
 
-Omitting presets in an interactive terminal displays a selection menu. Options **1–11** are `full`, followed by the ten presets in the table above (option **9** is `photo-zebra`; option **10** is `wifi-5ghz`; option **11** is `date-stamp`). Enter numbers or names separated by spaces or commas; an empty response selects `full`.
-
-- `2 4 5` or `liveview-dual,m900,mtp-fast`: combined display, M900, and MTP acceleration.
-- `11` or `date-stamp`: the date stamp alone, with its required menu framework.
-- `1` or `full`: all ten features, including orientation, bitrate/slow-motion changes and the date stamp.
-
-Alternatively, specify presets directly on the command line, separated by spaces:
-
-```powershell
-python patch.py liveview-dual m900 mtp-fast --source "Z_30_0120.bin" --output "output/EG209020-custom.BIN"
-python patch.py full --source "Z_30_0120.bin" --output "output/EG209020-full.BIN"
-```
-
-Each feature is applied once, in a fixed build order. `full video-rot` and `full bitrate-slowmo-uncap` enable the same feature set as `full` alone. With redirected input or a noninteractive script, omission defaults to `full`; `--interactive` forces the menu.
-
-The legacy alias `modular` is still accepted on the command line or when typed into the menu, but has no numbered entry. It includes only `liveview-dual`, `m900`, and `shutter-sound`. It excludes MTP acceleration, video orientation, and bitrate/slow-motion changes. Use `full` for the current complete bundle.
-
-### 4. Inspect the output
-
-The builder verifies the stock package's size and SHA-256, decodes it internally, validates container/module CRCs and EG identity, and checks expected bytes, boundaries, and overlaps for each patch. It then applies the patches and rebuilds the CRC. Offsets refer to the **extracted EG module**.
+### Output
 
 | File | Purpose |
 | --- | --- |
-| `EG209020.BIN`, or your chosen name | Standalone EG module; not a repackaged `Z_30_0120.bin`. |
-| Matching `.json` | Input/output digests, selected presets, expanded features, edit locations, expected/replacement bytes, appended code, and feature information. |
+| `EG209020.BIN` | The modified stand-alone EG module, not a repackaged `Z_30_0120.bin` |
+| `.json` with the same name | Input/output digests, selected features, and every edit's offset, original bytes and replacement bytes |
 
-The input is never modified. Existing output or report files are refused: choose a fresh path or move the previous BIN and JSON first. `Built` confirms a local build; a valid CRC does not establish correctness of all camera behavior. See [build details](docs/build.md) for implementation notes and the developer-only `--extracted-eg` mode.
+- The builder first checks the stock package's size and SHA-256, decodes it internally and checks every CRC, then verifies original bytes, bounds and non-overlap for each edit before rebuilding the CRC.
+- It never modifies its input and refuses to overwrite existing output.
+- `Built` means the local build finished. It does not mean every camera behavior is verified.
 
-## Menus and language
+Implementation details: [build notes](docs/build.md) (Chinese).
 
-Menus follow the stock **Language** setting. Simplified and Traditional Chinese use the stock Chinese fonts; all other languages receive English labels. Other translations are not implemented.
+## Using the features
 
-| Build content | English entry | Simplified Chinese entry | Traditional Chinese entry |
-| --- | --- | --- | --- |
-| Sound framework only | `Shutter sound` | 快门声音 | 快門聲音 |
-| Photo, bitrate or date stamp features included, such as `full` | `Extensions` | 自定义菜单 | 自訂選單 |
+### Menus and language
 
-Photo aspect, Photo zebra and Date stamp are also listed at the end of the **photo shooting menu**, and Video bitrate at the end of the **movie shooting menu**. One press of up from the first row reaches them, and features missing from a build do not appear. These rows are entries only: the right column always shows `--`, so open the page to see the current value. The same entries remain in the custom menu. The direct rows have QEMU verification only and are not yet confirmed on a camera.
+- **Menu entry:** new features live in **Setup menu → Extensions** (Simplified Chinese 自定义菜单, Traditional 自訂選單). A sound-only build names the entry `Shutter sound`.
+- **Direct rows:** Photo aspect, Photo zebra and Date stamp are also listed at the end of the photo shooting menu, and Video bitrate at the end of the video shooting menu; press up once from the first row to reach them. Direct rows show `--` on the right. These direct rows are verified in QEMU only.
+- **Language:** menus follow the stock **Language** setting and show Simplified Chinese, Traditional Chinese or English; other languages show English.
+- **Added glyphs:** the stock Chinese fonts only carry menu characters. Builds add every printable ASCII character and the characters the Chinese labels need, converted from Noto Sans CJK (SIL OFL 1.1). This does not provide arbitrary Chinese text input.
 
-Fixes cover missing titles, clipping by empty value columns, disappearing sidebars, back-button residue after returning, and corrupted entry labels in non-Chinese languages or on the first menu entry after reboot. The user reported the preceding drawing and language fixes working on hardware; the new message page and preferences still need separate hardware validation. Native QEMU and constructor comparisons are in the [UI verification record](docs/ui-qemu.md).
+### Custom shutter sound
 
-WAV filenames and paths remain ASCII. Stock Chinese fonts contain a limited character set, and menu wording uses checked characters. Arbitrary Chinese text input and a complete new font set are not provided.
-
-## Custom shutter sound
-
-With photo, video or date stamp features, the root menu is grouped by purpose and these operations live under Shutter sound. Sound-only builds show enable/disable, file selection, preview and reload directly. Selection pages mark the current choice with `*`; press OK once to apply and return to the sound menu. Selecting a file does not automatically enable sound or play it.
-
-Supported SD paths:
+Put the sounds on the SD card:
 
 ```text
 SD card root/
 ├─ SHUTTER.WAV
 └─ SHUTTER/
-   ├─ 1.WAV
-   ├─ 2.WAV
-   ├─ 3.WAV
-   └─ 4.WAV
+   ├─ 1.WAV  …  4.WAV
 ```
 
-Preparing `SHUTTER.WAV` in the root is recommended. The numbered files and `SHUTTER` directory are optional. Enabling sound without a loaded sample reads the current selection, initially `SHUTTER.WAV`. You can instead load an existing numbered file before enabling sound, so the root file is not mandatory for every usage path.
+- **Format:** 8000 Hz, mono, 16-bit signed PCM, non-empty and at most 1.08 s, with a standard 44-byte WAV header. Convert with `python tools/prepare_wav.py input.wav SHUTTER.WAV`.
+- **Trigger:** it plays for silent photos only, so the stock **Silent photography** must be on; videos and non-silent photos don't trigger it.
+- **Memory:** the selection and switch are saved to `WL-SOUND.CFG` at the card root and restored after a restart.
 
-Audio must be **8000 Hz, mono, signed 16-bit little-endian PCM, nonempty, and at most 1.08 seconds**, with a standard 44-byte WAV header and no extra chunks. Normalize a short integer-PCM WAV with:
+See the [sound notes](docs/shutter-sound.md).
 
-```powershell
-python tools/prepare_wav.py input.wav SHUTTER.WAV
-```
+### Video bitrate and slow motion
 
-The converter uses linear interpolation; consider an anti-aliasing resampler first for high-rate audio. Firmware updates do not require replacing your existing WAV files. No third-party audio is included; `example(slot)` in the script generates original synthetic samples.
-
-Sound defaults to OFF without a valid saved record. It plays for silent still-photo captures only when both this feature and stock silent photography are enabled; video and nonsilent photos do not trigger it, and preview works while OFF. Successful file selections and switch changes are saved to `WL-SOUND.CFG` in the SD-card root. After reboot, the previous selection and enabled state are restored on the first menu entry or photo trigger, without opening the menu first. The sound file must remain at its original path; the first photo may incur an extra SD read. Corrupt preferences or a failed startup sound load leave sound OFF. Save failures report that the current setting was not saved. Failed loads preserve the previous valid sample and switch state. Errors appear in a separate message page body while menu titles remain unchanged. The new message page and preferences have instruction-level and assisted QEMU coverage; the user has also confirmed physical-camera testing. See [sound details](docs/shutter-sound.md).
-
-## Automatic video orientation
-
-After stock configuration succeeds for a new recording's container object, `video-rot` reads the stock orientation and locks that object to **0°, 90°, 270°, or 180°**. Unknown or unavailable orientation falls back to 0°. Rotating the camera during recording does not change the current object's orientation. This implements the behavior discussed in [issue #3](https://github.com/WonderLantern/wonder-lantern-z30/issues/3).
-
-Only video-track orientation metadata for new recordings changes. Pixels and existing files are not rotated; the shared matrix, movie header, and audio track retain stock behavior. Players must honor orientation metadata. The user confirmed landscape, both portrait directions, and locking during recording. Upside-down landscape has no separately recorded result, and original MP4 matrices have not been checked byte for byte in this repository. See [video-orientation details](docs/video-rotation.md).
-
-## Video bitrates and slow motion
-
-Choose a profile under **Setup → Extensions → Video bitrate**. `*` marks the current profile. High quality is the default. The selection is stored in `WL-VIDEO.CFG` at the SD-card root and restored on the first menu entry or movie-parameter read after restart. Missing or invalid settings use High quality. A save failure opens a separate message page; the current selection remains available for subsequent recordings.
-
-Rates are in **Mbps, maximum / average**:
+Pick a profile in **Extensions → Video bitrate**. The default is High quality, saved in `WL-VIDEO.CFG`. Values in Mbps, maximum / average:
 
 | High-quality mode | Stock | Balanced | High quality (default) |
 | --- | --- | --- | --- |
@@ -176,64 +127,53 @@ Rates are in **Mbps, maximum / average**:
 | 1080p 60p, 50p | 56 / 48 | 84 / 70 | 108 / 90 |
 | 1080p 30p, 25p, 24p | 28 / 24 | 48 / 40 | 72 / 60 |
 
-The slow-motion **recording-time** limit rises from 3 to **25 minutes**. FAT32 allows up to 8 files; exFAT uses one large file. Bitrates for 120p/100p, slow motion, and standard quality remain stock. Resolution, frame rate, GOP, and the 125-minute limit for other modes remain stock. The 25-minute limit accounts for fixed-capacity index tables; recording is not unlimited. The 4K rate rationale and the [4K 50p/60p feasibility](docs/uhd-4k60-feasibility.md) conclusions are covered separately.
+- The slow-motion recording limit grows from 3 to 25 minutes: up to 8 files on FAT32, one file on exFAT.
+- Other modes keep their stock bitrates, frame rates and 125-minute limit.
+- The Stock profile restores bitrates only; it does not undo the slow-motion extension.
 
-Profiles affect subsequent native movie configurations and do not write to an active encoder. Stock restores bitrates only; the 25-minute slow-motion extension remains enabled. Earlier hardware tests covered fixed High quality rates and slow-motion file integrity. Runtime switching, Balanced, and persisted profile selection still need camera validation. See [bitrate and slow-motion details](docs/bitrate-slowmo-uncap.md) for parameters, QEMU boundaries, and earlier hardware records.
+### Other features
+
+- **Video orientation:** locks 0°, 90°, 180° or 270° when recording starts and writes orientation metadata only, without rotating pixels ([doc](docs/video-rotation.md)).
+- **Photo aspect:** masks at about 50% strength; choosing Off restores the stock frame ([doc](docs/aspect-profiles.md)).
+- **Date stamp:** off by default, and applies to in-camera JPEGs only ([doc](docs/date-stamp.md)).
 
 ## Verification status
 
-Offline results and user hardware reports are separate. Evidence for one preset does not establish coverage of every combination, mode, or failure condition.
+Offline checks and camera feedback are recorded separately. This table lists existing evidence only and does not claim every mode or failure condition is covered.
 
-| Scope | Recorded evidence |
+| Area | Evidence |
 | --- | --- |
-| Builds and regressions | 54 unit tests pass. The aspect integration has six build-combination checks; see [integration details](docs/aspect-preset-integration.md). Historical CRC and byte-for-byte reproducibility passed for `shutter-sound` and `full`. |
-| Menus and language | Native QEMU pages/constructors and Unicorn instruction checks; the user reported the preceding drawing/language version working on hardware. New message-page and preferences behavior still needs hardware validation. |
-| Custom aspects and mask | Hardware feedback covers specific capture, live-view, boundary/grid and mask fixes; the latest v42 playback retest was reported normal. See [current details](docs/aspect-profiles.md). |
-| EG installation | Maintainer confirmation of Z30 C 1.20 installation. |
-| Date stamp | Five formats, four colors, the glow and both portrait sides confirmed by the user on the camera; Unicorn checks ARM against the host reference pixel for pixel. |
-| Video orientation | Hardware feedback for the standalone preset's orientation and recording-time lock; see the dedicated coverage notes. |
-| MTP acceleration | 590 property-list responses matched stock, with reduced query times; conditions and numbers are in the verification document. |
-| Photo zebra | Photo live view, native controls and JPEG/NEF integrity have hardware coverage. The independent photo switch has ARM and three-language native QEMU menu checks; its hardware validation is pending. |
-| Bitrates and slow motion | Earlier fixed High quality builds have hardware file checks; runtime profiles, Balanced, and persistence still need camera validation. |
+| Build and unit tests | 143 unit tests pass; builds are byte-for-byte reproducible with zero CRC residue |
+| EG installation | Maintainer confirmed installation on Z30 C 1.20 |
+| Menus, language and added glyphs | QEMU native pages and Unicorn instruction checks; the added Chinese glyphs, the Language page (every region's list) and the firmware update page have QEMU checks and user camera confirmation |
+| Dual live view, shutter sound, M900, aspect profiles | Confirmed by users on camera |
+| Date stamp | Five formats, four colors, glow and both portrait orientations confirmed on camera |
+| Video orientation | Camera feedback for landscape, both portrait sides and in-recording lock; no separate record for upside-down landscape |
+| Bitrate and slow motion | Profiles, Balanced and memory confirmed on camera; the 4K 200/168 row has no camera record yet |
+| Photo zebra | Live view, stock thresholds and file integrity verified on camera; the separate switch is checked in QEMU only |
+| MTP acceleration | Matches stock on 590 property-list replies, with faster queries |
+| Wi-Fi 5 GHz | A user confirmed 5 GHz connections; throughput and long-term stability untested |
 
-Hardware results for combined histogram/level display, shutter-sound playback, and M-mode extended exposure are not individually recorded in the verification document. `camera_verified: false` means **the build script itself did not perform a camera test**; hardware feedback is recorded separately. Reported EG installation does not establish that every generated image has been tested. This tool does not build complete Nikon update packages.
+`camera_verified: false` in a build report means **the build script itself ran no camera test**; camera results are recorded in the feature documents.
 
-Run tests without stock firmware:
-
-```powershell
-python -m pip install '.[sound,verify]'
-$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
-python -m unittest discover -s tests -v
-```
-
-See [verification instructions](docs/verification.md) and the [UI record](docs/ui-qemu.md) for identity/CRC checks, boundaries, stock-instruction execution, MTP comparisons, and the external QEMU environment. Assisted QEMU boot and diagnostic inputs do not replace complete hardware boot, recording, SD/USB, or failure-scenario testing.
-
-## Documentation index
-
-Detailed documents are currently mainly in Chinese. The [Chinese README](README.md) covers the same usage and scope as this English version.
+## Documentation
 
 | Document | Contents |
 | --- | --- |
-| [Build guide](PATCH_GUIDE.md) | Inputs, menu selection, outputs, and common errors. |
-| [Build details](docs/build.md) | Identity, decoding, preset combinations, and patch workflow. |
-| [Photo live-view zebra](docs/photo-zebra.md) | Independent switch, native patterns/thresholds, preferences and validation scope. |
-| [Date stamp](docs/date-stamp.md) | Hook point, validation scope and camera test steps for the film-style JPEG date stamp. |
-| [Custom aspects and translucent mask](docs/aspect-profiles.md) | Six ratios, output dimensions, live-view behavior and evidence boundaries. |
-| [v42 playback fix](docs/aspect-lifecycle-v42.md) | Lifecycle gate, stale-mask retirement and user retest. |
-| [Sound details](docs/shutter-sound.md) | Menus, trigger conditions, format, and state. |
-| [Video orientation](docs/video-rotation.md) | Locking, metadata, and hardware records. |
-| [Bitrates and slow motion](docs/bitrate-slowmo-uncap.md) | Parameters, index capacity, and hardware file checks. |
-| [4K 60p feasibility](docs/uhd-4k60-feasibility.md) | Evidence chain and verdict for unlocking 4K 50p/60p, plus the 4K rate rationale. |
-| [Verification instructions](docs/verification.md) | Tests, stock-instruction execution, MTP, and hardware evidence. |
-| [UI verification record](docs/ui-qemu.md) | Chinese menus, rendering, return behavior, and first-entry fixes. |
-| [Licenses and third-party notices](THIRD_PARTY_NOTICES.md) | File-specific licenses and resource provenance. |
+| [Offline build guide](PATCH_GUIDE.md) | GUI and command-line steps, common errors (Chinese) |
+| [Contributor guide](CONTRIBUTING.en.md) | Code layout, writing patches, tests and QEMU checks, commits and releases |
+| [Build notes](docs/build.md) | Input checks, decoding, preset composition, patch flow |
+| [Verification](docs/verification.md) | Unit tests, stock instruction execution, camera evidence |
+| [UI verification log](docs/ui-qemu.md) | Menus, Chinese text, fonts and added glyphs, Language and firmware update pages |
+| Feature documents | Linked from the feature table |
+| [Licenses and third-party notices](THIRD_PARTY_NOTICES.md) | Per-file licenses and asset sources |
 
-## Licensing and project identity
+Topic documents are mostly in Chinese; this English README covers the same content as the Chinese one.
 
-This project belongs to **WonderLantern** and is independent and experimental. Nikon does not endorse or support it.
+## License
 
-Original code and documentation use the [MIT License](LICENSE), except for the sound, menu, aspect and mask implementation files listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Those files use the [Wonder Lantern Community License](licenses/Wonder-Lantern.txt); see their SPDX markers and the file list.
-
-The community license permits use, modification, and free redistribution, requires publicly distributed modified versions to provide source under the same license, and prohibits charging for software distribution. Paid professional photography or filmmaking using it is permitted. Combined code must comply with each file's terms. The restriction on claiming derivative versions as official Wonder Lantern releases concerns software-release identity; it does not change this repository's ownership by the WonderLantern organization.
-
-These licenses grant no rights to Nikon firmware, stock resources, third-party software, or trademarks. Stock firmware and menu templates are read locally from matching user input. Reference-project and dependency provenance and licensing are in the [third-party notices](THIRD_PARTY_NOTICES.md).
+- **Project identity:** this project belongs to the **WonderLantern** organization and is an independent experiment, not supported or endorsed by Nikon.
+- **Code:** original code and documents are under the [MIT License](LICENSE). The sound, menu and aspect implementation files listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are under the [Wonder Lantern Community License](licenses/Wonder-Lantern.txt), which allows use, modification and free redistribution but forbids paid distribution.
+- **Added glyphs:** the glyphs converted from Noto fonts are under the [SIL OFL 1.1](licenses/OFL-Noto-CJK.txt).
+- **Per-file terms:** each file's SPDX tag and the list above decide.
+- **Nikon:** nothing here grants rights to Nikon firmware, Nikon resources or trademarks.
