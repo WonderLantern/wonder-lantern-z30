@@ -19,7 +19,7 @@ python -m pip install -e '.[sound,verify]'
 
 - **Python 3.10+。** `sound` 安装 Keystone（汇编补丁代码），`verify` 安装 Unicorn（执行原厂与补丁指令的测试）。
 - **原厂固件。** 把未修改的 `Z_30_0120.bin` 放在仓库根目录（已被 `.gitignore` 忽略），依赖固件的测试和工具会自动使用它；没有它时这些测试会跳过。
-- **QEMU（可选）。** 把 z30-qemu（基于 WonderLantern/z7-qemu 的 Z30 模拟机）放在本仓库旁边（`../z30-qemu`），按它的 README 构建，并把解码后的原厂模块放到 `../z30-qemu/.local/firmware/eg2090_0120a0.bi`。QEMU 工具在 Linux 或 WSL 中用 `python3` 运行，传 `--qemu-root ../z30-qemu`。
+- **QEMU（可选）。** 把 [z30-qemu](https://github.com/WonderLantern/z30-qemu)（基于 WonderLantern/z7-qemu 的 Z30 模拟机）克隆到本仓库旁边（`../z30-qemu`），按它的 README 构建，并把解码后的原厂模块放到 `../z30-qemu/.local/firmware/eg2090_0120a0.bi`。QEMU 工具在 Linux 或 WSL 中用 `python3` 运行，传 `--qemu-root ../z30-qemu`。
 - **补字字体（只在增加中文标签时需要）。** `python -m pip install fonttools`，再把 [noto-cjk](https://github.com/notofonts/noto-cjk) 的 `Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf`、`Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf` 和 `Sans/Mono/NotoSansMonoCJKsc-Regular.otf` 下载到 `build/fonts/noto-cjk/`。
 
 ## 仓库结构

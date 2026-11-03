@@ -19,7 +19,7 @@ python -m pip install -e '.[sound,verify]'
 
 - **Python 3.10+.** `sound` installs Keystone (assembling patch code); `verify` installs Unicorn (tests that execute stock and patch instructions).
 - **Stock firmware.** Put an unmodified `Z_30_0120.bin` in the repository root (ignored by `.gitignore`). Firmware-dependent tests and tools pick it up automatically and are skipped without it.
-- **QEMU (optional).** Place z30-qemu (the Z30 machine based on WonderLantern/z7-qemu) next to this repository as `../z30-qemu`, build it as its README describes, and put the decoded stock module at `../z30-qemu/.local/firmware/eg2090_0120a0.bi`. QEMU tools run under Linux or WSL with `python3` and take `--qemu-root ../z30-qemu`.
+- **QEMU (optional).** Clone [z30-qemu](https://github.com/WonderLantern/z30-qemu) (the Z30 machine based on WonderLantern/z7-qemu) next to this repository as `../z30-qemu`, build it as its README describes, and put the decoded stock module at `../z30-qemu/.local/firmware/eg2090_0120a0.bi`. QEMU tools run under Linux or WSL with `python3` and take `--qemu-root ../z30-qemu`.
 - **Glyph fonts (only when adding Chinese labels).** Run `python -m pip install fonttools`, then download `Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf`, `Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf` and `Sans/Mono/NotoSansMonoCJKsc-Regular.otf` from [noto-cjk](https://github.com/notofonts/noto-cjk) into `build/fonts/noto-cjk/`.
 
 ## Repository layout
