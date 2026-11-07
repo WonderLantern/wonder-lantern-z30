@@ -41,7 +41,7 @@ python patch.py --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 python patch.py liveview-dual m900 mtp-fast --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 ```
 
-`full` 展开为全部十项功能：同屏、M900、快门声音、MTP 加速、视频方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz 和日期水印。`modular` 现为同屏、M900 和快门声音；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra wifi-5ghz date-stamp` 与 full 启用同一功能集合。SD 模块宿主的代码保留给研究工具，通过 `build(..., module_host=True)` 构建，不再出现在 patch 程序和图形界面中。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
+`full` 展开为全部十一项功能：同屏、M900、快门声音、MTP 加速、视频方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印和 NEF 压缩菜单（`nef-menu`）。`nef-uncompressed` 和 `nef-compressed` 不在 `full` 中，和 `full` 一起选时替换其中的 `nef-menu`，三者互斥。`modular` 现为同屏、M900 和快门声音；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra wifi-5ghz date-stamp nef-menu` 与 full 启用同一功能集合。SD 模块宿主的代码保留给研究工具，通过 `build(..., module_host=True)` 构建，不再出现在 patch 程序和图形界面中。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
 
 ### 视频码率与慢动作限制
 

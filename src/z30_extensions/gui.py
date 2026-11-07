@@ -18,7 +18,7 @@ OUTPUT_STEM = 'EG209020'
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
-    'full': 'All ten features, including aspect profiles and the film-style date stamp',
+    'full': 'All eleven features, including aspect profiles, the film-style date stamp and the NEF compression menu',
     'liveview-dual': 'Histogram and level together on a new full-info DISP page',
     'shutter-sound': 'Custom electronic shutter sound',
     'm900': '900-second exposure in M mode',
@@ -28,6 +28,9 @@ PRESET_LABELS_EN = {
     'aspect-profiles': 'Custom photo aspect ratios with a translucent mask, keeps stock grid',
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
+    'nef-uncompressed': 'Experimental: NEF fixed to uncompressed (confirmed on the camera as Packed 14-bit); not in full, replaces the nef-menu inside full',
+    'nef-compressed': 'Experimental: NEF fixed to compressed (lossy), confirmed on the camera as Lossy type 2; not in full, replaces the nef-menu inside full',
+    'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; included in full, the effect of the menu choice is not verified on the camera yet',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
 }
 
@@ -175,7 +178,11 @@ def main(argv=None):
                 if full:
                     checks[name].set(True)
         chosen = selected_presets({name: var.get() for name, var in checks.items()})
-        enabled = resolve_presets(chosen)[1] if chosen else []
+        try:
+            enabled = resolve_presets(chosen)[1] if chosen else []
+        except ValueError as error:
+            enabled_var.set(str(error))
+            return
         enabled_var.set(text['enabled'].format(', '.join(enabled) or text['none']))
 
     def start_source_check(*_):
