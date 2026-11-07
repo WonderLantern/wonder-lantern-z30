@@ -31,6 +31,16 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 
 ¹ `wifi-5ghz` only changes the wireless country request; it does not write the camera's sales region or NVRAM. Cameras that could use 2.4 GHz channels 12 and 13 may no longer connect on them (inferred, not tested). It does not promise a 5 GHz access point from the camera itself or faster transfers, and the channels and power in use must suit local rules.
 
+### Optional presets (not in `full`)
+
+The three NEF compression presets below are not part of `full`. They are mutually exclusive, so pick at most one; each can be combined with `full`, for example `full nef-uncompressed`. `nef-menu` adds a choice to the extension menu; the other two fix the compression type at build time, without a menu.
+
+| Preset | What it does | Notes |
+| --- | --- | --- |
+| `nef-menu` | Choose the NEF compression type (lossless / compressed / uncompressed) in the extension menu, saved to `WL-NEF.CFG` | [Doc](docs/nef-compression.md), shooting is normal with the default choice; the effect of the menu choice is not verified on a camera yet |
+| `nef-uncompressed` | Fixes NEF to uncompressed at build time | [Doc](docs/nef-compression.md), confirmed on a camera |
+| `nef-compressed` | Fixes NEF to compressed (lossy) at build time | [Doc](docs/nef-compression.md), confirmed on a camera |
+
 ## Quick start
 
 ### Stock firmware
@@ -63,7 +73,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 ```
 
 - `.[sound]` installs the Keystone assembler. Every feature except `m900` or `wifi-5ghz` built on their own needs it.
-- Without presets, a multi-select menu lists `full` and the eleven features as entries 1–12; press Enter for `full`.
+- Without presets, a multi-select menu lists `full`, the eleven features above and the three optional presets below as entries 1–15; press Enter for `full`.
 - Or name the presets directly, separated by spaces; repeated features apply once:
 
 ```powershell

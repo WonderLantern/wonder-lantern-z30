@@ -18,6 +18,9 @@ PRESET_LABELS = {
     'photo-zebra': '照片取景斑马纹；独立开关，复用原厂样式和阈值',
     'wifi-5ghz': 'Wi-Fi 5 GHz 地区解锁；全部有效配置请求 US/-1，包含在 full 中',
     'portrait-ui': '竖拿相机时照片取景信息改为竖版，转动后自动重排，默认关闭；包含在 full 中',
+    'nef-uncompressed': '实验性：NEF 固定为未压缩（实机已确认变为 Packed 14-bit）；不包含在 full 中，与其他 NEF 预设互斥',
+    'nef-compressed': '实验性：NEF 固定为压缩（有损）（实机已确认变为 Lossy type 2）；不包含在 full 中，与其他 NEF 预设互斥',
+    'nef-menu': '实验性：扩展菜单中选择 NEF 压缩（无失真压缩/压缩/未压缩），保存到 WL-NEF.CFG；不包含在 full 中，菜单选择的效果尚未实机验证',
     'date-stamp': '在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，竖拍自动转向，默认关闭；包含在 full 中',
 }
 
@@ -67,6 +70,7 @@ def main(argv=None):
     parser.add_argument('feature', nargs='*', metavar='PRESET',
                         help='Combine presets with spaces: ' + ', '.join(PRESETS) +
                              '; full enables eleven features including wifi-5ghz (all valid profiles US/-1), date-stamp and portrait-ui; '
+                             'nef-menu, nef-uncompressed and nef-compressed are optional, not in full, and only one may be selected; '
                              'aspect-profiles includes a translucent live-view mask; '
                              'photo-zebra includes an independent photo live-view switch; '
                              'date-stamp and portrait-ui are off until chosen in the camera menu; legacy alias: modular')

@@ -9,10 +9,10 @@ from .sound_layout import *
 from .sound_audio import audio_code
 from .sound_ui import ui_code
 
-ROOT_ORDER = ('aspect', 'zebra', 'portrait', 'stamp', 'bitrate', 'sound', 'modules')
+ROOT_ORDER = ('aspect', 'zebra', 'portrait', 'stamp', 'nef', 'bitrate', 'sound', 'modules')
 
 
-def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
+def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, nef=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
     if precapture_probe and (wireless or bitrate):
@@ -42,11 +42,14 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     sizes['page_return'] = 96
     if aspect:
         sizes.update(ensure=1024, getter=512, route=448, row=384)
-    grouped = bool(modules or bitrate or aspect or zebra or stamp or portrait)
+    grouped = bool(modules or bitrate or aspect or zebra or stamp or portrait or nef)
     if grouped:
         sizes.update(ensure=1280, getter=640, route=640, action=1280)
     if stamp:
         sizes.update(ensure=1536, getter=768, route=768, action=1536)
+    if nef:
+        sizes.update(ensure=sizes['ensure'] + 128, getter=sizes['getter'] + 64,
+                     route=sizes['route'] + 64, action=sizes['action'] + 128)
     # Research builds keep their single-purpose page inside the custom menu only.
     native_menus = () if wireless or lut_sd or precapture_probe else tuple(
         menu for menu in NATIVE_MENUS if any(dict(aspect=aspect, zebra=zebra, portrait=portrait, stamp=stamp, bitrate=bitrate)[key] for key in menu[3]))
@@ -139,6 +142,9 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     if stamp:
         from . import date_stamp_ui as su
         register('stamp', su, su.ROWS, restore=('stamp_restore',))
+    if nef:
+        from . import nef_ui as nu
+        register('nef', nu, 3, restore=('nef_restore',))
     by_key = {page['key']: page for page in pages}
     # Scan stock row IDs now: direct rows need theirs before the row hook assembles.
     used = set()

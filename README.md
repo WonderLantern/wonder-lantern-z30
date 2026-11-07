@@ -31,6 +31,16 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的实验
 
 ¹ `wifi-5ghz` 只改无线国家请求，不写整机销售地区或 NVRAM。原本可用 2.4 GHz 第 12、13 信道的机身可能无法再连接这些信道（推断，未实测）。它不保证相机自身的 5 GHz 热点，也不保证提速；有效信道与功率需符合使用地点的规定。
 
+### 可选预设（不在 `full` 中）
+
+下面三个 NEF 压缩预设默认不包含在 `full` 中，彼此互斥，最多选一个，可以和 `full` 一起选，例如 `full nef-uncompressed`。`nef-menu` 在扩展菜单里提供选择；另外两个在构建时固定压缩类型，没有菜单。
+
+| 预设 | 功能 | 说明 |
+| --- | --- | --- |
+| `nef-menu` | 在扩展菜单里选择 NEF 压缩类型（无失真压缩／压缩／未压缩），保存到 `WL-NEF.CFG` | [文档](docs/nef-compression.md)，默认选项下实拍正常，菜单选择的效果尚未实机验证 |
+| `nef-uncompressed` | 构建时把 NEF 固定为未压缩 | [文档](docs/nef-compression.md)，已有实机确认 |
+| `nef-compressed` | 构建时把 NEF 固定为压缩（有损） | [文档](docs/nef-compression.md)，已有实机确认 |
+
 ## 快速开始
 
 ### 准备原厂固件
@@ -63,7 +73,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 ```
 
 - `.[sound]` 安装 Keystone 汇编器。除了单独构建 `m900` 或 `wifi-5ghz`，其他功能都需要它。
-- 省略预设时会显示多选菜单：编号 1–12 依次是 `full` 和上表十一项；直接回车选 `full`。
+- 省略预设时会显示多选菜单：编号 1–15 依次是 `full`、上表十一项和下面三个可选预设；直接回车选 `full`。
 - 也可以直接写预设名，多个用空格分隔，重复的功能只应用一次：
 
 ```powershell

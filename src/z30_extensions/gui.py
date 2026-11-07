@@ -29,6 +29,9 @@ PRESET_LABELS_EN = {
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
     'portrait-ui': 'Portrait layout for photo live-view info when held upright, redrawn after each turn, off by default; included in full',
+    'nef-uncompressed': 'Experimental: NEF fixed to uncompressed (confirmed on the camera as Packed 14-bit); not in full, excludes the other NEF presets',
+    'nef-compressed': 'Experimental: NEF fixed to compressed (lossy), confirmed on the camera as Lossy type 2; not in full, excludes the other NEF presets',
+    'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; not in full, the effect of the menu choice is not verified on the camera yet',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
 }
 
@@ -176,7 +179,11 @@ def main(argv=None):
                 if full:
                     checks[name].set(True)
         chosen = selected_presets({name: var.get() for name, var in checks.items()})
-        enabled = resolve_presets(chosen)[1] if chosen else []
+        try:
+            enabled = resolve_presets(chosen)[1] if chosen else []
+        except ValueError as error:
+            enabled_var.set(str(error))
+            return
         enabled_var.set(text['enabled'].format(', '.join(enabled) or text['none']))
 
     def start_source_check(*_):
