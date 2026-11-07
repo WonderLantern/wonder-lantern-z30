@@ -13,7 +13,7 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 
 ## Features
 
-`full` enables all ten features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate and date stamp automatically include the `shutter-sound` menu framework.
+`full` enables all eleven features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate and date stamp automatically include the `shutter-sound` menu framework.
 
 | Preset | What it does | Notes |
 | --- | --- | --- |
@@ -27,8 +27,18 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 | `photo-zebra` | Extends the stock zebra pattern to photo live view, with its own switch | [Doc](docs/photo-zebra.md) |
 | `wifi-5ghz` | Requests the US/-1 country code on every valid wireless profile to unlock 5 GHz connections | See note¹ |
 | `date-stamp` | Film-style date stamp in the lower right of JPEGs: five formats, four colors, optional glow, follows portrait orientation | [Doc](docs/date-stamp.md) |
+| `nef-menu` | Choose the NEF compression type (lossless / compressed / uncompressed) in the extension menu, saved to `WL-NEF.CFG` | [Doc](docs/nef-compression.md), shooting is normal with the default choice; the effect of the menu choice is not verified on a camera yet |
 
 ¹ `wifi-5ghz` only changes the wireless country request; it does not write the camera's sales region or NVRAM. Cameras that could use 2.4 GHz channels 12 and 13 may no longer connect on them (inferred, not tested). It does not promise a 5 GHz access point from the camera itself or faster transfers, and the channels and power in use must suit local rules.
+
+### Optional presets (not in `full`)
+
+The two presets below fix NEF to one compression type at build time, without a menu. They are mutually exclusive and are not part of `full`. Selected together with `full`, they replace the `nef-menu` inside it, for example `full nef-uncompressed`.
+
+| Preset | What it does | Notes |
+| --- | --- | --- |
+| `nef-uncompressed` | Fixes NEF to uncompressed at build time | [Doc](docs/nef-compression.md), confirmed on a camera |
+| `nef-compressed` | Fixes NEF to compressed (lossy) at build time | [Doc](docs/nef-compression.md), confirmed on a camera |
 
 ## Quick start
 
@@ -62,7 +72,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 ```
 
 - `.[sound]` installs the Keystone assembler. Every feature except `m900` or `wifi-5ghz` built on their own needs it.
-- Without presets, a multi-select menu lists `full` and the ten features as entries 1–11; press Enter for `full`.
+- Without presets, a multi-select menu lists `full`, the eleven features above and two optional presets as entries 1–14; press Enter for `full`.
 - Or name the presets directly, separated by spaces; repeated features apply once:
 
 ```powershell

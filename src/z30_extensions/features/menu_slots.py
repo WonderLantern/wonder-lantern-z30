@@ -14,7 +14,7 @@ SLOT_COUNT = 256
 STOCK_SLOTS = frozenset((*range(14), *range(20, 25), 26, 30, 31, 40, 59, 70, *range(72, 75), 77,
                          *range(79, 83), *range(84, 90), *range(100, 115), 177, *range(190, 200), 215))
 BLOCKS = dict(sound_group=(117, 1), zebra=(118, 8), stamp=(126, 19), sound=(145, 28),
-              modules=(216, 8), video=(224, 11), aspect=(235, 17))
+              nef=(200, 9), modules=(216, 8), video=(224, 11), aspect=(235, 17))
 _owned = [slot for base, size in BLOCKS.values() for slot in range(base, base + size)]
 if len(set(_owned)) != len(_owned) or max(_owned) >= SLOT_COUNT or STOCK_SLOTS.intersection(_owned):
     raise ValueError('Text slot blocks overlap each other or stock text')
