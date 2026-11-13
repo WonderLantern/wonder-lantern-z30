@@ -18,6 +18,18 @@ class AssemblyCacheTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'exceeds'):
                 assembly.assemble('nop;', 0x1000, 1)
 
+    def test_out_of_range_cbz_is_refused(self):
+        try:
+            import keystone  # noqa: F401
+        except Exception:
+            self.skipTest('Keystone not available')
+        with patch.object(assembly, '_cache', {}):
+            far = 'cbz r1,far;' + 'movw r0,#1;' * 40 + 'far:bx lr;'
+            with self.assertRaisesRegex(ValueError, 'cannot reach far'):
+                assembly.assemble(far, 0x12000000, 512)
+            near = 'cbz r1,near;movw r0,#1;near:cbnz r2,end;end:bx lr;'
+            self.assertTrue(assembly.assemble(near, 0x12000000, 64))
+
 
 if __name__ == '__main__':
     unittest.main()

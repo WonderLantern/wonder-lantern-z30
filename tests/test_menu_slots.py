@@ -1,6 +1,6 @@
 import unittest
 
-from z30_extensions.features import date_stamp_ui, menu_slots, module_host, sound_layout, zebra_ui
+from z30_extensions.features import date_stamp_ui, menu_slots, module_host, portrait_menu, sound_layout, zebra_ui
 from z30_extensions.features.menu_slots import BLOCKS, STOCK_SLOTS, page_slots
 
 
@@ -26,6 +26,8 @@ class MenuSlotTests(unittest.TestCase):
         self.assertLess(date_stamp_ui.CURRENT_SLOT, base + size)
         base, size = BLOCKS['zebra']
         self.assertLess(zebra_ui.CURRENT_SLOT, base + size)
+        base, size = BLOCKS['portrait']
+        self.assertLess(portrait_menu.CURRENT_SLOT, base + size)
         base, size = BLOCKS['modules']
         self.assertLess(module_host.STATUS_SLOT, base + size)
         base, size = BLOCKS['sound']

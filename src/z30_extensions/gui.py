@@ -18,7 +18,7 @@ OUTPUT_STEM = 'EG209020'
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
-    'full': 'All ten features, including aspect profiles and the film-style date stamp',
+    'full': 'All eleven features, including aspect profiles, the film-style date stamp and the portrait layout',
     'liveview-dual': 'Histogram and level together on a new full-info DISP page',
     'shutter-sound': 'Custom electronic shutter sound',
     'm900': '900-second exposure in M mode',
@@ -28,6 +28,7 @@ PRESET_LABELS_EN = {
     'aspect-profiles': 'Custom photo aspect ratios with a translucent mask, keeps stock grid',
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
+    'portrait-ui': 'Portrait layout for photo live-view info when held upright, redrawn after each turn, off by default; included in full',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
 }
 

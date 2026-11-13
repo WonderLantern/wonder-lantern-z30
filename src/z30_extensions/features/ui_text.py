@@ -31,6 +31,7 @@ TRANSLATIONS = {
     'Wi-Fi buffer': ('Wi-Fi \u53d1\u9001', 'Wi-Fi \u50b3\u9001'),
     '64 KiB (stock)': ('64 KiB (stock)', '64 KiB (stock)'),
     'Photo zebra': ('照片高光显示', '照片高光顯示'),
+    'Portrait UI': ('竖拍显示', '豎拍顯示'),
     'Photo aspect': ('照片画幅', '照片畫幅'),
     'Date stamp': ('日期水印', '日期水印'),
     'Y M D': ('年 月 日', '年 月 日'),

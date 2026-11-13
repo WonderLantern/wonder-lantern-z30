@@ -13,7 +13,7 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 
 ## Features
 
-`full` enables all ten features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate and date stamp automatically include the `shutter-sound` menu framework.
+`full` enables all eleven features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate, date stamp and portrait UI automatically include the `shutter-sound` menu framework.
 
 | Preset | What it does | Notes |
 | --- | --- | --- |
@@ -27,6 +27,7 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 | `photo-zebra` | Extends the stock zebra pattern to photo live view, with its own switch | [Doc](docs/photo-zebra.md) |
 | `wifi-5ghz` | Requests the US/-1 country code on every valid wireless profile to unlock 5 GHz connections | See note¹ |
 | `date-stamp` | Film-style date stamp in the lower right of JPEGs: five formats, four colors, optional glow, follows portrait orientation | [Doc](docs/date-stamp.md) |
+| `portrait-ui` | Photo live-view info turns to a portrait layout when the camera is held upright and fills in on its own after a turn; off by default; the i menu, touch-opened setting pages and the histogram stay landscape | [Doc](docs/portrait-ui.md) |
 
 ¹ `wifi-5ghz` only changes the wireless country request; it does not write the camera's sales region or NVRAM. Cameras that could use 2.4 GHz channels 12 and 13 may no longer connect on them (inferred, not tested). It does not promise a 5 GHz access point from the camera itself or faster transfers, and the channels and power in use must suit local rules.
 
@@ -62,7 +63,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 ```
 
 - `.[sound]` installs the Keystone assembler. Every feature except `m900` or `wifi-5ghz` built on their own needs it.
-- Without presets, a multi-select menu lists `full` and the ten features as entries 1–11; press Enter for `full`.
+- Without presets, a multi-select menu lists `full` and the eleven features as entries 1–12; press Enter for `full`.
 - Or name the presets directly, separated by spaces; repeated features apply once:
 
 ```powershell
@@ -143,12 +144,13 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 
 | Area | Evidence |
 | --- | --- |
-| Build and unit tests | 143 unit tests pass; builds are byte-for-byte reproducible with zero CRC residue |
+| Build and unit tests | 145 unit tests pass; builds are byte-for-byte reproducible with zero CRC residue |
 | EG installation | Maintainer confirmed installation on Z30 C 1.20 |
 | Menus, language and added glyphs | QEMU native pages and Unicorn instruction checks; the added Chinese glyphs, the Language page (every region's list) and the firmware update page have QEMU checks and user camera confirmation |
 | Dual live view, shutter sound, M900, aspect profiles | Confirmed by users on camera |
 | Date stamp | Five formats, four colors, glow and both portrait orientations confirmed on camera |
 | Video orientation | Camera feedback for landscape, both portrait sides and in-recording lock; no separate record for upside-down landscape |
+| Portrait UI | Layout, automatic fill-in after a turn (about 0.3–0.5 s by USB timing) and switching back and forth confirmed on camera; the release build without the diagnostic readout is confirmed separately |
 | Bitrate and slow motion | Profiles, Balanced and memory confirmed on camera; the 4K 200/168 row has no camera record yet |
 | Photo zebra | Live view, stock thresholds and file integrity verified on camera; the separate switch is checked in QEMU only |
 | MTP acceleration | Matches stock on 590 property-list replies, with faster queries |

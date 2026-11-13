@@ -6,10 +6,10 @@ from .platform.z30_120 import BASE
 
 
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot',
-           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp')
+           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
-                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp')
+                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui')
 FULL_FEATURES = FEATURE_ORDER
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 
@@ -30,14 +30,14 @@ def resolve_presets(preset='full'):
         else:
             features.add(name)
     # These pages share the sound menu/state framework.
-    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp')):
+    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui')):
         features.add('shutter-sound')
     return list(dict.fromkeys(selected)), [f for f in FEATURE_ORDER if f in features]
 
 
 def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
           aspect_border_diagnostic=False, aspect_border_lease=False,
-          aspect_mask=None, aspect_mask_trial=False, module_host=False):
+          aspect_mask=None, aspect_mask_trial=False, module_host=False, ptp_read=False):
     # module_host is a research option only: the SD module host is no longer a
     # patcher preset, but its tools still build it on top of the sound framework.
     selected, features = resolve_presets(preset)
@@ -80,7 +80,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'shutter-sound' in features:
         from .features.shutter_sound import add
         add(plan, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
-            zebra='photo-zebra' in features, stamp='date-stamp' in features,
+            zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
             aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
             aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial)
@@ -102,12 +102,19 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'date-stamp' in features:
         from .features.date_stamp import add
         add(plan)
+    if 'portrait-ui' in features:
+        from .features.portrait_ui import add
+        add(plan)
+    if ptp_read:
+        # Research only: read-only USB PTP 0x9FF1 ReadMemory for live readouts.
+        from .features.ptp_read import add
+        add(plan)
     output, report = plan.finish()
     for address, expected in VIDEO_STOCK_WINDOWS:
         if output[address - BASE:address - BASE + len(expected)] != expected:
             raise ValueError('Video shutter differs from stock')
     report['preset'] = selected[0] if len(selected) == 1 else selected
     report['selected_presets'] = selected
-    report['enabled_features'] = features + (['module-host'] if module_host else [])
+    report['enabled_features'] = features + (['module-host'] if module_host else []) + (['ptp-read-memory'] if ptp_read else [])
     report['video_shutter_stock'] = True
     return output, report

@@ -1,6 +1,7 @@
 """Checked assembly helpers for optional Keystone-backed target features."""
 import gzip
 import hashlib
+import re
 import struct
 import sys
 from importlib.resources import files
@@ -57,6 +58,36 @@ def keystone_assemble(source, address):
     return None if raw is None else bytes(raw)
 
 
+def check_short_branches(source, address):
+    """Keystone silently wraps an out-of-range cbz/cbnz. Assemble once more with a
+    distinct udf marker at each such label and require every target to hit it."""
+    found = re.findall(r'\bcbn?z\s+r\d+\s*,\s*(\w+)', source)
+    if not found:
+        return
+    labels = list(dict.fromkeys(found))
+    marked = source
+    for number, label in enumerate(labels):
+        marked = re.sub(rf'(?<![\w.]){label}:', f'{label}:udf #{number};', marked, count=1)
+    raw = keystone_assemble(marked, address)
+    if raw is None:
+        return
+    starts, offset = [], 0
+    while offset + 2 <= len(raw):
+        starts.append(offset)
+        half, = struct.unpack_from('<H', raw, offset)
+        offset += 4 if half >> 11 in (0b11101, 0b11110, 0b11111) else 2
+    markers, targets = {}, []
+    for start in starts:
+        half, = struct.unpack_from('<H', raw, start)
+        if half & 0xFF00 == 0xDE00:
+            markers.setdefault(half & 0xFF, start)
+        elif half & 0xF500 == 0xB100:
+            targets.append((start, start + 4 + (((half >> 9) & 1) << 6 | ((half >> 3) & 31) << 1)))
+    for (start, target), label in zip(targets, found):
+        if markers.get(labels.index(label)) != target:
+            raise ValueError(f'cbz/cbnz at {address + start:#x} cannot reach {label}; use cmp and b<cond>')
+
+
 def assemble(source, address, capacity):
     global _cache
     if _cache is None:
@@ -66,6 +97,8 @@ def assemble(source, address, capacity):
     raw = _cache.get(key)
     if raw is None:
         raw = keystone_assemble(source, address)
+        if raw is not None:
+            check_short_branches(source, address)
     if raw is None or len(raw) > capacity:
         raise ValueError(f'Assembled function exceeds its {capacity}-byte slot')
     if recorder is not None:

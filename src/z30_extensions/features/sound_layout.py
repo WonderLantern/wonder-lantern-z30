@@ -53,5 +53,5 @@ POPUP_OK_SLOT = ENTRY_SLOT + 27
 # Native list geometry: rows start below the title and an eighth row is the last that fits.
 ROW_TOP, ROW_PITCH, MAX_ROWS = 62, 52, 8
 # Native shooting menus that take direct rows: name, page object, stock rows, feature pages.
-NATIVE_MENUS = (('photo', 0xC18333D8, 34, ('aspect', 'zebra', 'stamp')),
+NATIVE_MENUS = (('photo', 0xC18333D8, 34, ('aspect', 'zebra', 'portrait', 'stamp')),
                 ('movie', 0xC1834FDC, 26, ('bitrate',)))

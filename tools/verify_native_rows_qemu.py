@@ -17,9 +17,9 @@ from z30_extensions.features.ui_text import TRANSLATIONS
 TAB = 0xc1832d50
 TAB_X, PHOTO_TAB_Y = 32, 90
 EVENT_UP, EVENT_DOWN, EVENT_RIGHT = 0x253, 0x254, 0x25b
-LABELS = dict(aspect='Photo aspect', zebra='Photo zebra', stamp='Date stamp', bitrate='Video bitrate')
+LABELS = dict(aspect='Photo aspect', zebra='Photo zebra', portrait='Portrait UI', stamp='Date stamp', bitrate='Video bitrate')
 # A choice that writes the record without depending on the area of the current lens.
-CHOICE = {'aspect': 2, 'zebra': 1, 'stamp': 1, 'bitrate': 1}
+CHOICE = {'aspect': 2, 'zebra': 1, 'portrait': 1, 'stamp': 1, 'bitrate': 1}
 
 
 def main():

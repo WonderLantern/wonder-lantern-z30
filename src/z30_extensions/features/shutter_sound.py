@@ -9,10 +9,10 @@ from .sound_layout import *
 from .sound_audio import audio_code
 from .sound_ui import ui_code
 
-ROOT_ORDER = ('aspect', 'zebra', 'stamp', 'bitrate', 'sound', 'modules')
+ROOT_ORDER = ('aspect', 'zebra', 'portrait', 'stamp', 'bitrate', 'sound', 'modules')
 
 
-def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
+def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
     if precapture_probe and (wireless or bitrate):
@@ -42,20 +42,21 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     sizes['page_return'] = 96
     if aspect:
         sizes.update(ensure=1024, getter=512, route=448, row=384)
-    grouped = bool(modules or bitrate or aspect or zebra or stamp)
+    grouped = bool(modules or bitrate or aspect or zebra or stamp or portrait)
     if grouped:
         sizes.update(ensure=1280, getter=640, route=640, action=1280)
     if stamp:
         sizes.update(ensure=1536, getter=768, route=768, action=1536)
     # Research builds keep their single-purpose page inside the custom menu only.
     native_menus = () if wireless or lut_sd or precapture_probe else tuple(
-        menu for menu in NATIVE_MENUS if any(dict(aspect=aspect, zebra=zebra, stamp=stamp, bitrate=bitrate)[key] for key in menu[3]))
+        menu for menu in NATIVE_MENUS if any(dict(aspect=aspect, zebra=zebra, portrait=portrait, stamp=stamp, bitrate=bitrate)[key] for key in menu[3]))
     if native_menus:
         sizes.update(row=768)
         for name, _, _, keys in native_menus:
             sizes[f'select_{name}'] = 128
             sizes[f'init_{name}'] = 128
-            sizes.update({f'direct_{key}': 96 for key in keys})
+            # Builds without the portrait page keep their earlier layout byte for byte.
+            sizes.update({f'direct_{key}': 96 for key in keys if key != 'portrait' or portrait})
     f = {name: plan.alloc(bytes(size)) for name, size in sizes.items()}
     from . import ui_text
     text_resources = ui_text.prepare(plan, f)
@@ -132,6 +133,9 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     if zebra:
         from . import zebra_ui as zu
         register('zebra', zu, 2, restore=('zebra_restore',))
+    if portrait:
+        from . import portrait_menu as pm
+        register('portrait', pm, pm.ROWS, restore=('portrait_restore',))
     if stamp:
         from . import date_stamp_ui as su
         register('stamp', su, su.ROWS, restore=('stamp_restore',))
