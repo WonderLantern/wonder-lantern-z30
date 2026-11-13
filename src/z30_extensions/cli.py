@@ -7,7 +7,7 @@ from .build import build, PRESETS, resolve_presets
 from .container import extract_eg, CONTAINER_SHA256
 
 PRESET_LABELS = {
-    'full': '全部十一项功能，包含自定义画幅与半透明遮幅、胶片风格日期水印和竖拍显示',
+    'full': '全部十二项功能，包含自定义画幅与半透明遮幅、胶片风格日期水印、竖拍显示和 NEF 压缩菜单',
     'liveview-dual': '直方图与水平仪同屏，新增全信息 DISP 页',
     'shutter-sound': '自定义电子快门声音',
     'm900': 'M 档 900 秒曝光',
@@ -18,6 +18,9 @@ PRESET_LABELS = {
     'photo-zebra': '照片取景斑马纹；独立开关，复用原厂样式和阈值',
     'wifi-5ghz': 'Wi-Fi 5 GHz 地区解锁；全部有效配置请求 US/-1，包含在 full 中',
     'portrait-ui': '竖拿相机时照片取景信息改为竖版，转动后自动重排，默认关闭；包含在 full 中',
+    'nef-uncompressed': '实验性：NEF 固定为未压缩（实机已确认变为 Packed 14-bit）；不包含在 full 中，与 full 同选时替换其中的 nef-menu',
+    'nef-compressed': '实验性：NEF 固定为压缩（有损）（实机已确认变为 Lossy type 2）；不包含在 full 中，与 full 同选时替换其中的 nef-menu',
+    'nef-menu': '实验性：扩展菜单中选择 NEF 压缩（无失真压缩/压缩/未压缩），保存到 WL-NEF.CFG；包含在 full 中，菜单选择的效果尚未实机验证',
     'date-stamp': '在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，竖拍自动转向，默认关闭；包含在 full 中',
 }
 
@@ -66,7 +69,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('feature', nargs='*', metavar='PRESET',
                         help='Combine presets with spaces: ' + ', '.join(PRESETS) +
-                             '; full enables eleven features including wifi-5ghz (all valid profiles US/-1), date-stamp and portrait-ui; '
+                             '; full enables twelve features including wifi-5ghz (all valid profiles US/-1), date-stamp, portrait-ui and nef-menu; '
+                             'nef-uncompressed and nef-compressed are optional, and replace the nef-menu inside full; '
                              'aspect-profiles includes a translucent live-view mask; '
                              'photo-zebra includes an independent photo live-view switch; '
                              'date-stamp and portrait-ui are off until chosen in the camera menu; legacy alias: modular')

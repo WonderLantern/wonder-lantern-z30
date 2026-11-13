@@ -6,11 +6,15 @@ from .platform.z30_120 import BASE
 
 
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot',
-           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui')
+           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
+           'nef-menu', 'nef-uncompressed', 'nef-compressed')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
-                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui')
-FULL_FEATURES = FEATURE_ORDER
+                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
+                 'nef-menu', 'nef-uncompressed', 'nef-compressed')
+NEF_FIXED_FEATURES = ('nef-uncompressed', 'nef-compressed')
+NEF_COMPRESSION_FEATURES = ('nef-menu',) + NEF_FIXED_FEATURES
+FULL_FEATURES = tuple(name for name in FEATURE_ORDER if name not in NEF_FIXED_FEATURES)
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 
 
@@ -29,8 +33,13 @@ def resolve_presets(preset='full'):
             features.update(MODULAR_FEATURES)
         else:
             features.add(name)
+    # A fixed NEF preset chosen with full replaces the menu that full brings.
+    if 'nef-menu' not in selected and any(name in features for name in NEF_FIXED_FEATURES):
+        features.discard('nef-menu')
+    if sum(name in features for name in NEF_COMPRESSION_FEATURES) > 1:
+        raise ValueError('Select only one NEF compression preset')
     # These pages share the sound menu/state framework.
-    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui')):
+    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui', 'nef-menu')):
         features.add('shutter-sound')
     return list(dict.fromkeys(selected)), [f for f in FEATURE_ORDER if f in features]
 
@@ -81,6 +90,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         from .features.shutter_sound import add
         add(plan, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
+            nef='nef-menu' in features,
             aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
             aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial)
@@ -104,6 +114,13 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         add(plan)
     if 'portrait-ui' in features:
         from .features.portrait_ui import add
+        add(plan)
+    for name in NEF_FIXED_FEATURES:
+        if name in features:
+            from .features.nef_compression import add
+            add(plan, name)
+    if 'nef-menu' in features:
+        from .features.nef_menu import add
         add(plan)
     if ptp_read:
         # Research only: read-only USB PTP 0x9FF1 ReadMemory for live readouts.

@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'src'))
 from z30_extensions import assembly
-from z30_extensions.build import FEATURE_ORDER, build
+from z30_extensions.build import FEATURE_ORDER, build, resolve_presets
 from z30_extensions.container import extract_eg
 
 CACHE = ROOT / 'src' / 'z30_extensions' / assembly.CACHE_NAME
@@ -31,6 +31,14 @@ def start_worker(firmware, block_keystone):
     else:
         assembly._cache = {}
     _source = extract_eg(Path(firmware).read_bytes())
+
+
+def is_valid(combo):
+    try:
+        resolve_presets(list(combo))
+    except ValueError:
+        return False
+    return True
 
 
 def build_combo(combo):
@@ -52,7 +60,7 @@ def main():
     parser.add_argument('--source', type=Path, default=ROOT / 'Z_30_0120.bin')
     args = parser.parse_args()
     combos = [c for n in range(1, len(FEATURE_ORDER) + 1)
-              for c in itertools.combinations(FEATURE_ORDER, n)]
+              for c in itertools.combinations(FEATURE_ORDER, n) if is_valid(c)]
     CACHE.unlink(missing_ok=True)
     code, hashes = {}, {}
     for combo, digest, recorded in run((str(args.source), False), combos):
