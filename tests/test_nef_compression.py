@@ -46,18 +46,19 @@ class NefCompressionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_immediate(0, 256)
 
-    def test_nef_presets_are_opt_in(self):
+    def test_menu_is_in_full_and_the_fixed_presets_are_not(self):
         self.assertEqual(PRESETS[-3:], ('nef-menu', 'nef-uncompressed', 'nef-compressed'))
-        self.assertNotIn('nef-menu', resolve_presets('full')[1])
+        self.assertEqual(resolve_presets('full')[1][-1], 'nef-menu')
         self.assertNotIn('nef-uncompressed', resolve_presets('full')[1])
         self.assertNotIn('nef-compressed', resolve_presets('full')[1])
         self.assertEqual(resolve_presets('nef-uncompressed')[1], ['nef-uncompressed'])
         self.assertIn('shutter-sound', resolve_presets('nef-menu')[1])
 
-    def test_nef_presets_add_to_full(self):
+    def test_fixed_presets_replace_the_menu_inside_full(self):
         base = resolve_presets('full')[1]
-        for name in ('nef-menu', 'nef-uncompressed', 'nef-compressed'):
-            expected = base + [name]
+        self.assertEqual(resolve_presets(['full', 'nef-menu'])[1], base)
+        for name in ('nef-uncompressed', 'nef-compressed'):
+            expected = [feature for feature in base if feature != 'nef-menu'] + [name]
             self.assertEqual(resolve_presets(['full', name, name])[1], expected)
             self.assertEqual(resolve_presets([name, 'full'])[1], expected)
 

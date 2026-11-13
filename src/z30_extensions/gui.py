@@ -18,7 +18,7 @@ OUTPUT_STEM = 'EG209020'
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
-    'full': 'All eleven features, including aspect profiles, the film-style date stamp and the portrait layout',
+    'full': 'All twelve features, including aspect profiles, the film-style date stamp, the portrait layout and the NEF compression menu',
     'liveview-dual': 'Histogram and level together on a new full-info DISP page',
     'shutter-sound': 'Custom electronic shutter sound',
     'm900': '900-second exposure in M mode',
@@ -29,9 +29,9 @@ PRESET_LABELS_EN = {
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
     'portrait-ui': 'Portrait layout for photo live-view info when held upright, redrawn after each turn, off by default; included in full',
-    'nef-uncompressed': 'Experimental: NEF fixed to uncompressed (confirmed on the camera as Packed 14-bit); not in full, excludes the other NEF presets',
-    'nef-compressed': 'Experimental: NEF fixed to compressed (lossy), confirmed on the camera as Lossy type 2; not in full, excludes the other NEF presets',
-    'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; not in full, the effect of the menu choice is not verified on the camera yet',
+    'nef-uncompressed': 'Experimental: NEF fixed to uncompressed (confirmed on the camera as Packed 14-bit); not in full, replaces the nef-menu inside full',
+    'nef-compressed': 'Experimental: NEF fixed to compressed (lossy), confirmed on the camera as Lossy type 2; not in full, replaces the nef-menu inside full',
+    'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; included in full, the effect of the menu choice is not verified on the camera yet',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
 }
 

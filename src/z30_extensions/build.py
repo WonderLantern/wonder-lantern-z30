@@ -14,8 +14,7 @@ FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-ro
                  'nef-menu', 'nef-uncompressed', 'nef-compressed')
 NEF_FIXED_FEATURES = ('nef-uncompressed', 'nef-compressed')
 NEF_COMPRESSION_FEATURES = ('nef-menu',) + NEF_FIXED_FEATURES
-# NEF presets stay opt-in until the menu choices and a full build have camera records.
-FULL_FEATURES = tuple(name for name in FEATURE_ORDER if name not in NEF_COMPRESSION_FEATURES)
+FULL_FEATURES = tuple(name for name in FEATURE_ORDER if name not in NEF_FIXED_FEATURES)
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 
 
@@ -34,6 +33,9 @@ def resolve_presets(preset='full'):
             features.update(MODULAR_FEATURES)
         else:
             features.add(name)
+    # A fixed NEF preset chosen with full replaces the menu that full brings.
+    if 'nef-menu' not in selected and any(name in features for name in NEF_FIXED_FEATURES):
+        features.discard('nef-menu')
     if sum(name in features for name in NEF_COMPRESSION_FEATURES) > 1:
         raise ValueError('Select only one NEF compression preset')
     # These pages share the sound menu/state framework.
