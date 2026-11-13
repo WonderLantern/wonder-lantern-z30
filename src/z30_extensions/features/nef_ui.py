@@ -69,4 +69,4 @@ def finish(plan, f, extension, identifiers):
         state_offset=extension['state_offset'], settings_file='WL-NEF.CFG',
         selections={'0': 'lossless compressed (stock)', '1': 'compressed', '2': 'uncompressed'},
         restore_policy='First custom-menu initialization; stock lossless before initialization',
-        functions={k: hex(f[k] | 1) for k in SIZES}, physical_verified=False)
+        functions={k: hex(f[k] | 1) for k in SIZES}, physical_verified=True)

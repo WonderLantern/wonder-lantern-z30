@@ -20,7 +20,7 @@ PRESET_LABELS = {
     'portrait-ui': '竖拿相机时照片取景信息改为竖版，转动后自动重排，默认关闭；包含在 full 中',
     'nef-uncompressed': '实验性：NEF 固定为未压缩（实机已确认变为 Packed 14-bit）；不包含在 full 中，与 full 同选时替换其中的 nef-menu',
     'nef-compressed': '实验性：NEF 固定为压缩（有损）（实机已确认变为 Lossy type 2）；不包含在 full 中，与 full 同选时替换其中的 nef-menu',
-    'nef-menu': '实验性：扩展菜单中选择 NEF 压缩（无失真压缩/压缩/未压缩），保存到 WL-NEF.CFG；包含在 full 中，菜单选择的效果尚未实机验证',
+    'nef-menu': '实验性：扩展菜单中选择 NEF 压缩（无失真压缩/压缩/未压缩），保存到 WL-NEF.CFG；包含在 full 中，三个选项实机已确认',
     'date-stamp': '在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，竖拍自动转向，默认关闭；包含在 full 中',
 }
 

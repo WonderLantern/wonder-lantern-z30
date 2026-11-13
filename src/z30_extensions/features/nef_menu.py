@@ -64,4 +64,4 @@ def add(plan):
         revision=2, hooks=hooks,
         selections={'0': 'stock', '1': 'compressed (mode 2)', '2': 'uncompressed (mode 0)'},
         state_offset=control['state_offset'], settings_file='WL-NEF.CFG',
-        stock_when_uninitialized=True, camera_verified=False)
+        stock_when_uninitialized=True, camera_verified=True)

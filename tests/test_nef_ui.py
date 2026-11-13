@@ -181,7 +181,7 @@ class NefPageTests(unittest.TestCase):
         self.assertEqual(control['default'], 0)
         self.assertEqual(control['page_index'], 966)
         self.assertEqual(control['settings_file'], 'WL-NEF.CFG')
-        self.assertFalse(control['physical_verified'])
+        self.assertTrue(control['physical_verified'])
 
 
 if __name__ == '__main__':

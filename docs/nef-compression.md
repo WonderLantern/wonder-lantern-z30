@@ -4,7 +4,7 @@
 
 | 预设 | 在 `full` 中 | 状态 |
 |---|---|---|
-| `nef-menu` | 是 | 扩展菜单中选择。默认选项下实拍正常、未见崩溃；选择"压缩"或"未压缩"后的效果尚未实机验证 |
+| `nef-menu` | 是 | 扩展菜单中选择。12 位和 14 位下三个选项实机均已确认，见[实机记录](#实机记录) |
 | `nef-uncompressed` | 否 | 构建时固定为未压缩，没有菜单，实机已确认变为 Packed 14-bit |
 | `nef-compressed` | 否 | 构建时固定为压缩（有损），没有菜单，实机已确认变为 Lossy (type 2) |
 
@@ -16,7 +16,9 @@
 
 第一版（只替换三处拍摄序列里的读取点）在实机上无效：`nef-uncompressed` 和 `nef-menu` 拍出的 14 位 NEF 在 ExifTool 中仍是 Compression = Nikon NEF Compressed、NEF Compression = Lossless。
 
-第二版固定模式在实机上有效：`nef-uncompressed` 拍出的 14 位 NEF 变为 Packed 14-bit，文件明显变大；`nef-compressed` 拍出的 NEF 变为 Lossy (type 2)。菜单版在默认选项下拍出的 NEF 仍是 Lossless，这是预期的默认行为，不能证明菜单选择生效。
+第二版固定模式在实机上有效：`nef-uncompressed` 拍出的 14 位 NEF 变为 Packed 14-bit，文件明显变大；`nef-compressed` 拍出的 NEF 变为 Lossy (type 2)。菜单版在默认选项下拍出的 NEF 仍是 Lossless，这是预期的默认行为。
+
+PR 合并时的 `full`（`ce3df74`，页面 966、槽位 178 起）在实机上三个菜单选项都有效：12 位和 14 位下分别得到 Lossless、Lossy (type 2) 和未压缩，选择在关机重开后保持。
 
 ## 第一版失败的原因
 
@@ -81,8 +83,7 @@
 - 请用 RAW+JPEG 拍测试照，确认 JPEG 正常，再检查 NEF 能否被 ExifTool 和 RawDigger 或 LibRaw 打开。
 - 压缩字节也可能在其他位置被修正。0x100A42F4 在特定条件下会把配置模式直接写成 0。
 - 菜单版改动了菜单框架代码。刷入后第一件事是确认「设定菜单 → 固件版本」还能进入。
-- `nef-menu` 包含在 `full` 中，但实机使用只覆盖了单独构建的 `nef-menu`（旧布局：页面 965、槽位 200 起）。包含全部功能的 `full` 整机组合，以及菜单选择“压缩”“未压缩”后的效果，都没有实机记录。合并前需要用变基后的 `full` 实拍：两个菜单选项各拍一张 RAW+JPEG，并确认「设定菜单 → 固件版本」能进入。
-- 为了避开竖拍显示（页面 965、槽位 200–210），菜单页改到页面 966、槽位 178 起。改动后的 `nef-menu` 构建与下表的 SHA-256 不同，需要重新实拍确认默认选项和固件版本页。
+- 第三方 RAW 软件能否正确解码 12 位未压缩 NEF（MakerNote 0x93 = 6）尚未确认。
 
 ## 证据
 
@@ -137,7 +138,7 @@ Z30 固件中三种模式都有完整实现的迹象：
 | 第二版 `nef-compressed`（照片 DSC_5418） | ExifTool：NEF Compression = Lossy (type 2)，Compression = Nikon NEF Compressed |
 | 第二版 `nef-menu`（照片 DSC_5419） | ExifTool：NEF Compression = Lossless，Compression = Nikon NEF Compressed。拍摄时的菜单选项未记录，没有选择"压缩"或"未压缩"后的实拍，所以菜单选择是否生效尚未确认 |
 
-三个第二版构建在实拍使用中均未出现崩溃（用户反馈，未记录张数和时长）。包含全部功能的 `full` 整机组合没有实机记录。
+三个第二版构建在实拍使用中均未出现崩溃（用户反馈，未记录张数和时长）。
 
 测试日期：2026-11-06
 
@@ -148,6 +149,28 @@ Z30 固件中三种模式都有完整实现的迹象：
 | `nef-uncompressed` | `6f28642d651e34d8096e7819b0a3ff74503f8092ea62c5f67c8fecef73b4559c` |
 | `nef-compressed` | `60a5bf8cef5139c14e13538bed0a401aa409daec9c160a7740025da3d05ed283` |
 | `nef-menu` | `20ad1fbbe15103f8151bf3bd0d6c899af7310485b5a790f1200cc1501287bfa5` |
+
+### PR 合并时的 `full` 构建
+
+基于 `ce3df74` 构建的 `full`（十二项功能，含 `nef-menu`，页面 966、槽位 178 起），SHA-256 `28e7cec1975b72a00e277b35efa43b9aef5bd743bff3a78d635bd5157855c404`，测试日期 2026-11-14。NEFCompression 读自 MakerNote 0x93，图像数据大小为 RAW 子 IFD 的 StripByteCounts。
+
+| 照片 | 菜单选项 | 位深 | NEFCompression | 文件 / 图像数据 |
+|---|---|---|---|---|
+| DSC_0442 | 未压缩 | 14 | Packed 14 bits（10） | 38,739,200 / 36,564,224 B |
+| DSC_0443 | 无失真压缩 | 14 | Lossless（3） | 24,596,561 / 22,435,409 B |
+| DSC_0444 | 压缩 | 14 | Lossy (type 2)（4） | 22,449,966 / 20,328,750 B |
+| DSC_0445 | 无失真压缩 | 12 | Lossless（3） | 19,564,998 / 17,319,366 B |
+| DSC_0446 | 压缩 | 12 | Lossy (type 2)（4） | 18,595,868 / 16,299,036 B |
+| DSC_0447 | 未压缩 | 12 | Uncompressed (reduced to 12 bit)（6） | 33,636,096 / 31,315,200 B |
+
+12 位未压缩的图像数据正好是 5600×3728×12 位，MakerNote 值与上文 0x102D9802 的分析一致。
+
+同一构建下用户还确认了：
+
+- 「设定菜单 → 固件版本」能进入。
+- 菜单选择在关机重开后保持；`WL-NEF.CFG` 保存最后一次的选择，校验正确。
+- RAW+JPEG 拍摄正常。
+- 其他扩展菜单页（含竖拍显示）不受影响。
 
 ## 建议的验证顺序
 

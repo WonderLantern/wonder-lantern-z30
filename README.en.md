@@ -28,7 +28,7 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 | `wifi-5ghz` | Requests the US/-1 country code on every valid wireless profile to unlock 5 GHz connections | See note¹ |
 | `date-stamp` | Film-style date stamp in the lower right of JPEGs: five formats, four colors, optional glow, follows portrait orientation | [Doc](docs/date-stamp.md) |
 | `portrait-ui` | Photo live-view info turns to a portrait layout when the camera is held upright and fills in on its own after a turn; off by default; the i menu, touch-opened setting pages and the histogram stay landscape | [Doc](docs/portrait-ui.md) |
-| `nef-menu` | Choose the NEF compression type (lossless / compressed / uncompressed) in the extension menu, saved to `WL-NEF.CFG` | [Doc](docs/nef-compression.md), shooting is normal with the default choice; the effect of the menu choice is not verified on a camera yet |
+| `nef-menu` | Choose the NEF compression type (lossless / compressed / uncompressed) in the extension menu, saved to `WL-NEF.CFG` | [Doc](docs/nef-compression.md), all three choices confirmed on a camera in 12-bit and 14-bit |
 
 ¹ `wifi-5ghz` only changes the wireless country request; it does not write the camera's sales region or NVRAM. Cameras that could use 2.4 GHz channels 12 and 13 may no longer connect on them (inferred, not tested). It does not promise a 5 GHz access point from the camera itself or faster transfers, and the channels and power in use must suit local rules.
 

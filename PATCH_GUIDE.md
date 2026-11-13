@@ -47,7 +47,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 | 10 | `wifi-5ghz` | 全部 22 个有效配置请求 US/-1，5 GHz 地区解锁；包含在 full 中，也可单独选择 |
 | 11 | `date-stamp` | JPEG 胶片风格日期水印，五种格式、四种颜色和柔光，竖拍自动转向；包含在 full 中，菜单里默认关闭，见[日期水印说明](docs/date-stamp.md) |
 | 12 | `portrait-ui` | 竖拿相机时照片取景信息改为竖版，转动后自动重排；包含在 full 中，菜单里默认关闭，见[竖拍显示说明](docs/portrait-ui.md) |
-| 13 | `nef-menu` | 扩展菜单里选择 NEF 压缩类型（无失真压缩／压缩／未压缩），保存到 `WL-NEF.CFG`；包含在 full 中，菜单选择的效果尚未实机验证，见[NEF 压缩说明](docs/nef-compression.md) |
+| 13 | `nef-menu` | 扩展菜单里选择 NEF 压缩类型（无失真压缩／压缩／未压缩），保存到 `WL-NEF.CFG`；包含在 full 中，12/14 位下三个选项实机已确认，见[NEF 压缩说明](docs/nef-compression.md) |
 | 14 | `nef-uncompressed` | 构建时把 NEF 固定为未压缩，没有菜单；不包含在 full 中，和 full 一起选时替换其中的 `nef-menu`；实机已确认 |
 | 15 | `nef-compressed` | 构建时把 NEF 固定为压缩（有损），没有菜单；不包含在 full 中，和 full 一起选时替换其中的 `nef-menu`；实机已确认 |
 
