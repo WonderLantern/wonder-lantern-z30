@@ -122,6 +122,39 @@ LOG, LOG_MAGIC, LOG_CAPACITY = 112, 0x314C5657, 256
 
 KINDS = dict(image=0, rect=1, clear=2, frame=3, text=5, image2=6, image3=7)
 
+# The i menu (camera, 2026-11-15, USB readout and RAM diffs): view kind 3, the
+# same context words as live view otherwise. Landscape it is a 6x2 grid of 120x72
+# cells (x 0..720, y 280..424) on a backdrop 0,280,720,146; the title above it
+# (clear 88,228,544,44, glyph baseline y 264) and the bottom bar right of x 463
+# (y 430..478). Portrait it becomes 4x3 by slot number, so the order reads the
+# same: slot i at column i & 3, row i >> 2. The title and the bar keep their size.
+MENU_VIEW = 3
+MENU_TOP, MENU_CELL_W, MENU_CELL_H, MENU_SPLIT = 280, 120, 72, 352  # landscape grid, row 1 from y 352
+MENU_BACKDROP = (0, 280, 720, 146)
+MENU_GRID_Y = 440                          # portrait grid top: rows 440, 512, 584, bottom 656
+MENU_TITLE = (200, 280, -120, 150)         # centre y range, dx, dy
+MENU_BAR = (428, 400, -340, 240)           # centre y from, x from, dx, dy
+MENU_MODE = 4                              # R_MODE bit: the portrait layout is the i menu
+# A setting page opened from the i menu (OK on a cell) is view kind 3 too; there the
+# navigation-table state (C182D8C4) is 3 and the navigation block counts its own
+# options (camera: image quality, 7). Only state 0 is the grid; a setting page
+# stays landscape, handled like a level camera (one full clear, stock layout).
+# Direction keys in the i menu: the action handlers (e.g. right 103DF5E3) call
+# 1051B654(direction: 0 up, 1 down, 2 right, 3 left), which in table state 0
+# (C182D8C4) is 1051B7AC: current slot 1042B52A(), the 6x2 target into the
+# navigation block C201D198 (+0 count 12, +4 slot), then the cursor setter
+# 1042BBFC(slot), which moves the highlight. Portrait, the hook turns the key with
+# the screen, moves in 4x3 (wrapping inside the row or column) and does the same
+# store and setter call, skipping the stock 6x2 arithmetic.
+NAV_MOVE, NAV_MOVE_EXPECTED = 0x1051B654, bytes.fromhex('ec49' '0a78' '091d' '01ebc201')  # ldr r1,=C182D8C4; ldrb r2,[r1]; adds r1,r1,#4; add.w r1,r1,r2,lsl #3
+CURSOR_GET_EXPECTED, CURSOR_SET_EXPECTED = bytes.fromhex('5e485b4990300078'), bytes.fromhex('2de9fc41c84c0546')
+NAV_MOVE_RESUME = NAV_MOVE + len(NAV_MOVE_EXPECTED)
+NAV_TABLE, NAV_BLOCK = 0xC182D8C4, 0xC201D198
+CURSOR_GET, CURSOR_SET = 0x1042B52A, 0x1042BBFC
+# Physical direction (0 up, 1 down, 2 right, 3 left) to the direction on the
+# portrait screen, one nibble each, per orientation (as panel_box turns the screen).
+NAV_TURN = {1: 0x1023, 2: 0x0132}
+
 # name, site, stock bytes of the displaced window, replayed instructions, resume
 HOOKS = (
     ('rect', RECT, '2de9f041044688b0','push.w {r4-r8,lr};mov r4,r0;sub sp,#0x20;'),
@@ -133,8 +166,8 @@ HOOKS = (
 )
 TEXT_EXPECTED = bytes.fromhex('bbf770fe022141f22210')
 
-SIZES = dict(portrait_f2fix=96, portrait_fix2f=96, portrait_focus=96, portrait_locate=320,
-             portrait_rect=224, portrait_image=320, portrait_image3=320, portrait_text=384,
+SIZES = dict(portrait_f2fix=96, portrait_fix2f=96, portrait_focus=96, portrait_locate=640,
+             portrait_rect=320, portrait_image=320, portrait_image3=320, portrait_text=384,
              portrait_hook=768, portrait_log=512)
 # Runtime words after the switch word (see portrait_menu): mode, pending full
 # clear, repaint wanted, refresh passes, forced repaints, then the readout.
@@ -199,6 +232,46 @@ def locate(x, y, w, h):
     return 1, x - 120, y + SHIFT_Y, w, h
 
 
+def locate_menu(x, y, w, h):
+    """Python model of the i-menu branch of portrait_locate; status 3: not part of the menu (clears are dropped)."""
+    if w >= FULL_W and h >= FULL_H:
+        return 0, x, y, w, h
+    bx, by, bw, bh = MENU_BACKDROP
+    if x == bx and w >= 700 and 260 <= y <= 300:
+        return 1, 0, MENU_GRID_Y, 480, 3 * MENU_CELL_H
+    cy = y + (h >> 1)
+    if MENU_TOP <= cy < MENU_BAR[0]:
+        row = 0 if cy < MENU_SPLIT else 1
+        if w <= 2:   # a vertical line is the right edge of its cell (x 0: the left edge of the first)
+            col = 0 if x < 2 else (x + 2) // MENU_CELL_W - 1
+        else:
+            col = (x + (w >> 1)) // MENU_CELL_W if x + (w >> 1) >= 0 else 0
+        col = max(0, min(5, col))
+        slot = row * 6 + col
+        return (1, x + MENU_CELL_W * ((slot & 3) - col),
+                y + (MENU_GRID_Y - MENU_TOP) + MENU_CELL_H * ((slot >> 2) - row), w, h)
+    if MENU_TITLE[0] <= cy < MENU_TITLE[1]:
+        return 1, x + MENU_TITLE[2], y + MENU_TITLE[3], w, h
+    if cy >= MENU_BAR[0] and x >= MENU_BAR[1]:
+        return 1, x + MENU_BAR[2], y + MENU_BAR[3], w, h
+    return 3, x, y, w, h
+
+
+def nav_target(ori, direction, slot):
+    """Python model of the i-menu key hook: the slot a physical direction moves to in the portrait 4x3 grid."""
+    turned = (NAV_TURN[ori] >> (direction * 4)) & 15
+    col, row = slot & 3, slot >> 2
+    if turned == 0:
+        row = (row + 2) % 3
+    elif turned == 1:
+        row = (row + 1) % 3
+    elif turned == 2:
+        col = (col + 1) & 3
+    else:
+        col = (col + 3) & 3
+    return row * 4 + col
+
+
 def panel_box(ori, px, py, pw, ph):
     """Portrait box to the physical landscape rectangle (x, y-up, w, h)."""
     if ori == 2:
@@ -234,9 +307,12 @@ def sources(f, state_offset, runtime, layout):
         green:cmp r2,#0xc0;blo no;cmp r1,#0x40;bhs no;cmp r3,#0x40;bhs no;
         yes:movs r0,#1;bx lr;no:movs r0,#0;bx lr;'''
     # r0 -> {x, y-down, w, h}, rewritten to the portrait box; returns 0 keep, 1 moved, 2 scaled.
+    # The i menu (view kind 3) has its own branch, modelled by locate_menu; 3 there
+    # means the command is not part of the menu.
     code['portrait_locate'] = f'''push {{r4-r8,lr}};mov r12,r0;ldm r0,{{r0-r3}};
         movw r4,#{FULL_W};cmp r2,r4;blt sized;movw r4,#{FULL_H};cmp r3,r4;bge keep;
-        sized:add r4,r0,r2,asr #1;add r5,r1,r3,asr #1;{c('r6',layout)}
+        sized:{c('r4',VIEW_KIND)}ldrb r4,[r4];cmp r4,#{MENU_VIEW};beq menu;
+        add r4,r0,r2,asr #1;add r5,r1,r3,asr #1;{c('r6',layout)}
         rule:ldrsh r7,[r6];movw r8,#0x7fff;cmp r7,r8;beq zones;
         cmp r4,r7;blt next;ldrsh r7,[r6,#2];cmp r4,r7;bge next;
         ldrsh r7,[r6,#4];cmp r5,r7;blt next;ldrsh r7,[r6,#6];cmp r5,r7;bge next;
@@ -254,22 +330,48 @@ def sources(f, state_offset, runtime, layout):
         bottom:movw r5,#{SPLIT_X};cmp r0,r5;blt lower;sub r0,r0,#240;add r1,r1,#240;b bar;
         lower:add r1,r1,#{240 - ROW};
         bar:stm r12,{{r0-r3}};movs r0,#2;pop {{r4-r8,pc}};
-        keep:movs r0,#0;pop {{r4-r8,pc}};'''
+        keep:movs r0,#0;pop {{r4-r8,pc}};
+        menu:cmp r0,#{MENU_BACKDROP[0]};bne m_cy;movw r4,#700;cmp r2,r4;blt m_cy;
+        movw r4,#260;cmp r1,r4;blt m_cy;movw r4,#300;cmp r1,r4;bgt m_cy;
+        movs r0,#0;movw r1,#{MENU_GRID_Y};movw r2,#480;movw r3,#{3 * MENU_CELL_H};b m_store;
+        m_cy:add r5,r1,r3,asr #1;
+        movw r4,#{MENU_TOP};cmp r5,r4;blt m_title;movw r4,#{MENU_BAR[0]};cmp r5,r4;bge m_bar;
+        movs r6,#0;movw r4,#{MENU_SPLIT};cmp r5,r4;it ge;movge r6,#1;
+        cmp r2,#2;bgt m_cx;cmp r0,#2;blt m_col0;adds r4,r0,#2;mvn r8,#0;b m_div;
+        m_cx:add r4,r0,r2,asr #1;movs r8,#0;
+        m_div:movs r7,#0;
+        m_loop:cmp r4,#{MENU_CELL_W};blt m_q;subs r4,#{MENU_CELL_W};adds r7,#1;b m_loop;
+        m_q:add r7,r7,r8;cmp r7,#0;bge m_hi;
+        m_col0:movs r7,#0;
+        m_hi:cmp r7,#5;it gt;movgt r7,#5;
+        add r4,r6,r6,lsl #1;add r4,r7,r4,lsl #1;
+        and r5,r4,#3;sub r5,r5,r7;movs r8,#{MENU_CELL_W};mla r0,r5,r8,r0;
+        lsr r5,r4,#2;sub r5,r5,r6;movs r8,#{MENU_CELL_H};mla r1,r5,r8,r1;add r1,r1,#{MENU_GRID_Y - MENU_TOP};b m_store;
+        m_title:cmp r5,#{MENU_TITLE[0]};blt m_none;sub r0,r0,#{-MENU_TITLE[2]};add r1,r1,#{MENU_TITLE[3]};b m_store;
+        m_bar:movw r4,#{MENU_BAR[1]};cmp r0,r4;blt m_none;movw r4,#{-MENU_BAR[2]};sub r0,r0,r4;add r1,r1,#{MENU_BAR[3]};b m_store;
+        m_none:movs r0,#3;pop {{r4-r8,pc}};
+        m_store:stm r12,{{r0-r3}};movs r0,#1;pop {{r4-r8,pc}};'''
     # r0 -> x, y-up, w, h (+16 rgba for rectangles); r1 orientation; r2 kind.
     # Thin clears (w or h <= THIN) stay where they are: on the live-view page they are
     # only the eight 2-px lines that erase the AF-area corner frame (camera log,
     # 2026-11-11, the same as the Z 5 found). Moving them left the frame behind.
-    code['portrait_rect'] = f'''push {{r4-r6,lr}};sub sp,#16;mov r4,r0;mov r5,r1;
-        cmp r2,#{k['clear']};bne not_thin;ldr r0,[r4,#8];cmp r0,#{THIN};ble done;ldr r0,[r4,#12];cmp r0,#{THIN};ble done;
-        not_thin:cmp r2,#{k['rect']};bne geometry;ldr r0,[r4,#16];{n(f['portrait_focus'])}cmp r0,#0;bne done;
+    # In the i menu the grid lines are 2-px clears and rectangles: no thin-clear rule
+    # there, and a clear that is not part of the menu (status 3) is dropped, as the
+    # live-view icons under the menu must not punch holes into it.
+    code['portrait_rect'] = f'''push {{r4-r6,lr}};sub sp,#24;mov r4,r0;mov r5,r1;str r2,[sp,#16];
+        cmp r2,#{k['clear']};bne not_thin;{c('r0',VIEW_KIND)}ldrb r0,[r0];cmp r0,#{MENU_VIEW};beq not_thin;
+        ldr r0,[r4,#8];cmp r0,#{THIN};ble done;ldr r0,[r4,#12];cmp r0,#{THIN};ble done;
+        not_thin:ldr r2,[sp,#16];cmp r2,#{k['rect']};bne geometry;ldr r0,[r4,#16];{n(f['portrait_focus'])}cmp r0,#0;bne done;
         geometry:ldm r4,{{r0-r3}};rsb r1,r1,#480;sub r1,r1,r3;
-        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;mov r12,r0;
+        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;
+        cmp r0,#3;bne moved;ldr r0,[sp,#16];cmp r0,#{k['clear']};bne done;movs r0,#0;str r0,[r4,#8];str r0,[r4,#12];b done;
+        moved:mov r12,r0;
         ldm sp,{{r0-r3}};cmp r2,#480;ble placed;movs r0,#0;movw r2,#480;
         cmp r12,#2;bne placed;add r3,r3,#{ROW};
         placed:cmp r5,#2;bne other;str r1,[r4];str r0,[r4,#4];b sizes;
         other:rsb r6,r1,#720;sub r6,r6,r3;str r6,[r4];rsb r6,r0,#480;sub r6,r6,r2;str r6,[r4,#4];
         sizes:str r3,[r4,#8];str r2,[r4,#12];
-        done:add sp,#16;pop {{r4-r6,pc}};'''
+        done:add sp,#24;pop {{r4-r6,pc}};'''
     # r0 -> image 1/2 descriptor; r1 orientation; r2 kind.
     code['portrait_image'] = f'''push {{r4-r7,lr}};sub sp,#20;mov r4,r0;mov r5,r1;
         ldrh r0,[r4,#0x40];cmp r0,#0;beq upright_source;movw r1,#360;cmp r0,r1;bne done;
@@ -284,7 +386,7 @@ def sources(f, state_offset, runtime, layout):
         ldrsh r0,[r4,#0x1e];ldrsh r1,[r4,#0x1a];sub r7,r0,r1;
         cmp r6,#0;ble done;cmp r7,#0;ble done;
         box:ldrsh r0,[r4,#0x18];ldrsh r1,[r4,#0x1a];mov r2,r6;mov r3,r7;
-        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;
+        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;cmp r0,#3;beq done;
         ldm sp,{{r0-r3}};movs r6,#0;str r6,[r4];
         cmp r5,#2;bne other;
         strh r1,[r4,#0x18];rsb r6,r0,#480;sub r7,r6,r2;strh r7,[r4,#0x1a];
@@ -299,7 +401,7 @@ def sources(f, state_offset, runtime, layout):
         ldr r0,[r4,#0x18];asr r0,r0,#16;ldr r1,[r4,#0x1c];asr r1,r1,#16;
         ldr r2,[r4,#0x20];asr r2,r2,#16;sub r2,r2,r0;ldr r3,[r4,#0x24];asr r3,r3,#16;sub r3,r3,r1;
         cmp r2,#0;ble done;cmp r3,#0;ble done;
-        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;
+        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;cmp r0,#3;beq done;
         movs r0,#0;mov r1,sp;movs r2,#23;
         wipe:str r0,[r1],#4;subs r2,#1;bne wipe;
         ldm r4,{{r0-r3}};stm sp,{{r0-r3}};ldr r0,[r4,#16];str r0,[sp,#16];ldr r0,[r4,#20];str r0,[sp,#20];
@@ -320,7 +422,7 @@ def sources(f, state_offset, runtime, layout):
         ldr r0,[r4,#24];{n(f['portrait_f2fix'])}mov r10,r0;
         ldr r0,[r4,#28];{n(f['portrait_f2fix'])}mov r11,r0;
         asr r0,r10,#8;asr r1,r11,#8;rsb r1,r1,#480;sub r1,r1,r9;mov r2,r8;mov r3,r9;
-        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;str r0,[sp,#16];
+        stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;cmp r0,#3;beq done;str r0,[sp,#16];
         ldm sp,{{r0-r3}};and r12,r10,#255;add r8,r12,r0,lsl #8;add r1,r1,r3;lsl r9,r1,#8;
         cmp r5,#2;beq upright;
         eor r6,r6,#0x80000000;movw r0,#{720 << 8 & 0xFFFF};movt r0,#{720 << 8 >> 16};sub r9,r0,r9;
@@ -379,15 +481,16 @@ def sources(f, state_offset, runtime, layout):
         {c('r1',TARGET)}ldrb r0,[r1];cmp r0,#31;it hi;movhi r0,#31;movs r2,#1;lsl r2,r2,r0;
         ldr r3,[r6,#{R_COPIES}];orr r3,r3,r2;str r3,[r6,#{R_COPIES}];
         gate:{c('r1',UI_SERVICE_PHASE)}ldrb r0,[r1];cmp r0,#1;beq phase;cmp r0,#2;bne context;
-        phase:{c('r1',VIEW_KIND)}ldrb r0,[r1];cmp r0,#0;bne context;
-        {c('r1',PHOTO_BACKEND)}ldr r0,[r1];cmp r0,#1;bne context;
+        phase:{c('r1',VIEW_KIND)}ldrb r0,[r1];cmp r0,#0;beq view_ok;cmp r0,#{MENU_VIEW};bne context;
+        view_ok:{c('r1',PHOTO_BACKEND)}ldr r0,[r1];cmp r0,#1;bne context;
         {c('r1',OVERLAY_BUSY[0])}ldr r0,[r1];cmp r0,#0;bne context;
         {c('r1',OVERLAY_BUSY[1])}ldr r0,[r1];cmp r0,#0;bne context;movs r8,#1;
         context:movs r0,#0;cmp r8,#0;beq mode;cmp r7,#1;beq portrait;cmp r7,#2;bne mode;
-        portrait:mov r0,r7;
+        portrait:mov r0,r7;{c('r1',VIEW_KIND)}ldrb r1,[r1];cmp r1,#{MENU_VIEW};bne mode;
+        {c('r1',NAV_TABLE)}ldrb r1,[r1];cmp r1,#0;ite eq;orreq r0,r0,#{MENU_MODE};movne r0,#0;
         mode:ldr r2,[r6,#{R_MODE}];cmp r0,r2;beq same;str r0,[r6,#{R_MODE}];
         movs r2,#1;str r2,[r6,#{R_PENDING}];str r2,[r6,#{R_REPAINT}];
-        same:mov r7,r0;cmp r8,#0;bne live;movs r2,#0;str r2,[r6,#{R_PENDING}];b out;
+        same:and r7,r0,#3;cmp r8,#0;bne live;movs r2,#0;str r2,[r6,#{R_PENDING}];b out;
         live:{c('r1',TARGET)}ldrb r0,[r1];cmp r0,#{OSD_TARGET};bne out;
         cmp r4,#{k['clear']};bne draw;ldr r0,[r6,#{R_PENDING}];cmp r0,#0;beq draw;
         movs r0,#0;str r0,[r6,#{R_PENDING}];ldr r1,[r5];str r0,[r1];str r0,[r1,#4];
@@ -643,6 +746,36 @@ def add(plan):
         plan.alloc(code)
         plan.edit(DRAW_SITE, jump(DRAW_SITE, entry, len(DRAW_EXPECTED)), 'Portrait UI: remember drawn live-view widgets', DRAW_EXPECTED)
         hooks.append(dict(name='draw_record', site=hex(DRAW_SITE), entry=hex(entry | 1), window=len(DRAW_EXPECTED)))
+    # i-menu direction keys: portrait, the slot moves in the 4x3 layout (nav_target).
+    if (im.read(NAV_MOVE, len(NAV_MOVE_EXPECTED)) != NAV_MOVE_EXPECTED
+            or im.words(((NAV_MOVE + 4) & ~3) + 0x3B0, 1)[0] != NAV_TABLE
+            or im.read(CURSOR_GET, len(CURSOR_GET_EXPECTED)) != CURSOR_GET_EXPECTED
+            or im.read(CURSOR_SET, len(CURSOR_SET_EXPECTED)) != CURSOR_SET_EXPECTED):
+        raise ValueError('Unexpected i-menu cursor functions')
+    state = control['state_offset']
+    entry = plan.address
+    code = assemble(f'''push {{r1-r7,lr}};mov r4,r0;cmp r4,#3;bhi stock;
+        {n(f['get'])}cmp r0,#0;beq stock;{c('r1',state)}add r5,r0,r1;ldr r0,[r5];cmp r0,#1;bne stock;
+        ldr r6,[r5,#{R_MODE}];tst r6,#{MENU_MODE};beq stock;and r6,r6,#3;
+        {c('r0',VIEW_KIND)}ldrb r0,[r0];cmp r0,#{MENU_VIEW};bne stock;
+        {c('r0',NAV_TABLE)}ldrb r0,[r0];cmp r0,#0;bne stock;
+        {c('r7',NAV_BLOCK)}ldr r0,[r7];cmp r0,#12;bne stock;
+        {n(CURSOR_GET)}cmp r0,#11;bhi stock;
+        movw r1,#{NAV_TURN[1]};cmp r6,#2;bne turned;movw r1,#{NAV_TURN[2]};
+        turned:lsl r2,r4,#2;lsr r1,r1,r2;and r1,r1,#15;
+        and r2,r0,#3;lsr r3,r0,#2;
+        cmp r1,#0;bne not_up;cmp r3,#0;ite eq;moveq r3,#2;subne r3,r3,#1;b place;
+        not_up:cmp r1,#1;bne not_down;cmp r3,#2;ite eq;moveq r3,#0;addne r3,r3,#1;b place;
+        not_down:cmp r1,#2;bne left;adds r2,#1;and r2,r2,#3;b place;
+        left:adds r2,#3;and r2,r2,#3;
+        place:add r0,r2,r3,lsl #2;str r0,[r7,#4];{n(CURSOR_SET)}
+        movs r0,#0;pop {{r1-r7,pc}};
+        stock:mov r0,r4;pop {{r1-r7,lr}};
+        {c('r1',NAV_TABLE)}ldrb r2,[r1];adds r1,r1,#4;add.w r1,r1,r2,lsl #3;
+        ldr.w pc,={NAV_MOVE_RESUME | 1};''', entry, 320)
+    plan.alloc(code)
+    plan.edit(NAV_MOVE, jump(NAV_MOVE, entry, len(NAV_MOVE_EXPECTED)), 'Portrait UI: i-menu keys follow the screen', NAV_MOVE_EXPECTED)
+    hooks.append(dict(name='menu_keys', site=hex(NAV_MOVE), entry=hex(entry | 1), window=len(NAV_MOVE_EXPECTED)))
     if REPAINT_HOOK:
         if (im.read(REFRESH_REQUEST, len(REFRESH_EXPECTED)) != REFRESH_EXPECTED
                 or im.words(((REFRESH_REQUEST + 4) & ~3) + 0x328, 1)[0] != REDRAW_PREDICATE):
@@ -671,6 +804,13 @@ def add(plan):
         layout=dict(top_band=TOP_BAND, bottom_band=BOTTOM_BAND, left_column=LEFT_COLUMN,
                     right_column=RIGHT_COLUMN, shift_y=SHIFT_Y, bar_split_x=SPLIT_X, bar_row=ROW, rules=[list(r) for r in LAYOUT],
                     rules_source='live-view boxes read on the camera over USB, 2026-11-11'),
-        scope='photo live view on the rear screen; menus, i menu, playback and movie stay landscape',
+        menu=dict(view_kind=MENU_VIEW, backdrop=list(MENU_BACKDROP), grid_top=MENU_TOP, cell=[MENU_CELL_W, MENU_CELL_H],
+                  portrait_grid_top=MENU_GRID_Y, title=list(MENU_TITLE), bar=list(MENU_BAR), mode_bit=MENU_MODE,
+                  keys=dict(site=hex(NAV_MOVE), navigation=hex(NAV_BLOCK), cursor_get=hex(CURSOR_GET), cursor_set=hex(CURSOR_SET),
+                            turn={str(k): hex(v) for k, v in NAV_TURN.items()}),
+                  grid_state=dict(address=hex(NAV_TABLE), value=0), setting_pages='landscape',
+                  source='camera USB readout and RAM diffs, 2026-11-15',
+                  camera_verified='2026-11-15: grid, title, bar, keys and wrap in both grips; setting page landscape; level stock'),
+        scope='photo live view and its i menu (4x3) on the rear screen; menus, i-menu setting pages, playback and movie stay landscape',
         default=0, inert_when_off=True,
         camera_verified=False, osd_target_camera_verified=False, orientation_side_camera_verified=False)

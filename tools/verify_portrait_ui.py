@@ -77,6 +77,16 @@ class Machine:
             mu.reg_write(UC_ARM_REG_PC, mu.reg_read(UC_ARM_REG_LR))
         u.hook_add(UC_HOOK_CODE, gate, begin=0x103051A0, end=0x103051A0)
         u.mem_map(0xC201A000, 0x1000)  # UI handler table read by the event windows
+        u.mem_map(pu.NAV_BLOCK & ~0xFFF, 0x1000)  # i-menu navigation block (count, slot)
+        self.slot, self.set_calls = 0, []
+        def cursor_get(mu, address, size, data):   # 1042B52A: the current slot is an input
+            mu.reg_write(UC_ARM_REG_R0, self.slot)
+            mu.reg_write(UC_ARM_REG_PC, mu.reg_read(UC_ARM_REG_LR))
+        def cursor_set(mu, address, size, data):   # 1042BBFC: record the slot it is asked to show
+            self.set_calls.append(mu.reg_read(UC_ARM_REG_R0))
+            mu.reg_write(UC_ARM_REG_PC, mu.reg_read(UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE, cursor_get, begin=pu.CURSOR_GET, end=pu.CURSOR_GET)
+        u.hook_add(UC_HOOK_CODE, cursor_set, begin=pu.CURSOR_SET, end=pu.CURSOR_SET)
         u.mem_map(0xC1D41000, 0x1000)  # pose byte the event trace records
         u.mem_map(0xC6100000, 0x2000)  # fake widgets for the draw-record tests
         self.refreshes = []
@@ -87,7 +97,8 @@ class Machine:
             u.hook_add(UC_HOOK_CODE, refresh, begin=address, end=address)
         self.state_offset = state_offset
 
-    def context(self, switch=1, present=True, phase=2, kind=0, backend=1, target=2, orientation=0, busy=(0, 0)):
+    def context(self, switch=1, present=True, phase=2, kind=0, backend=1, target=2, orientation=0, busy=(0, 0),
+                nav_state=0, nav_count=12):
         u = self.u
         u.mem_write(STATE, bytes(0x100000))
         if present and self.state_offset is not None:
@@ -102,7 +113,10 @@ class Machine:
         u.mem_write(pu.TARGET, bytes([target]))
         for address, value in zip(pu.OVERLAY_BUSY, busy):
             u.mem_write(address, struct.pack('<I', value))
+        u.mem_write(pu.NAV_TABLE, bytes([nav_state]))
+        u.mem_write(pu.NAV_BLOCK, struct.pack('<2I', nav_count, 0))
         self.orientation = orientation
+        self.set_calls.clear()
 
     def words(self, offset, count):
         return struct.unpack(f'<{count}I', self.u.mem_read(STATE + self.state_offset + offset, count * 4))
@@ -157,15 +171,17 @@ def f32(v):
     return struct.unpack('<I', struct.pack('<f', v))[0]
 
 
-def model_rect(ori, kind, b):
+def model_rect(ori, kind, b, menu=False):
     x, yu, w, h, color = struct.unpack('<4iI', b[:20])
     if kind == 'rect' and focus(color & 0xFFFFFFFF):
         return b
-    if kind == 'clear' and (w <= pu.THIN or h <= pu.THIN):
+    if kind == 'clear' and not menu and (w <= pu.THIN or h <= pu.THIN):
         return b
-    status, px, py, pw, ph = pu.locate(x, 480 - yu - h, w, h)
+    status, px, py, pw, ph = (pu.locate_menu if menu else pu.locate)(x, 480 - yu - h, w, h)
     if not status:
         return b
+    if status == 3:  # not part of the i menu: clears are dropped, the rest stays
+        return struct.pack('<4i', x, yu, 0, 0) + b[16:] if kind == 'clear' else b
     if pw > 480:
         px, pw = 0, 480
         if status == 2:  # a full-width bar covers both rows
@@ -173,7 +189,7 @@ def model_rect(ori, kind, b):
     return struct.pack('<4i', *pu.panel_box(ori, px, py, pw, ph)) + b[16:]
 
 
-def model_image(ori, kind, d):
+def model_image(ori, kind, d, menu=False):
     d = bytearray(d)
     mode, = struct.unpack_from('<I', d, 0)
     sx0, sy0, sx1, sy1 = struct.unpack_from('<4h', d, 0x10)
@@ -186,8 +202,8 @@ def model_image(ori, kind, d):
     w, h = (sw, sh) if mode == 1 else (x1 - x0, y1 - y0)
     if w <= 0 or h <= 0:
         return bytes(d)
-    status, px, py, pw, ph = pu.locate(x0, y0, w, h)
-    if not status:
+    status, px, py, pw, ph = (pu.locate_menu if menu else pu.locate)(x0, y0, w, h)
+    if status in (0, 3):
         return bytes(d)
     struct.pack_into('<I', d, 0, 0)
     if ori == 2:
@@ -220,7 +236,7 @@ def fix2f(v):
     return s | ((top + 119) << 23) | (a & 0x7FFFFF)
 
 
-def model_text(ori, m):
+def model_text(ori, m, menu=False):
     m = list(struct.unpack('<9I', m))
     if (m[1] << 1) & 0xFFFFFFFF or (m[3] << 1) & 0xFFFFFFFF:
         return m
@@ -229,8 +245,8 @@ def model_text(ori, m):
     if gh <= 0:
         return m
     e, f = f2fix(m[6]), f2fix(m[7])
-    status, bx, by, pw, ph = pu.locate(e >> 8, 480 - (f >> 8) - gh, gw, gh)
-    if not status:
+    status, bx, by, pw, ph = (pu.locate_menu if menu else pu.locate)(e >> 8, 480 - (f >> 8) - gh, gw, gh)
+    if status in (0, 3):
         return m
     px = (bx << 8) + (e & 255)
     py = (by + ph) << 8
@@ -257,6 +273,7 @@ def windows():
     out.extend((site, site + len(bytes.fromhex(expected))) for _, site, expected, _ in pu.EVENT_HOOKS)
     if pu.REPAINT_HOOK:
         out.append((pu.REFRESH_REQUEST, pu.REFRESH_REQUEST + len(pu.REFRESH_EXPECTED)))
+    out.append((pu.NAV_MOVE, pu.NAV_MOVE_RESUME))
     return out
 
 
@@ -362,7 +379,9 @@ def main():
     # 1. Inert in every state that must leave the stock path alone.
     inert_states = dict(switch_off=dict(switch=0, orientation=1), no_state=dict(present=False, orientation=2),
                         landscape=dict(orientation=0), inverted=dict(orientation=3),
-                        playback_phase=dict(phase=4, orientation=1), other_view=dict(kind=3, orientation=2),
+                        playback_phase=dict(phase=4, orientation=1), other_view=dict(kind=5, orientation=2),
+                        menu_setting_page=dict(kind=pu.MENU_VIEW, nav_state=3, nav_count=7, orientation=1),
+                        menu_level=dict(kind=pu.MENU_VIEW, orientation=0),
                         no_backend=dict(backend=0, orientation=1), off_screen_target=dict(target=5, orientation=2),
                         overlay_first=dict(busy=(1, 0), orientation=1), overlay_second=dict(busy=(0, 0x20), orientation=2))
     inert = {}
@@ -425,6 +444,95 @@ def main():
             rewrites[f'{name}-{ori}'] = count
     results['portrait_cases'] = rewrites
 
+    # 2b. The i menu (view kind 3, grid state): the boxes read on the camera, then random ones.
+    camera_boxes = [(0, 280, 720, 146), (4, 284, 113, 66), (603, 356, 113, 66), (0, 280, 2, 74), (119, 352, 2, 74),
+                    (718, 352, 2, 74), (599, 424, 121, 2), (0, 280, 121, 2), (88, 228, 544, 44), (463, 430, 102, 48),
+                    (575, 432, 123, 44), (2, 446, 60, 32), (90, 42, 36, 36), (4, 180, 36, 36), (0, 0, 720, 480)]
+    menu_cases = {}
+    for ori in (1, 2):
+        for name, site, stop in entries:
+            if name == 'image3':
+                continue
+            count = 0
+            for i in range(a.cases):
+                data, regs = random_input(name)
+                if i < len(camera_boxes) and name in ('rect', 'clear', 'frame', 'image', 'image2'):
+                    x, y, w, h = camera_boxes[i]
+                    if name in ('rect', 'clear'):
+                        data = rect_bytes(x, 480 - y - h, w, h)
+                    elif name == 'frame':
+                        regs[:4] = [x, 480 - y - h, w, h]
+                    else:
+                        data = image_bytes(x, y, x + w, y + h, w, h, mode=1, angle=360)
+                patched.context(orientation=ori, kind=pu.MENU_VIEW)
+                patched.u.mem_write(STATE + control['state_offset'] + 16, struct.pack('<2I', ori | pu.MENU_MODE, 0))
+                out = run(patched, name, site, stop, data, regs)
+                if out['pc'] != stop:
+                    failures.append(dict(test='menu', entry=name, ori=ori, field='pc', pc=hex(out['pc'])))
+                    continue
+                if name in ('rect', 'clear'):
+                    want = model_rect(ori, name, data, menu=True)
+                    got = out['desc'][:len(want)]
+                elif name == 'frame':
+                    box = struct.pack('<4i', *[v - (1 << 32) if v >> 31 else v for v in regs[:4]]) + bytes(4)
+                    want = model_rect(ori, 'frame', box, menu=True)[:16]
+                    got = struct.pack('<4I', *out['regs'][:4])
+                    want = struct.pack('<4I', *[v & 0xFFFFFFFF for v in struct.unpack('<4i', want)])
+                elif name == 'text':
+                    want = struct.pack('<9I', *model_text(ori, data, menu=True))
+                    got = patched.loaded[0] if patched.loaded else b''
+                else:
+                    want = model_image(ori, name, data, menu=True)
+                    got = out['desc'][:len(want)]
+                if got != want:
+                    failures.append(dict(test='menu', entry=name, ori=ori, input=data.hex(),
+                                         regs=[hex(v) for v in regs[:4]], got=got.hex(), want=want.hex()))
+                count += 1
+            menu_cases[f'{name}-{ori}'] = count
+    results['menu_cases'] = menu_cases
+
+    # 2c. i-menu keys: the slot moves in 4x3 with the screen; elsewhere the stock window runs unchanged.
+    key_cases = dict(moved=0, stock=0)
+    key_stop = pu.NAV_MOVE_RESUME
+    for ori in (1, 2):
+        for direction in range(4):
+            for slot in range(12):
+                patched.context(orientation=ori, kind=pu.MENU_VIEW)
+                patched.u.mem_write(STATE + control['state_offset'] + 16, struct.pack('<I', ori | pu.MENU_MODE))
+                patched.slot = slot
+                regs = [direction] + [rng.getrandbits(32) for _ in range(12)]
+                out = patched.run(pu.NAV_MOVE, SENTINEL_LR & ~1, regs, lr=SENTINEL_LR)
+                stored = struct.unpack('<I', patched.u.mem_read(pu.NAV_BLOCK + 4, 4))[0]
+                want = pu.nav_target(ori, direction, slot)
+                if (out['pc'] | 1) != SENTINEL_LR or out['regs'][0] != 0 or stored != want or patched.set_calls != [want] \
+                        or out['regs'][1:4] != regs[1:4]:
+                    failures.append(dict(test='menu_keys', ori=ori, direction=direction, slot=slot,
+                                         stored=stored, set=patched.set_calls, want=want, pc=hex(out['pc'])))
+                key_cases['moved'] += 1
+    stock_states = dict(switch_off=(dict(switch=0, kind=3, orientation=1), 1 | pu.MENU_MODE),
+                        live_view_mode=(dict(kind=3, orientation=1), 1),
+                        live_view=(dict(kind=0, orientation=2), 2 | pu.MENU_MODE),
+                        setting_page=(dict(kind=3, nav_state=3, nav_count=7, orientation=2), 2 | pu.MENU_MODE),
+                        other_count=(dict(kind=3, nav_count=7, orientation=2), 2 | pu.MENU_MODE),
+                        no_state=(dict(present=False, kind=3, orientation=1), 1 | pu.MENU_MODE))
+    for label, (state, mode) in stock_states.items():
+        for direction in (0, 1, 2, 3, 4, 9):
+            regs = [direction] + [rng.getrandbits(32) for _ in range(12)]
+            outs = []
+            for machine in (patched, original):
+                machine.context(**state)
+                if state.get('present', True):
+                    machine.u.mem_write(STATE + control['state_offset'] + 16, struct.pack('<I', mode))
+                machine.slot = 5
+                outs.append(machine.run(pu.NAV_MOVE, key_stop, regs))
+            mine, theirs = outs
+            # r12 is scratch in the hook's stock path (constant loads); everything else must match.
+            if mine['pc'] != key_stop or [mine['regs'][i] for i in range(15) if i != 12] != \
+                    [theirs['regs'][i] for i in range(15) if i != 12] or mine['stack'] != theirs['stack'] or patched.set_calls:
+                failures.append(dict(test='menu_keys_stock', state=label, direction=direction, pc=hex(mine['pc'])))
+            key_cases['stock'] += 1
+    results['menu_key_cases'] = key_cases
+
     # 3. Image 3 goes through image 1 (and its hook) and is then skipped.
     image3 = 0
     _, site3, expected3, _ = next(h for h in pu.HOOKS if h[0] == 'image3')
@@ -482,8 +590,9 @@ def main():
     steps.append(clear(patched))
     patched.u.mem_write(pu.VIEW_KIND, bytes([0]))
     steps.append(clear(patched))
+    # Upright again, now in the i menu (view kind 3): its own layout, one full clear; back to live view: another.
     expect = [((0, 0, 720, 480), (1, 0)), (model_box(1), (1, 0)), ((0, 0, 720, 480), (0, 0)),
-              ((100, 400, 40, 20), (0, 0)), ((100, 400, 40, 20), (0, 0)), ((0, 0, 720, 480), (2, 0))]
+              ((100, 400, 40, 20), (0, 0)), ((0, 0, 720, 480), (2 | pu.MENU_MODE, 0)), ((0, 0, 720, 480), (2, 0))]
     for i, (got, want) in enumerate(zip(steps, expect)):
         lifecycle.append(dict(step=i, box=got[0], runtime=got[1]))
         if (tuple(got[0]), tuple(got[1])) != (tuple(want[0]), tuple(want[1])):
@@ -861,7 +970,7 @@ def main():
                              'OSD target value 2 and the photo live-view context are assumptions shared with the Z 5 / aspect mask']
     a.output.parent.mkdir(parents=True, exist_ok=True)
     a.output.write_text(json.dumps(results, indent=1) + '\n', encoding='utf-8')
-    print(json.dumps({k: results[k] for k in ('inert_cases', 'portrait_cases', 'image3_cases', 'repaint_cases', 'request_trace_cases', 'event_trace_cases', 'traversal_trace_cases', 'draw_record_cases', 'inject_cases', 'readout', 'log', 'failure_count', 'passed')}, indent=1))
+    print(json.dumps({k: results[k] for k in ('inert_cases', 'portrait_cases', 'menu_cases', 'menu_key_cases', 'image3_cases', 'repaint_cases', 'request_trace_cases', 'event_trace_cases', 'traversal_trace_cases', 'draw_record_cases', 'inject_cases', 'readout', 'log', 'failure_count', 'passed')}, indent=1))
     for failure in failures[:8]:
         print(json.dumps(failure)[:600])
     return 0 if not failures else 1
