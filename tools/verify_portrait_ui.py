@@ -171,13 +171,17 @@ def f32(v):
     return struct.unpack('<I', struct.pack('<f', v))[0]
 
 
+def locator(menu):
+    return pu.locate_mini if menu == 'mini' else pu.locate_menu if menu else pu.locate
+
+
 def model_rect(ori, kind, b, menu=False):
     x, yu, w, h, color = struct.unpack('<4iI', b[:20])
     if kind == 'rect' and focus(color & 0xFFFFFFFF):
         return b
     if kind == 'clear' and not menu and (w <= pu.THIN or h <= pu.THIN):
         return b
-    status, px, py, pw, ph = (pu.locate_menu if menu else pu.locate)(x, 480 - yu - h, w, h)
+    status, px, py, pw, ph = locator(menu)(x, 480 - yu - h, w, h)
     if not status:
         return b
     if status == 3:  # not part of the i menu: clears are dropped, the rest stays
@@ -202,7 +206,7 @@ def model_image(ori, kind, d, menu=False):
     w, h = (sw, sh) if mode == 1 else (x1 - x0, y1 - y0)
     if w <= 0 or h <= 0:
         return bytes(d)
-    status, px, py, pw, ph = (pu.locate_menu if menu else pu.locate)(x0, y0, w, h)
+    status, px, py, pw, ph = locator(menu)(x0, y0, w, h)
     if status in (0, 3):
         return bytes(d)
     struct.pack_into('<I', d, 0, 0)
@@ -245,9 +249,11 @@ def model_text(ori, m, menu=False):
     if gh <= 0:
         return m
     e, f = f2fix(m[6]), f2fix(m[7])
-    status, bx, by, pw, ph = (pu.locate_menu if menu else pu.locate)(e >> 8, 480 - (f >> 8) - gh, gw, gh)
+    status, bx, by, pw, ph = locator(menu)(e >> 8, 480 - (f >> 8) - gh, gw, gh)
     if status in (0, 3):
         return m
+    if status == 4:  # the 2/3 setting page: the glyph scale shrinks too
+        a, d = fix2f(pu.scale_mini(f2fix(a))), fix2f(pu.scale_mini(f2fix(d)))
     px = (bx << 8) + (e & 255)
     py = (by + ph) << 8
     if ori == 2:
@@ -274,6 +280,7 @@ def windows():
     if pu.REPAINT_HOOK:
         out.append((pu.REFRESH_REQUEST, pu.REFRESH_REQUEST + len(pu.REFRESH_EXPECTED)))
     out.append((pu.NAV_MOVE, pu.NAV_MOVE_RESUME))
+    out.append((pu.TOUCH, pu.TOUCH + len(pu.TOUCH_EXPECTED)))
     return out
 
 
@@ -380,7 +387,7 @@ def main():
     inert_states = dict(switch_off=dict(switch=0, orientation=1), no_state=dict(present=False, orientation=2),
                         landscape=dict(orientation=0), inverted=dict(orientation=3),
                         playback_phase=dict(phase=4, orientation=1), other_view=dict(kind=5, orientation=2),
-                        menu_setting_page=dict(kind=pu.MENU_VIEW, nav_state=3, nav_count=7, orientation=1),
+                        menu_setting_level=dict(kind=pu.MENU_VIEW, nav_state=3, nav_count=7, orientation=0),
                         menu_level=dict(kind=pu.MENU_VIEW, orientation=0),
                         no_backend=dict(backend=0, orientation=1), off_screen_target=dict(target=5, orientation=2),
                         overlay_first=dict(busy=(1, 0), orientation=1), overlay_second=dict(busy=(0, 0x20), orientation=2))
@@ -532,6 +539,158 @@ def main():
                 failures.append(dict(test='menu_keys_stock', state=label, direction=direction, pc=hex(mine['pc'])))
             key_cases['stock'] += 1
     results['menu_key_cases'] = key_cases
+
+    # 2d. i-menu setting page (view kind 3, navigation-table state not 0): the 2/3 page.
+    mini_cases = {}
+    for ori in (1, 2):
+        for name, site, stop in entries:
+            if name == 'image3':
+                continue
+            count = 0
+            for _ in range(a.cases):
+                data, regs = random_input(name)
+                patched.context(orientation=ori, kind=pu.MENU_VIEW, nav_state=3, nav_count=7)
+                patched.u.mem_write(STATE + control['state_offset'] + 16, struct.pack('<2I', ori | pu.MINI_MODE, 0))
+                out = run(patched, name, site, stop, data, regs)
+                if out['pc'] != stop:
+                    failures.append(dict(test='mini', entry=name, ori=ori, field='pc', pc=hex(out['pc'])))
+                    continue
+                if name in ('rect', 'clear'):
+                    want = model_rect(ori, name, data, menu='mini')
+                    got = out['desc'][:len(want)]
+                elif name == 'frame':
+                    box = struct.pack('<4i', *[v - (1 << 32) if v >> 31 else v for v in regs[:4]]) + bytes(4)
+                    want = model_rect(ori, 'frame', box, menu='mini')[:16]
+                    got = struct.pack('<4I', *out['regs'][:4])
+                    want = struct.pack('<4I', *[v & 0xFFFFFFFF for v in struct.unpack('<4i', want)])
+                elif name == 'text':
+                    want = struct.pack('<9I', *model_text(ori, data, menu='mini'))
+                    got = patched.loaded[0] if patched.loaded else b''
+                else:
+                    want = model_image(ori, name, data, menu='mini')
+                    got = out['desc'][:len(want)]
+                if got != want:
+                    failures.append(dict(test='mini', entry=name, ori=ori, input=data.hex(),
+                                         regs=[hex(v) for v in regs[:4]], got=got.hex(), want=want.hex()))
+                count += 1
+            mini_cases[f'{name}-{ori}'] = count
+    results['mini_cases'] = mini_cases
+    # The drawing hooks enter the 2/3 mode on a setting page, with one full clear.
+    patched.context(orientation=1, kind=pu.MENU_VIEW, nav_state=3, nav_count=7)
+    clear_site0, clear_stop0 = next((s, e) for n, s, e in entries if n == 'clear')
+    out = run(patched, 'clear', clear_site0, clear_stop0, rect_bytes(100, 400, 40, 20), [DESC] + [0] * 12)
+    got_mode = patched.runtime()
+    if (struct.unpack('<4i', out['desc'][:16]), got_mode) != ((0, 0, 720, 480), (1 | pu.MINI_MODE, 0)):
+        failures.append(dict(test='mini_enter', box=struct.unpack('<4i', out['desc'][:16]), runtime=got_mode))
+
+    # 2e. Touch at entry C: sequences of events against touch_map; inert where it must be.
+    touch_stop = pu.TOUCH + len(pu.TOUCH_EXPECTED)
+    touch_at = STATE + control['state_offset'] + control['touch_offset']
+    def event(X, Y, flag, kind):
+        e = bytearray(60)
+        struct.pack_into('<I', e, 0, 1)
+        e[8], e[9] = flag, kind
+        struct.pack_into('<2H', e, 0x12, X, Y)
+        return bytes(e)
+    live_rows, menu_rows = pu.touch_tables()
+    def landscape_point(ori, px, py):   # inverse of portrait_point
+        return (py, 480 - px) if ori == 2 else (720 - py, px)
+    def strokes(ori, mode):
+        """Presses on every control (portrait), on the empty landscape places, on the picture; with drags."""
+        points = []
+        rows = menu_rows if mode & pu.MENU_MODE else live_rows
+        for kind, a0, a1, a2, a3, _, _ in rows:
+            if kind == pu.T_MAPPED:
+                points.append(landscape_point(ori, (a0 + a2) // 2, (a1 + a3) // 2))
+                points.append(landscape_point(ori, a0, a1))
+                points.append(landscape_point(ori, a2 - 1, a3 - 1))
+            else:
+                points.append(((a0 + a2) // 2, (a1 + a3) // 2))
+        points += [(rng.randrange(0, 720), rng.randrange(0, 480)) for _ in range(24)]
+        out = []
+        for X, Y in points:
+            seq = [event(X, Y, 1, 1)]
+            for _ in range(rng.randrange(0, 4)):
+                X, Y = max(0, min(719, X + rng.randrange(-40, 41))), max(0, min(479, Y + rng.randrange(-40, 41)))
+                seq.append(event(X, Y, 1, rng.choice((2, 2, 4))))
+            seq.append(event(X, Y, 0, rng.choice((1, 1, 3))))
+            out.append(seq)
+        out.append([event(300, 200, 1, 1), event(310, 200, 0, 9)])   # stock cancel mid-touch
+        return out
+    touch_cases = dict(mapped=0, inert=0)
+    for ori in (1, 2):
+        for mode_bits, state in ((0, dict()), (pu.MENU_MODE, dict(kind=pu.MENU_VIEW)),
+                                 (pu.MINI_MODE, dict(kind=pu.MENU_VIEW, nav_state=3, nav_count=7))):
+            mode = ori | mode_bits
+            for seq in strokes(ori, mode):
+                patched.context(orientation=ori, **state)
+                patched.u.mem_write(STATE + control['state_offset'] + pu.R_MODE, struct.pack('<I', mode))
+                tstate, ox, oy = pu.T_NONE, 0, 0
+                for i, ev in enumerate(seq):
+                    regs = [DESC] + [rng.getrandbits(32) for _ in range(12)]
+                    patched.u.mem_write(DESC, ev + bytes(0x60 - len(ev)))
+                    out = patched.run(pu.TOUCH, touch_stop, regs, pushed=28)
+                    want, tstate, ox, oy = pu.touch_map(mode, tstate, ox, oy, ev)
+                    got = out['desc'][:60]
+                    header = struct.unpack('<2I', patched.u.mem_read(touch_at + 4, 8))
+                    record = struct.unpack('<4H4BI', patched.u.mem_read(touch_at + 16 + ((header[0] - 1) % pu.TCH_CAPACITY) * 16, 16))
+                    want_record = (*struct.unpack_from('<2H', ev, 0x12), *struct.unpack_from('<2H', want, 0x12),
+                                   ev[9], ev[8], state.get('kind', 0), tstate, mode)
+                    if out['pc'] != touch_stop or got != want or out['regs'][0] != DESC or out['regs'][1:4] != regs[1:4] \
+                            or header[1] != tstate or record != want_record:
+                        failures.append(dict(test='touch', ori=ori, mode=mode, step=i, event=ev[8:0x16].hex(),
+                                             got=got[8:0x16].hex(), want=want[8:0x16].hex(), state=header[1],
+                                             want_state=tstate, record=record, want_record=want_record))
+                        break
+                    touch_cases['mapped'] += 1
+    # Inert: switch off, no state, level grip (R_MODE 0): the event and registers stay stock.
+    for label, state, mode in (('switch_off', dict(switch=0, orientation=1), 1), ('no_state', dict(present=False, orientation=2), 2),
+                               ('level', dict(orientation=0), 0), ('setting_level', dict(kind=3, nav_state=3, orientation=0), 0)):
+        for _ in range(24):
+            ev = event(rng.randrange(0, 720), rng.randrange(0, 480), rng.choice((0, 1)), rng.choice((1, 2, 3, 4, 9)))
+            regs = [DESC] + [rng.getrandbits(32) for _ in range(12)]
+            stack = bytes(rng.getrandbits(8) for _ in range(64))
+            outs = []
+            for machine in (patched, original):
+                machine.context(**state)
+                if machine is patched and state.get('present', True):
+                    machine.u.mem_write(STATE + control['state_offset'] + pu.R_MODE, struct.pack('<I', mode))
+                machine.u.mem_write(DESC, ev + bytes(0x60 - len(ev)))
+                outs.append(machine.run(pu.TOUCH, touch_stop, regs, stack=stack, pushed=28))
+            mine, theirs = outs
+            if any(mine[k] != theirs[k] for k in ('pc', 'regs', 'flags', 'stack', 'desc')):
+                failures.append(dict(test='touch_inert', state=label, diff=[k for k in ('pc', 'regs', 'flags', 'stack', 'desc') if mine[k] != theirs[k]]))
+            if label in ('switch_off', 'no_state', 'level') and patched.u.mem_read(touch_at + 4, 4) != bytes(4):
+                failures.append(dict(test='touch_recorded_while_inert', state=label))
+            touch_cases['inert'] += 1
+    results['touch_cases'] = touch_cases
+
+    # 2f. Setting-page keys: in the 2/3 mode the action entry turns direction codes with the screen.
+    action_site = pu.EVENT_HOOKS[0][1]
+    action_resume = action_site + len(bytes.fromhex(pu.EVENT_HOOKS[0][2]))
+    seen_codes = []
+    def code_seen(mu, address, size, data):
+        seen_codes.append(mu.reg_read(UC_ARM_REG_R1))
+        mu.reg_write(UC_ARM_REG_PC, mu.reg_read(UC_ARM_REG_LR))
+    hook = patched.u.hook_add(UC_HOOK_CODE, code_seen, begin=action_resume, end=action_resume)
+    key_turn = 0
+    for ori in (1, 2):
+        for label, state, mode, turned in (('setting_page', dict(kind=3, nav_state=3, nav_count=7), ori | pu.MINI_MODE, True),
+                                           ('grid', dict(kind=3), ori | pu.MENU_MODE, False),
+                                           ('live', dict(kind=0), ori, False),
+                                           ('stale_mode', dict(kind=3, nav_state=0), ori | pu.MINI_MODE, False)):
+            for code in (0, 2, 3, 4, 5, 6, 0x13, 0x18):
+                patched.context(orientation=ori, **state)
+                patched.u.mem_write(pu.UI_TABLE, bytes(0x100))
+                patched.u.mem_write(STATE + control['state_offset'] + pu.R_MODE, struct.pack('<I', mode))
+                seen_codes.clear()
+                patched.run(action_site, SENTINEL_LR & ~1, [code] + [0] * 12)
+                want = pu.turn_code(ori, code) if turned else code
+                if seen_codes != [want]:
+                    failures.append(dict(test='setting_keys', ori=ori, state=label, code=code, seen=seen_codes, want=want))
+                key_turn += 1
+    patched.u.hook_del(hook)
+    results['setting_key_cases'] = key_turn
 
     # 3. Image 3 goes through image 1 (and its hook) and is then skipped.
     image3 = 0
@@ -970,7 +1129,8 @@ def main():
                              'OSD target value 2 and the photo live-view context are assumptions shared with the Z 5 / aspect mask']
     a.output.parent.mkdir(parents=True, exist_ok=True)
     a.output.write_text(json.dumps(results, indent=1) + '\n', encoding='utf-8')
-    print(json.dumps({k: results[k] for k in ('inert_cases', 'portrait_cases', 'menu_cases', 'menu_key_cases', 'image3_cases', 'repaint_cases', 'request_trace_cases', 'event_trace_cases', 'traversal_trace_cases', 'draw_record_cases', 'inject_cases', 'readout', 'log', 'failure_count', 'passed')}, indent=1))
+    print(json.dumps({k: results[k] for k in ('inert_cases', 'portrait_cases', 'menu_cases', 'menu_key_cases', 'mini_cases',
+                                              'touch_cases', 'setting_key_cases', 'image3_cases', 'repaint_cases', 'request_trace_cases', 'event_trace_cases', 'traversal_trace_cases', 'draw_record_cases', 'inject_cases', 'readout', 'log', 'failure_count', 'passed')}, indent=1))
     for failure in failures[:8]:
         print(json.dumps(failure)[:600])
     return 0 if not failures else 1

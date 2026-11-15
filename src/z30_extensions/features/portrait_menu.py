@@ -40,7 +40,12 @@ TRV, TRV_MAGIC, TRV_CAPACITY, TRV_STRIDE = EVT + 16 + EVT_CAPACITY * EVT_STRIDE,
 # Live-view widgets the stock traversal actually drew: header (count) then pointers.
 WID, WID_CAPACITY = TRV + 16 + TRV_CAPACITY * TRV_STRIDE, 256
 WID_STRIDE = 8  # widget, last-draw stamp; header +0 count, +4 stamp counter
-STATE_SIZE = WID + 16 + WID_CAPACITY * WID_STRIDE
+# Portrait touch: header (magic, next index, touch state, landscape offset x/y as two
+# halfwords) then 16-byte records of every touch event while upright: the panel point
+# before and after, the type and contact bytes, the view kind, the touch state and the
+# layout mode. See portrait_ui portrait_touch.
+TCH, TCH_MAGIC, TCH_CAPACITY, TCH_STRIDE = WID + 16 + WID_CAPACITY * WID_STRIDE, 0x31485657, 64, 16  # WVH1
+STATE_SIZE = TCH + 16 + TCH_CAPACITY * TCH_STRIDE
 LOG_FILE = 'WL-VUI.DBG'
 SIZES = dict(portrait_get=96, portrait_labels=768, portrait_open=192,
              portrait_action=256, portrait_save=640, portrait_restore=640, portrait_close=128,
@@ -123,7 +128,8 @@ def prepare(plan, f, resources, allocation_size):
         ldrh r5,[r4,#22];ldrh r0,[r4,#24];add r5,r5,r0;cmp r5,#1;bhi done;
         {call('portrait_get')}cmp r0,#0;beq done;str r5,[r0];
         movs r1,#0;movs r2,#{RUNTIME_OFFSET};wipe:str r1,[r0,r2];adds r2,#4;cmp r2,#{TEXT_A};blo wipe;
-        str r1,[r0,#{LOG + 4}];movw r2,#{REQ + 4};str r1,[r0,r2];movw r2,#{EVT + 4};str r1,[r0,r2];movw r2,#{TRV + 4};str r1,[r0,r2];dmb ish;
+        str r1,[r0,#{LOG + 4}];movw r2,#{REQ + 4};str r1,[r0,r2];movw r2,#{EVT + 4};str r1,[r0,r2];movw r2,#{TRV + 4};str r1,[r0,r2];
+        movw r2,#{TCH + 4};str r1,[r0,r2];movw r2,#{TCH + 8};str r1,[r0,r2];dmb ish;
         {call('portrait_save')}cmp r0,#1;beq root;
         mov r0,r4;{call('show_error')}b done;
         root:mov r0,r4;{call('page_return')}
@@ -144,5 +150,6 @@ def finish(plan, f, extension, identifiers):
         state_offset=extension['state_offset'], runtime_offset=RUNTIME_OFFSET,
         settings_file=SETTINGS_FILE, diagnostics=DIAGNOSTICS, log_file=LOG_FILE if DIAGNOSTICS else None, log_offset=LOG, log_capacity=LOG_CAPACITY,
         log_stride=LOG_STRIDE, state_size=STATE_SIZE, request_offset=REQ, request_capacity=REQ_CAPACITY, event_offset=EVT, event_capacity=EVT_CAPACITY, traversal_offset=TRV, traversal_capacity=TRV_CAPACITY, widget_offset=WID, widget_capacity=WID_CAPACITY,
+        touch_offset=TCH, touch_capacity=TCH_CAPACITY,
         restore_policy='First custom-menu initialization; OFF before initialization',
         functions={k: hex(f[k] | 1) for k in SIZES}, physical_verified=False)

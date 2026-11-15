@@ -93,6 +93,7 @@ def main():
     screen.add_argument('--alpha', action='store_true', help='keep the canvas alpha (transparent where the live view shows through)')
     sub.add_parser('requests', help='print the traced 0x10453FAC redraw requests (newest last)')
     sub.add_parser('traversals', help='summarize the traced 0x102BD3BA redraw traversals (container, caller, view kind)')
+    sub.add_parser('touches', help='print the recorded portrait touch events (panel point before and after, newest last)')
     peek = sub.add_parser('peek')
     peek.add_argument('address', type=lambda v: int(v, 0))
     peek.add_argument('length', type=lambda v: int(v, 0))
@@ -142,6 +143,17 @@ def main():
         print(f'{total} traversals recorded; last {min(total, pm.TRV_CAPACITY)} by container, callback, caller, view kind, pose:')
         for key, number in rows.most_common():
             print(f'  {number:4d}  container {key[0]}  callback {key[1]}  from {key[2]}  view {key[3]}  pose {key[4]}')
+        return
+    if a.command == 'touches':
+        base = block + pm.TCH
+        magic, total, state, offset = struct.unpack('<4I', live.read(base, 16))
+        ring = live.read(base + 16, pm.TCH_CAPACITY * pm.TCH_STRIDE)
+        states = {pu.T_NONE: 'pass', pu.T_MAPPED: 'mapped', pu.T_CANCEL: 'cancel', pu.T_MINI: 'page 2/3'}
+        print(f'{total} touch events while upright (magic {magic:#x}), touch state now {states.get(state, state)}')
+        for seq in range(max(0, total - pm.TCH_CAPACITY), total):
+            x, y, nx, ny, kind, contact, view, after, mode = struct.unpack_from('<4H4BI', ring, (seq % pm.TCH_CAPACITY) * pm.TCH_STRIDE)
+            print(f'{seq:5d}  type {kind} contact {contact}  ({x:3d},{y:3d}) -> ({nx:3d},{ny:3d})  view {view}  '
+                  f'mode {mode:#x}  after: {states.get(after, after)}')
         return
     if a.command == 'dump':
         a.out.write_bytes(live.read(block, pm.STATE_SIZE))

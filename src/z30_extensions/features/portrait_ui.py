@@ -155,6 +155,133 @@ CURSOR_GET, CURSOR_SET = 0x1042B52A, 0x1042BBFC
 # portrait screen, one nibble each, per orientation (as panel_box turns the screen).
 NAV_TURN = {1: 0x1023, 2: 0x0132}
 
+# Setting pages opened from the i menu (view kind 3, navigation-table state not 0).
+# Their layouts were not read on the camera yet, so v22 does not lay them out item by
+# item: the whole landscape page is drawn at 2/3 size, upright, at the bottom of the
+# portrait screen (480x320, y 400..720), as the Z 5 does for its third-level pages.
+# Touch goes back by the exact 3/2; the direction keys turn with the screen.
+MINI_MODE = 8                     # R_MODE bit: the 2/3 setting page
+MINI_Y = 720 - 320                # portrait top of the page
+MINI_NUM, MINI_SHIFT = 683, 10    # 2/3 as (v * 683) >> 10, no divide
+# Direction action codes at the UI action entry (10310BF8; the i-menu handler 103DEC33
+# reads them): right 2, left 3, up 4, down 5. Physical code -> screen code per grip,
+# one nibble per code 2..5, from NAV_TURN (camera-verified for the i-menu grid).
+CODE_DIR = {4: 0, 5: 1, 2: 2, 3: 3}
+DIR_CODE = {v: k for k, v in CODE_DIR.items()}
+CODE_TURN = {ori: sum(DIR_CODE[(turn >> (CODE_DIR[code] * 4)) & 15] << ((code - 2) * 4) for code in (2, 3, 4, 5))
+             for ori, turn in NAV_TURN.items()}
+
+# Touch. The shooting application's loop (102F7678, event 0x56) hands every touch event
+# of a view kind below 0x11 to 104F1AD4 (entry C on the Z 5; live view is 0, the i menu
+# 3); 1039DA3C takes the others. 104F1AD4 copies the 60-byte event and passes it on to
+# the widgets, so the event is rewritten in place at its entry and every later reader,
+# including the copy in C2006558 the i-menu hit test reads, sees the landscape point.
+# Event (as on the Z 5, and as QEMU's touch input 103CE7E6 builds it): +8 contact
+# (1 down, 0 up), +9 type (1 press/release, 2 move, 3 drag end, 4 hold, 9 cancel),
+# +0x12/+0x14 the landscape panel point (y down). The GUI's own touch entry 104759DC
+# (menus) is not changed.
+TOUCH, TOUCH_EXPECTED = 0x104F1AD4, bytes.fromhex('2de9f043' '93b0' '0646')  # push.w {r4-r9,lr}; sub sp,#0x4c; mov r6,r0
+TOUCH_CALL, TOUCH_VIEW_LIMIT = 0x102F7688, 0x11
+TOUCH_EVENT_COPY = 0x10456220   # memcpy(C2006558, event, 0x3C), reached from the widgets
+# Touch states (header +8): 0 none, 1 mapped by a control's offset, 2 cancelled,
+# 3 the 2/3 setting page (exact inverse).
+T_NONE, T_MAPPED, T_CANCEL, T_MINI = 0, 1, 2, 3
+# Live-view controls, landscape boxes read on the camera over USB (2026-11-11 log, the
+# same places as on the Z 5): each is placed where portrait_locate draws it. A press
+# on a placed control goes to that control's landscape place; a press on a landscape
+# place (empty in portrait) is cancelled; anything else is the picture (touch AF).
+LIVE_CONTROLS = (
+    ('touch_shutter', (2, 128, 80, 48)),
+    ('i_button', (660, 128, 58, 48)),
+    ('hint_button', (306, 372, 106, 48)),
+    ('shutter', (128, 430, 124, 48)),
+    ('aperture', (266, 430, 104, 48)),
+    ('iso', (436, 430, 153, 48)),
+)
+LIVE_CANCEL = tuple(box for _, box in LIVE_CONTROLS if _ != 'hint_button') + ((195, 372, 328, 48),)  # the whole hint row
+MENU_BAR_BOX = (400, 428, 320, 52)   # the i-menu bottom bar (moved by MENU_BAR)
+TOUCH_END = 0x7FFF
+TCH_MAGIC, TCH_CAPACITY = 0x31485657, 64  # WVH1; the ring lives in the page's state block (portrait_menu.TCH)
+
+
+def scale_mini(v):
+    return (v * MINI_NUM) >> MINI_SHIFT
+
+
+def locate_mini(x, y, w, h):
+    """Python model of the setting-page branch of portrait_locate: the page at 2/3, bottom of the portrait screen."""
+    if w >= FULL_W and h >= FULL_H:
+        return 0, x, y, w, h
+    return 4, scale_mini(x), scale_mini(y) + MINI_Y, max(1, scale_mini(w)), max(1, scale_mini(h))
+
+
+def touch_tables():
+    """(live, menu): rows (kind, a0, a1, a2, a3, ox, oy). Kind 1: portrait box -> offset; kind 2: landscape box -> cancel."""
+    live, menu = [], []
+    for _, (x, y, w, h) in LIVE_CONTROLS:
+        status, px, py, pw, ph = locate(x, y, w, h)
+        live.append((T_MAPPED, px, py, px + pw, py + ph, x - px, y - py))
+    for x, y, w, h in LIVE_CANCEL:
+        live.append((T_CANCEL, x, y, x + w, y + h, 0, 0))
+    for slot in range(12):
+        x, y = MENU_CELL_W * (slot % 6), MENU_TOP + MENU_CELL_H * (slot // 6)
+        px, py = MENU_CELL_W * (slot & 3), MENU_GRID_Y + MENU_CELL_H * (slot >> 2)
+        menu.append((T_MAPPED, px, py, px + MENU_CELL_W, py + MENU_CELL_H, x - px, y - py))
+    x, y, w, h = MENU_BAR_BOX
+    menu.append((T_MAPPED, x + MENU_BAR[2], y + MENU_BAR[3], x + MENU_BAR[2] + w, y + MENU_BAR[3] + h, -MENU_BAR[2], -MENU_BAR[3]))
+    return live, menu
+
+
+def portrait_point(ori, X, Y):
+    """Landscape panel point (y down) -> the point on the upright portrait screen."""
+    return (480 - Y, X) if ori == 2 else (Y, 720 - X)
+
+
+def touch_press(mode, X, Y):
+    """Python model of the press decision: (state, ox, oy)."""
+    ori = mode & 3
+    px, py = portrait_point(ori, X, Y)
+    if mode & MINI_MODE:
+        return (T_MINI, 0, 0) if py >= MINI_Y else (T_CANCEL, 0, 0)
+    live, menu = touch_tables()
+    for kind, a0, a1, a2, a3, ox, oy in (menu if mode & MENU_MODE else live):
+        if kind == T_MAPPED and a0 <= px < a2 and a1 <= py < a3:
+            return T_MAPPED, ox, oy
+        if kind == T_CANCEL and a0 <= X < a2 and a1 <= Y < a3:
+            return T_CANCEL, 0, 0
+    return (T_CANCEL if mode & MENU_MODE else T_NONE), 0, 0
+
+
+def touch_map(mode, state, ox, oy, event):
+    """Python model of portrait_touch for one event: (new event bytes, new state, ox, oy)."""
+    e = bytearray(event)
+    flag, kind = e[8], e[9]
+    X, Y = struct.unpack_from('<2H', e, 0x12)
+    ori = mode & 3
+    if kind == 9 or not ori:
+        return bytes(e), T_NONE, ox, oy
+    if kind == 1 and flag == 1:
+        state, ox, oy = touch_press(mode, X, Y)
+    if state == T_CANCEL:
+        e[8], e[9] = 0, 9
+    elif state in (T_MAPPED, T_MINI):
+        px, py = portrait_point(ori, X, Y)
+        if state == T_MAPPED:
+            nx, ny = px + ox, py + oy
+        else:
+            nx, ny = (px * 3) >> 1, ((py - MINI_Y) * 3) >> 1
+        struct.pack_into('<2H', e, 0x12, max(0, min(719, nx)), max(0, min(479, ny)))
+    if flag == 0 or kind == 3:
+        state = T_NONE
+    return bytes(e), state, ox, oy
+
+
+def turn_code(ori, code):
+    """Python model of the setting-page key turn at the action entry."""
+    if 2 <= code <= 5:
+        return (CODE_TURN[ori] >> ((code - 2) * 4)) & 15
+    return code
+
 # name, site, stock bytes of the displaced window, replayed instructions, resume
 HOOKS = (
     ('rect', RECT, '2de9f041044688b0','push.w {r4-r8,lr};mov r4,r0;sub sp,#0x20;'),
@@ -166,9 +293,9 @@ HOOKS = (
 )
 TEXT_EXPECTED = bytes.fromhex('bbf770fe022141f22210')
 
-SIZES = dict(portrait_f2fix=96, portrait_fix2f=96, portrait_focus=96, portrait_locate=640,
-             portrait_rect=320, portrait_image=320, portrait_image3=320, portrait_text=384,
-             portrait_hook=768, portrait_log=512)
+SIZES = dict(portrait_f2fix=96, portrait_fix2f=96, portrait_focus=96, portrait_locate=768,
+             portrait_rect=320, portrait_image=320, portrait_image3=320, portrait_text=448,
+             portrait_hook=768, portrait_log=512, portrait_touch=640)
 # Runtime words after the switch word (see portrait_menu): mode, pending full
 # clear, repaint wanted, refresh passes, forced repaints, then the readout.
 R_MODE, R_PENDING, R_REPAINT, R_PASSES, R_FORCED = 16, 20, 24, 28, 32
@@ -279,11 +406,13 @@ def panel_box(ori, px, py, pw, ph):
     return 720 - py - ph, 480 - px - pw, ph, pw
 
 
-def sources(f, state_offset, runtime, layout):
+def sources(f, state_offset, runtime, layout, touch=None):
     if runtime != R_MODE:
         raise ValueError('Runtime words moved')
     k = KINDS
     code = {}
+    if touch is not None:
+        code['portrait_touch'] = touch_source(f, state_offset, **touch)
     # IEEE single <-> signed 24.8, for the glyph matrix only. No VFP in a GUI hook.
     code['portrait_f2fix'] = '''
         ubfx r1,r0,#23,#8;sub r1,r1,#127;cmn r1,#8;blt zero;
@@ -331,7 +460,12 @@ def sources(f, state_offset, runtime, layout):
         lower:add r1,r1,#{240 - ROW};
         bar:stm r12,{{r0-r3}};movs r0,#2;pop {{r4-r8,pc}};
         keep:movs r0,#0;pop {{r4-r8,pc}};
-        menu:cmp r0,#{MENU_BACKDROP[0]};bne m_cy;movw r4,#700;cmp r2,r4;blt m_cy;
+        mini:movw r4,#{MINI_NUM};mul r0,r0,r4;asr r0,r0,#{MINI_SHIFT};mul r1,r1,r4;asr r1,r1,#{MINI_SHIFT};add r1,r1,#{MINI_Y};
+        mul r2,r2,r4;asr r2,r2,#{MINI_SHIFT};cmp r2,#1;it lt;movlt r2,#1;
+        mul r3,r3,r4;asr r3,r3,#{MINI_SHIFT};cmp r3,#1;it lt;movlt r3,#1;
+        stm r12,{{r0-r3}};movs r0,#4;pop {{r4-r8,pc}};
+        menu:{c('r4',NAV_TABLE)}ldrb r4,[r4];cmp r4,#0;bne mini;
+        cmp r0,#{MENU_BACKDROP[0]};bne m_cy;movw r4,#700;cmp r2,r4;blt m_cy;
         movw r4,#260;cmp r1,r4;blt m_cy;movw r4,#300;cmp r1,r4;bgt m_cy;
         movs r0,#0;movw r1,#{MENU_GRID_Y};movw r2,#480;movw r3,#{3 * MENU_CELL_H};b m_store;
         m_cy:add r5,r1,r3,asr #1;
@@ -423,7 +557,10 @@ def sources(f, state_offset, runtime, layout):
         ldr r0,[r4,#28];{n(f['portrait_f2fix'])}mov r11,r0;
         asr r0,r10,#8;asr r1,r11,#8;rsb r1,r1,#480;sub r1,r1,r9;mov r2,r8;mov r3,r9;
         stm sp,{{r0-r3}};mov r0,sp;{n(f['portrait_locate'])}cmp r0,#0;beq done;cmp r0,#3;beq done;str r0,[sp,#16];
-        ldm sp,{{r0-r3}};and r12,r10,#255;add r8,r12,r0,lsl #8;add r1,r1,r3;lsl r9,r1,#8;
+        cmp r0,#4;bne sized;movw r8,#{MINI_NUM};
+        mov r0,r6;{n(f['portrait_f2fix'])}mul r0,r0,r8;asr r0,r0,#{MINI_SHIFT};{n(f['portrait_fix2f'])}mov r6,r0;
+        mov r0,r7;{n(f['portrait_f2fix'])}mul r0,r0,r8;asr r0,r0,#{MINI_SHIFT};{n(f['portrait_fix2f'])}mov r7,r0;
+        sized:ldm sp,{{r0-r3}};and r12,r10,#255;add r8,r12,r0,lsl #8;add r1,r1,r3;lsl r9,r1,#8;
         cmp r5,#2;beq upright;
         eor r6,r6,#0x80000000;movw r0,#{720 << 8 & 0xFFFF};movt r0,#{720 << 8 >> 16};sub r9,r0,r9;
         movw r0,#{480 << 8 & 0xFFFF};movt r0,#{480 << 8 >> 16};sub r8,r0,r8;b store;
@@ -487,7 +624,7 @@ def sources(f, state_offset, runtime, layout):
         {c('r1',OVERLAY_BUSY[1])}ldr r0,[r1];cmp r0,#0;bne context;movs r8,#1;
         context:movs r0,#0;cmp r8,#0;beq mode;cmp r7,#1;beq portrait;cmp r7,#2;bne mode;
         portrait:mov r0,r7;{c('r1',VIEW_KIND)}ldrb r1,[r1];cmp r1,#{MENU_VIEW};bne mode;
-        {c('r1',NAV_TABLE)}ldrb r1,[r1];cmp r1,#0;ite eq;orreq r0,r0,#{MENU_MODE};movne r0,#0;
+        {c('r1',NAV_TABLE)}ldrb r1,[r1];cmp r1,#0;ite eq;orreq r0,r0,#{MENU_MODE};orrne r0,r0,#{MINI_MODE};
         mode:ldr r2,[r6,#{R_MODE}];cmp r0,r2;beq same;str r0,[r6,#{R_MODE}];
         movs r2,#1;str r2,[r6,#{R_PENDING}];str r2,[r6,#{R_REPAINT}];
         same:and r7,r0,#3;cmp r8,#0;bne live;movs r2,#0;str r2,[r6,#{R_PENDING}];b out;
@@ -505,6 +642,56 @@ def sources(f, state_offset, runtime, layout):
         image:ldr r0,[r5];mov r1,r7;mov r2,r4;{n(f['portrait_image'])}
         out:pop {{r4-r8,pc}};'''
     return code
+
+
+def touch_source(f, state_offset, offset, magic, capacity, live, menu):
+    """r0 -> the touch event at 104F1AD4; rewritten in place (modelled by touch_map), recorded while upright.
+
+    r4 event, r5 state block, r6 touch header (+8 state, +12/+14 offset), r7 state,
+    r8 contact, r9 type, r10 grip, r11 layout mode, r2/r3 the portrait point."""
+    if capacity & (capacity - 1):
+        raise ValueError('Touch ring capacity must be a power of two')
+    return f'''push {{r4-r11,lr}};mov r4,r0;
+        {n(f['get'])}cmp r0,#0;beq out;{c('r1',state_offset)}add r5,r0,r1;ldr r0,[r5];cmp r0,#1;bne out;
+        {c('r1',offset)}add r6,r5,r1;
+        ldr r11,[r5,#{R_MODE}];ands r10,r11,#3;bne upright;movs r0,#0;str r0,[r6,#8];b out;
+        upright:sub sp,#8;ldrb r8,[r4,#8];ldrb r9,[r4,#9];
+        ldrh r0,[r4,#0x12];strh r0,[sp];ldrh r1,[r4,#0x14];strh r1,[sp,#2];
+        cmp r10,#2;bne grip1;rsb r2,r1,#480;mov r3,r0;b point;
+        grip1:mov r2,r1;rsb r3,r0,#720;
+        point:cmp r9,#9;beq reset;cmp r9,#1;bne follow;cmp r8,#1;bne follow;
+        tst r11,#{MINI_MODE};beq tables;movs r7,#{T_MINI};cmp r3,#{MINI_Y};it lt;movlt r7,#{T_CANCEL};b decided;
+        tables:tst r11,#{MENU_MODE};bne menu;{c('r12',live)}movs r7,#{T_NONE};b scan;
+        menu:{c('r12',menu)}movs r7,#{T_CANCEL};
+        scan:ldrsh lr,[r12];movw r0,#{TOUCH_END};cmp lr,r0;beq decided;
+        cmp lr,#{T_MAPPED};bne landscape;
+        ldrsh r0,[r12,#2];cmp r2,r0;blt next;ldrsh r0,[r12,#6];cmp r2,r0;bge next;
+        ldrsh r0,[r12,#4];cmp r3,r0;blt next;ldrsh r0,[r12,#8];cmp r3,r0;bge next;
+        ldrsh r0,[r12,#10];strh r0,[r6,#12];ldrsh r0,[r12,#12];strh r0,[r6,#14];movs r7,#{T_MAPPED};b decided;
+        landscape:ldrh r1,[sp];ldrh lr,[sp,#2];
+        ldrsh r0,[r12,#2];cmp r1,r0;blt next;ldrsh r0,[r12,#6];cmp r1,r0;bge next;
+        ldrsh r0,[r12,#4];cmp lr,r0;blt next;ldrsh r0,[r12,#8];cmp lr,r0;bge next;
+        movs r7,#{T_CANCEL};b decided;
+        next:adds r12,#16;b scan;
+        decided:str r7,[r6,#8];
+        follow:ldr r7,[r6,#8];
+        cmp r7,#{T_CANCEL};bne not_cancel;movs r0,#0;strb r0,[r4,#8];movs r0,#9;strb r0,[r4,#9];b finish;
+        not_cancel:cmp r7,#{T_MAPPED};bne not_mapped;ldrsh r0,[r6,#12];add r0,r2,r0;ldrsh r1,[r6,#14];add r1,r3,r1;b store;
+        not_mapped:cmp r7,#{T_MINI};bne finish;
+        add r0,r2,r2,lsl #1;asr r0,r0,#1;sub r1,r3,#{MINI_Y};add r1,r1,r1,lsl #1;asr r1,r1,#1;
+        store:cmp r0,#0;it lt;movlt r0,#0;movw r12,#719;cmp r0,r12;it gt;movgt r0,r12;
+        cmp r1,#0;it lt;movlt r1,#0;movw r12,#479;cmp r1,r12;it gt;movgt r1,r12;
+        strh r0,[r4,#0x12];strh r1,[r4,#0x14];
+        finish:cmp r8,#0;beq reset;cmp r9,#3;bne record;
+        reset:movs r0,#0;str r0,[r6,#8];
+        record:{c('r0',magic)}str r0,[r6];ldr r0,[r6,#4];and r1,r0,#{capacity - 1};adds r0,#1;str r0,[r6,#4];
+        add r1,r6,r1,lsl #4;adds r1,#16;
+        ldrh r0,[sp];strh r0,[r1];ldrh r0,[sp,#2];strh r0,[r1,#2];
+        ldrh r0,[r4,#0x12];strh r0,[r1,#4];ldrh r0,[r4,#0x14];strh r0,[r1,#6];
+        strb r9,[r1,#8];strb r8,[r1,#9];{c('r0',VIEW_KIND)}ldrb r0,[r0];strb r0,[r1,#10];
+        ldr r0,[r6,#8];strb r0,[r1,#11];str r11,[r1,#12];
+        add sp,#8;
+        out:pop {{r4-r11,pc}};'''
 
 
 def call_hook(f, kind):
@@ -537,10 +724,22 @@ def add(plan):
     # 10310BF8: the UI dispatch indexes its handler table with VIEW_KIND.
     if im.words(0x10310DDC, 1)[0] != VIEW_KIND:
         raise ValueError('Unexpected UI state byte')
+    if (control['touch_capacity'], TCH_CAPACITY) != (TCH_CAPACITY, TCH_CAPACITY):
+        raise ValueError('Touch ring layout differs between the page and the hooks')
+    # Entry C: the shooting loop calls it for view kinds below 0x11 (cmp r0,#0x11; bhs to entry D).
+    if (im.read(TOUCH, len(TOUCH_EXPECTED)) != TOUCH_EXPECTED
+            or im.read(TOUCH_CALL - 6, 10) != bytes.fromhex('1128' '03a8' '02d2' 'faf124fa')  # ...; bl 104F1AD4
+            or im.read(TOUCH_EVENT_COPY, 10) != bytes.fromhex('10b50c46014685483c22')):
+        raise ValueError('Unexpected shooting touch entry')
     for name, size in SIZES.items():
         f[name] = plan.alloc(bytes(size))
     layout = plan.alloc(b''.join(struct.pack('<8h', *rule, 0) for rule in LAYOUT) + struct.pack('<8h', 0x7FFF, *[0] * 7))
-    for name, source in sources(f, control['state_offset'], control['runtime_offset'], layout).items():
+    live_rows, menu_rows = touch_tables()
+    def rows(table):
+        return b''.join(struct.pack('<8h', *row, 0) for row in table) + struct.pack('<8h', TOUCH_END, *[0] * 7)
+    touch = dict(offset=control['touch_offset'], magic=TCH_MAGIC, capacity=TCH_CAPACITY,
+                 live=plan.alloc(rows(live_rows)), menu=plan.alloc(rows(menu_rows)))
+    for name, source in sources(f, control['state_offset'], control['runtime_offset'], layout, touch).items():
         plan.put(f[name], assemble(source, f[name], SIZES[name]))
     hooks = []
     for name, site, expected, replay in HOOKS:
@@ -605,7 +804,16 @@ def add(plan):
         # change (R_REPAINT) and the full clear is done (R_PENDING 0), dispatch a UI
         # half press and release through the action entry; the page repaints on it.
         if name == 'action':
+            # The 2/3 setting page is upright: a direction code (2..5) turns with the screen
+            # (CODE_TURN, modelled by turn_code) before the stock handler sees it.
             act = f'''
+            ldr r1,[r2,#{R_MODE}];tst r1,#{MINI_MODE};beq no_turn;
+            {c('r0',VIEW_KIND)}ldrb r0,[r0];cmp r0,#{MENU_VIEW};bne no_turn;
+            {c('r0',NAV_TABLE)}ldrb r0,[r0];cmp r0,#0;beq no_turn;
+            ldr r0,[sp,#8];subs r3,r0,#2;cmp r3,#3;bhi no_turn;
+            and r1,r1,#3;movw r0,#{CODE_TURN[1]};cmp r1,#2;bne turn;movw r0,#{CODE_TURN[2]};
+            turn:lsl r3,r3,#2;lsr r0,r0,r3;and r0,r0,#15;str r0,[sp,#8];
+            no_turn:
             ldr r0,[sp,#8];cmp r0,#{ACTION_HALF};bne not_half;movs r1,#1;str r1,[r12,#8];b skip;
             not_half:cmp r0,#{ACTION_RELEASE};bne skip;str r0,[r12,#8];'''
             inject = ''
@@ -776,6 +984,14 @@ def add(plan):
     plan.alloc(code)
     plan.edit(NAV_MOVE, jump(NAV_MOVE, entry, len(NAV_MOVE_EXPECTED)), 'Portrait UI: i-menu keys follow the screen', NAV_MOVE_EXPECTED)
     hooks.append(dict(name='menu_keys', site=hex(NAV_MOVE), entry=hex(entry | 1), window=len(NAV_MOVE_EXPECTED)))
+    # Touch entry C: the event is rewritten in place, then the stock window runs as it was.
+    entry = plan.address
+    code = assemble(f'''push {{r0-r3,r12,lr}};mrs r0,apsr;push {{r0,r1}};ldr r0,[sp,#8];{n(f['portrait_touch'])}
+        pop {{r0,r1}};msr apsr_nzcvq,r0;pop {{r0-r3,r12,lr}};
+        push.w {{r4-r9,lr}};sub sp,#0x4c;mov r6,r0;ldr.w pc,={(TOUCH + len(TOUCH_EXPECTED)) | 1};''', entry, STUB_SIZE)
+    plan.alloc(code)
+    plan.edit(TOUCH, jump(TOUCH, entry, len(TOUCH_EXPECTED)), 'Portrait UI: touch follows the portrait layout', TOUCH_EXPECTED)
+    hooks.append(dict(name='touch', site=hex(TOUCH), entry=hex(entry | 1), window=len(TOUCH_EXPECTED)))
     if REPAINT_HOOK:
         if (im.read(REFRESH_REQUEST, len(REFRESH_EXPECTED)) != REFRESH_EXPECTED
                 or im.words(((REFRESH_REQUEST + 4) & ~3) + 0x328, 1)[0] != REDRAW_PREDICATE):
@@ -808,9 +1024,19 @@ def add(plan):
                   portrait_grid_top=MENU_GRID_Y, title=list(MENU_TITLE), bar=list(MENU_BAR), mode_bit=MENU_MODE,
                   keys=dict(site=hex(NAV_MOVE), navigation=hex(NAV_BLOCK), cursor_get=hex(CURSOR_GET), cursor_set=hex(CURSOR_SET),
                             turn={str(k): hex(v) for k, v in NAV_TURN.items()}),
-                  grid_state=dict(address=hex(NAV_TABLE), value=0), setting_pages='landscape',
+                  grid_state=dict(address=hex(NAV_TABLE), value=0),
                   source='camera USB readout and RAM diffs, 2026-11-15',
-                  camera_verified='2026-11-15: grid, title, bar, keys and wrap in both grips; setting page landscape; level stock'),
-        scope='photo live view and its i menu (4x3) on the rear screen; menus, i-menu setting pages, playback and movie stay landscape',
+                  camera_verified='2026-11-15: grid, title, bar, keys and wrap in both grips; level stock'),
+        setting_pages=dict(mode_bit=MINI_MODE, scale='2/3 as (v*683)>>10', portrait_top=MINI_Y,
+                           keys=dict(site=hex(EVENT_HOOKS[0][1]), codes='right 2, left 3, up 4, down 5',
+                                     turn={str(k): hex(v) for k, v in CODE_TURN.items()}),
+                           camera_verified=False),
+        touch=dict(site=hex(TOUCH), caller=hex(TOUCH_CALL), view_limit=hex(TOUCH_VIEW_LIMIT),
+                   event='+8 contact, +9 type, +0x12/+0x14 landscape point',
+                   live_controls={name: list(box) for name, box in LIVE_CONTROLS}, live_cancel=[list(b) for b in LIVE_CANCEL],
+                   menu_bar=list(MENU_BAR_BOX), ring=dict(magic=hex(TCH_MAGIC), capacity=TCH_CAPACITY),
+                   source='static analysis of 102F7678/104F1AD4, QEMU (menu path only: QEMU live view does not deliver touch)',
+                   camera_verified=False),
+        scope='photo live view, its i menu (4x3) and the i-menu setting pages (2/3) on the rear screen, with touch; menus, playback and movie stay landscape',
         default=0, inert_when_off=True,
         camera_verified=False, osd_target_camera_verified=False, orientation_side_camera_verified=False)
