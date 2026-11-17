@@ -166,6 +166,35 @@ MINI_NUM, MINI_SHIFT = 683, 10    # 2/3 as (v * 683) >> 10, no divide
 # Direction action codes at the UI action entry (10310BF8; the i-menu handler 103DEC33
 # reads them): right 2, left 3, up 4, down 5. Physical code -> screen code per grip,
 # one nibble per code 2..5, from NAV_TURN (camera-verified for the i-menu grid).
+# Slider pages: touching shutter speed, aperture or ISO in live view opens a value
+# slider over the live-view page (camera USB draw log, 2026-11-17): view kind 12
+# shutter, 11 aperture, 13 ISO (the bubble tail points at x 225 / 314 / 470). The
+# same context words as live view; the bottom bar stays, the top bar is hidden. The
+# slider row is y 358..406: ◀◀ 93..173, the value backdrop 203..517 (holds ◀, the
+# value and ▶), ▶▶ 547..627; the tail under the value y 406..430; the exposure scale
+# x 680..718, y 238..426. Portrait: the row loses its two 30-px gaps (474 of 480 px)
+# and sits just above the two bottom rows; the tail follows its item's column.
+SLIDER_VIEWS = (11, 12, 13)
+SLIDER_MODE = 16                  # R_MODE bit: a slider page
+SLIDER_DY = 188                   # row y 546..594, tail 594..618; bottom rows start at 618
+SLIDER_LAYOUT = (
+    # cx0, cx1, cy0, cy1,  dx,  dy, status
+    (80, 190, 340, 406, -92, SLIDER_DY, 1),    # ◀◀ (x 1..81)
+    (190, 530, 340, 406, -120, SLIDER_DY, 1),  # value backdrop with ◀ and ▶ (x 83..397)
+    (530, 640, 340, 406, -148, SLIDER_DY, 1),  # ▶▶ (x 399..479)
+    (100, 262, 406, 430, -127, SLIDER_DY, 1),  # tail under the shutter speed
+    (262, 380, 406, 430, -127, SLIDER_DY, 1),  # tail under the aperture
+    (430, 592, 406, 430, -185, SLIDER_DY, 1),  # tail under the ISO
+    (600, 720, 0, 60, -236, 0, 1),             # top-right button (636,4,80,48), to the top right
+)
+SLIDER_BUTTONS = (                # landscape box, portrait dx (dy SLIDER_DY)
+    ((93, 358, 80, 48), -92),
+    ((203, 358, 314, 48), -120),
+    ((547, 358, 80, 48), -148),
+)
+SLIDER_ROW_BOX = (93, 358, 534, 48)
+SLIDER_CORNER = (636, 4, 80, 48)
+
 CODE_DIR = {4: 0, 5: 1, 2: 2, 3: 3}
 DIR_CODE = {v: k for k, v in CODE_DIR.items()}
 CODE_TURN = {ori: sum(DIR_CODE[(turn >> (CODE_DIR[code] * 4)) & 15] << ((code - 2) * 4) for code in (2, 3, 4, 5))
@@ -216,8 +245,20 @@ def locate_mini(x, y, w, h):
 
 
 def touch_tables():
-    """(live, menu): rows (kind, a0, a1, a2, a3, ox, oy). Kind 1: portrait box -> offset; kind 2: landscape box -> cancel."""
-    live, menu = [], []
+    """(live, menu, slider): rows (kind, a0, a1, a2, a3, ox, oy). Kind 1: portrait box -> offset; kind 2: landscape box -> cancel."""
+    live, menu, slider = [], [], []
+    for (x, y, w, h), dx in SLIDER_BUTTONS:
+        px, py = x + dx, y + SLIDER_DY
+        slider.append((T_MAPPED, px, py, px + w, py + h, -dx, -SLIDER_DY))
+    x, y, w, h = SLIDER_CORNER
+    status, px, py, _, _ = locate_slider(x, y, w, h)
+    slider.append((T_MAPPED, px, py, px + w, py + h, x - px, y - py))
+    for name, (x, y, w, h) in LIVE_CONTROLS:
+        if name in ('shutter', 'aperture', 'iso'):
+            status, px, py, pw, ph = locate(x, y, w, h)
+            slider.append((T_MAPPED, px, py, px + pw, py + ph, x - px, y - py))
+    for x, y, w, h in (SLIDER_ROW_BOX, SLIDER_CORNER) + LIVE_CANCEL:
+        slider.append((T_CANCEL, x, y, x + w, y + h, 0, 0))
     for _, (x, y, w, h) in LIVE_CONTROLS:
         status, px, py, pw, ph = locate(x, y, w, h)
         live.append((T_MAPPED, px, py, px + pw, py + ph, x - px, y - py))
@@ -229,7 +270,7 @@ def touch_tables():
         menu.append((T_MAPPED, px, py, px + MENU_CELL_W, py + MENU_CELL_H, x - px, y - py))
     x, y, w, h = MENU_BAR_BOX
     menu.append((T_MAPPED, x + MENU_BAR[2], y + MENU_BAR[3], x + MENU_BAR[2] + w, y + MENU_BAR[3] + h, -MENU_BAR[2], -MENU_BAR[3]))
-    return live, menu
+    return live, menu, slider
 
 
 def portrait_point(ori, X, Y):
@@ -243,8 +284,8 @@ def touch_press(mode, X, Y):
     px, py = portrait_point(ori, X, Y)
     if mode & MINI_MODE:
         return (T_MINI, 0, 0) if py >= MINI_Y else (T_CANCEL, 0, 0)
-    live, menu = touch_tables()
-    for kind, a0, a1, a2, a3, ox, oy in (menu if mode & MENU_MODE else live):
+    live, menu, slider = touch_tables()
+    for kind, a0, a1, a2, a3, ox, oy in (menu if mode & MENU_MODE else slider if mode & SLIDER_MODE else live):
         if kind == T_MAPPED and a0 <= px < a2 and a1 <= py < a3:
             return T_MAPPED, ox, oy
         if kind == T_CANCEL and a0 <= X < a2 and a1 <= Y < a3:
@@ -338,13 +379,18 @@ LAYOUT = (
 )
 
 
-def locate(x, y, w, h):
+def locate_slider(x, y, w, h):
+    """Python model of portrait_locate on a slider page: SLIDER_LAYOUT first, then the live-view rules."""
+    return locate(x, y, w, h, SLIDER_LAYOUT + LAYOUT)
+
+
+def locate(x, y, w, h, rules=LAYOUT):
     """Python model of portrait_locate: (status, px, py, pw, ph); status 0 keeps the command, 2 is a bar."""
     if w >= FULL_W and h >= FULL_H:
         return 0, x, y, w, h
     cy = y + (h >> 1)
     cx = x + (w >> 1)
-    for cx0, cx1, cy0, cy1, dx, dy, status in LAYOUT:
+    for cx0, cx1, cy0, cy1, dx, dy, status in rules:
         if cx0 <= cx < cx1 and cy0 <= cy < cy1:
             return status, x + dx, y + dy, w, h
     if cy < TOP_BAND:
@@ -406,7 +452,9 @@ def panel_box(ori, px, py, pw, ph):
     return 720 - py - ph, 480 - px - pw, ph, pw
 
 
-def sources(f, state_offset, runtime, layout, touch=None):
+def sources(f, state_offset, runtime, layout, touch=None, slider_layout=None):
+    if slider_layout is None:
+        slider_layout = layout
     if runtime != R_MODE:
         raise ValueError('Runtime words moved')
     k = KINDS
@@ -441,7 +489,8 @@ def sources(f, state_offset, runtime, layout, touch=None):
     code['portrait_locate'] = f'''push {{r4-r8,lr}};mov r12,r0;ldm r0,{{r0-r3}};
         movw r4,#{FULL_W};cmp r2,r4;blt sized;movw r4,#{FULL_H};cmp r3,r4;bge keep;
         sized:{c('r4',VIEW_KIND)}ldrb r4,[r4];cmp r4,#{MENU_VIEW};beq menu;
-        add r4,r0,r2,asr #1;add r5,r1,r3,asr #1;{c('r6',layout)}
+        {c('r6',layout)}sub r4,r4,#{SLIDER_VIEWS[0]};cmp r4,#{len(SLIDER_VIEWS) - 1};bhi rules;{c('r6',slider_layout)}
+        rules:add r4,r0,r2,asr #1;add r5,r1,r3,asr #1;
         rule:ldrsh r7,[r6];movw r8,#0x7fff;cmp r7,r8;beq zones;
         cmp r4,r7;blt next;ldrsh r7,[r6,#2];cmp r4,r7;bge next;
         ldrsh r7,[r6,#4];cmp r5,r7;blt next;ldrsh r7,[r6,#6];cmp r5,r7;bge next;
@@ -618,13 +667,15 @@ def sources(f, state_offset, runtime, layout, touch=None):
         {c('r1',TARGET)}ldrb r0,[r1];cmp r0,#31;it hi;movhi r0,#31;movs r2,#1;lsl r2,r2,r0;
         ldr r3,[r6,#{R_COPIES}];orr r3,r3,r2;str r3,[r6,#{R_COPIES}];
         gate:{c('r1',UI_SERVICE_PHASE)}ldrb r0,[r1];cmp r0,#1;beq phase;cmp r0,#2;bne context;
-        phase:{c('r1',VIEW_KIND)}ldrb r0,[r1];cmp r0,#0;beq view_ok;cmp r0,#{MENU_VIEW};bne context;
+        phase:{c('r1',VIEW_KIND)}ldrb r0,[r1];cmp r0,#0;beq view_ok;cmp r0,#{MENU_VIEW};beq view_ok;
+        sub r0,r0,#{SLIDER_VIEWS[0]};cmp r0,#{len(SLIDER_VIEWS) - 1};bhi context;
         view_ok:{c('r1',PHOTO_BACKEND)}ldr r0,[r1];cmp r0,#1;bne context;
         {c('r1',OVERLAY_BUSY[0])}ldr r0,[r1];cmp r0,#0;bne context;
         {c('r1',OVERLAY_BUSY[1])}ldr r0,[r1];cmp r0,#0;bne context;movs r8,#1;
         context:movs r0,#0;cmp r8,#0;beq mode;cmp r7,#1;beq portrait;cmp r7,#2;bne mode;
-        portrait:mov r0,r7;{c('r1',VIEW_KIND)}ldrb r1,[r1];cmp r1,#{MENU_VIEW};bne mode;
-        {c('r1',NAV_TABLE)}ldrb r1,[r1];cmp r1,#0;ite eq;orreq r0,r0,#{MENU_MODE};orrne r0,r0,#{MINI_MODE};
+        portrait:mov r0,r7;{c('r1',VIEW_KIND)}ldrb r1,[r1];cmp r1,#{MENU_VIEW};beq menu_bits;
+        sub r1,r1,#{SLIDER_VIEWS[0]};cmp r1,#{len(SLIDER_VIEWS) - 1};it ls;orrls r0,r0,#{SLIDER_MODE};b mode;
+        menu_bits:{c('r1',NAV_TABLE)}ldrb r1,[r1];cmp r1,#0;ite eq;orreq r0,r0,#{MENU_MODE};orrne r0,r0,#{MINI_MODE};
         mode:ldr r2,[r6,#{R_MODE}];cmp r0,r2;beq same;str r0,[r6,#{R_MODE}];
         movs r2,#1;str r2,[r6,#{R_PENDING}];str r2,[r6,#{R_REPAINT}];
         same:and r7,r0,#3;cmp r8,#0;bne live;movs r2,#0;str r2,[r6,#{R_PENDING}];b out;
@@ -644,7 +695,7 @@ def sources(f, state_offset, runtime, layout, touch=None):
     return code
 
 
-def touch_source(f, state_offset, offset, magic, capacity, live, menu):
+def touch_source(f, state_offset, offset, magic, capacity, live, menu, slider):
     """r0 -> the touch event at 104F1AD4; rewritten in place (modelled by touch_map), recorded while upright.
 
     r4 event, r5 state block, r6 touch header (+8 state, +12/+14 offset), r7 state,
@@ -661,7 +712,8 @@ def touch_source(f, state_offset, offset, magic, capacity, live, menu):
         grip1:mov r2,r1;rsb r3,r0,#720;
         point:cmp r9,#9;beq reset;cmp r9,#1;bne follow;cmp r8,#1;bne follow;
         tst r11,#{MINI_MODE};beq tables;movs r7,#{T_MINI};cmp r3,#{MINI_Y};it lt;movlt r7,#{T_CANCEL};b decided;
-        tables:tst r11,#{MENU_MODE};bne menu;{c('r12',live)}movs r7,#{T_NONE};b scan;
+        tables:tst r11,#{MENU_MODE};bne menu;tst r11,#{SLIDER_MODE};bne slider;{c('r12',live)}movs r7,#{T_NONE};b scan;
+        slider:{c('r12',slider)}movs r7,#{T_NONE};b scan;
         menu:{c('r12',menu)}movs r7,#{T_CANCEL};
         scan:ldrsh lr,[r12];movw r0,#{TOUCH_END};cmp lr,r0;beq decided;
         cmp lr,#{T_MAPPED};bne landscape;
@@ -733,13 +785,16 @@ def add(plan):
         raise ValueError('Unexpected shooting touch entry')
     for name, size in SIZES.items():
         f[name] = plan.alloc(bytes(size))
-    layout = plan.alloc(b''.join(struct.pack('<8h', *rule, 0) for rule in LAYOUT) + struct.pack('<8h', 0x7FFF, *[0] * 7))
-    live_rows, menu_rows = touch_tables()
+    def rules(table):
+        return b''.join(struct.pack('<8h', *rule, 0) for rule in table) + struct.pack('<8h', 0x7FFF, *[0] * 7)
+    layout = plan.alloc(rules(LAYOUT))
+    slider_layout = plan.alloc(rules(SLIDER_LAYOUT + LAYOUT))
+    live_rows, menu_rows, slider_rows = touch_tables()
     def rows(table):
         return b''.join(struct.pack('<8h', *row, 0) for row in table) + struct.pack('<8h', TOUCH_END, *[0] * 7)
     touch = dict(offset=control['touch_offset'], magic=TCH_MAGIC, capacity=TCH_CAPACITY,
-                 live=plan.alloc(rows(live_rows)), menu=plan.alloc(rows(menu_rows)))
-    for name, source in sources(f, control['state_offset'], control['runtime_offset'], layout, touch).items():
+                 live=plan.alloc(rows(live_rows)), menu=plan.alloc(rows(menu_rows)), slider=plan.alloc(rows(slider_rows)))
+    for name, source in sources(f, control['state_offset'], control['runtime_offset'], layout, touch, slider_layout).items():
         plan.put(f[name], assemble(source, f[name], SIZES[name]))
     hooks = []
     for name, site, expected, replay in HOOKS:
@@ -807,10 +862,11 @@ def add(plan):
             # The 2/3 setting page is upright: a direction code (2..5) turns with the screen
             # (CODE_TURN, modelled by turn_code) before the stock handler sees it.
             act = f'''
-            ldr r1,[r2,#{R_MODE}];tst r1,#{MINI_MODE};beq no_turn;
-            {c('r0',VIEW_KIND)}ldrb r0,[r0];cmp r0,#{MENU_VIEW};bne no_turn;
+            ldr r1,[r2,#{R_MODE}];tst r1,#{MINI_MODE};bne mini_keys;tst r1,#{SLIDER_MODE};beq no_turn;
+            {c('r0',VIEW_KIND)}ldrb r0,[r0];sub r0,r0,#{SLIDER_VIEWS[0]};cmp r0,#{len(SLIDER_VIEWS) - 1};bhi no_turn;b turn_keys;
+            mini_keys:{c('r0',VIEW_KIND)}ldrb r0,[r0];cmp r0,#{MENU_VIEW};bne no_turn;
             {c('r0',NAV_TABLE)}ldrb r0,[r0];cmp r0,#0;beq no_turn;
-            ldr r0,[sp,#8];subs r3,r0,#2;cmp r3,#3;bhi no_turn;
+            turn_keys:ldr r0,[sp,#8];subs r3,r0,#2;cmp r3,#3;bhi no_turn;
             and r1,r1,#3;movw r0,#{CODE_TURN[1]};cmp r1,#2;bne turn;movw r0,#{CODE_TURN[2]};
             turn:lsl r3,r3,#2;lsr r0,r0,r3;and r0,r0,#15;str r0,[sp,#8];
             no_turn:
@@ -1031,12 +1087,17 @@ def add(plan):
                            keys=dict(site=hex(EVENT_HOOKS[0][1]), codes='right 2, left 3, up 4, down 5',
                                      turn={str(k): hex(v) for k, v in CODE_TURN.items()}),
                            camera_verified=False),
+        slider_pages=dict(view_kinds=list(SLIDER_VIEWS), mode_bit=SLIDER_MODE, rules=[list(r) for r in SLIDER_LAYOUT],
+                          buttons=[[list(box), dx] for box, dx in SLIDER_BUTTONS], row_dy=SLIDER_DY,
+                          keys='direction codes turn with the screen, as on the 2/3 setting pages',
+                          source='camera USB draw log, 2026-11-17 (shutter 12, aperture 11, ISO 13)',
+                          camera_verified='2026-11-17: layout, buttons, bottom-bar switch, corner button and keys in both grips'),
         touch=dict(site=hex(TOUCH), caller=hex(TOUCH_CALL), view_limit=hex(TOUCH_VIEW_LIMIT),
                    event='+8 contact, +9 type, +0x12/+0x14 landscape point',
                    live_controls={name: list(box) for name, box in LIVE_CONTROLS}, live_cancel=[list(b) for b in LIVE_CANCEL],
                    menu_bar=list(MENU_BAR_BOX), ring=dict(magic=hex(TCH_MAGIC), capacity=TCH_CAPACITY),
                    source='static analysis of 102F7678/104F1AD4, QEMU (menu path only: QEMU live view does not deliver touch)',
                    camera_verified=False),
-        scope='photo live view, its i menu (4x3) and the i-menu setting pages (2/3) on the rear screen, with touch; menus, playback and movie stay landscape',
+        scope='photo live view, its i menu (4x3), the i-menu setting pages (2/3) and the shutter/aperture/ISO slider pages on the rear screen, with touch; menus, playback and movie stay landscape',
         default=0, inert_when_off=True,
         camera_verified=False, osd_target_camera_verified=False, orientation_side_camera_verified=False)

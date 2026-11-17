@@ -172,14 +172,15 @@ def f32(v):
 
 
 def locator(menu):
-    return pu.locate_mini if menu == 'mini' else pu.locate_menu if menu else pu.locate
+    return (pu.locate_mini if menu == 'mini' else pu.locate_slider if menu == 'slider'
+            else pu.locate_menu if menu else pu.locate)
 
 
 def model_rect(ori, kind, b, menu=False):
     x, yu, w, h, color = struct.unpack('<4iI', b[:20])
     if kind == 'rect' and focus(color & 0xFFFFFFFF):
         return b
-    if kind == 'clear' and not menu and (w <= pu.THIN or h <= pu.THIN):
+    if kind == 'clear' and menu in (False, 'slider') and (w <= pu.THIN or h <= pu.THIN):
         return b
     status, px, py, pw, ph = locator(menu)(x, 480 - yu - h, w, h)
     if not status:
@@ -389,6 +390,8 @@ def main():
                         playback_phase=dict(phase=4, orientation=1), other_view=dict(kind=5, orientation=2),
                         menu_setting_level=dict(kind=pu.MENU_VIEW, nav_state=3, nav_count=7, orientation=0),
                         menu_level=dict(kind=pu.MENU_VIEW, orientation=0),
+                        slider_level=dict(kind=13, orientation=0), slider_view_10=dict(kind=10, orientation=1),
+                        slider_view_14=dict(kind=14, orientation=2),
                         no_backend=dict(backend=0, orientation=1), off_screen_target=dict(target=5, orientation=2),
                         overlay_first=dict(busy=(1, 0), orientation=1), overlay_second=dict(busy=(0, 0x20), orientation=2))
     inert = {}
@@ -583,6 +586,62 @@ def main():
     if (struct.unpack('<4i', out['desc'][:16]), got_mode) != ((0, 0, 720, 480), (1 | pu.MINI_MODE, 0)):
         failures.append(dict(test='mini_enter', box=struct.unpack('<4i', out['desc'][:16]), runtime=got_mode))
 
+    # 2d'. Slider pages (view kinds 11..13): the boxes read on the camera, then random ones.
+    slider_boxes = [(93, 358, 80, 48), (203, 358, 314, 48), (547, 358, 80, 48), (204, 359, 62, 46), (454, 359, 62, 46),
+                    (115, 366, 34, 32), (285, 362, 150, 40), (225, 406, 24, 24), (314, 406, 24, 24), (470, 406, 24, 24),
+                    (636, 4, 80, 48), (658, 10, 36, 36), (680, 238, 38, 188), (682, 330, 19, 4), (128, 430, 124, 48),
+                    (436, 430, 153, 48), (2, 396, 60, 32), (0, 0, 720, 480)]
+    slider_cases = {}
+    for ori in (1, 2):
+        for name, site, stop in entries:
+            if name == 'image3':
+                continue
+            count = 0
+            for i in range(a.cases):
+                data, regs = random_input(name)
+                if i < len(slider_boxes) and name in ('rect', 'clear', 'frame', 'image', 'image2'):
+                    x, y, w, h = slider_boxes[i]
+                    if name in ('rect', 'clear'):
+                        data = rect_bytes(x, 480 - y - h, w, h)
+                    elif name == 'frame':
+                        regs[:4] = [x, 480 - y - h, w, h]
+                    else:
+                        data = image_bytes(x, y, x + w, y + h, w, h, mode=1, angle=360)
+                kind = pu.SLIDER_VIEWS[i % len(pu.SLIDER_VIEWS)]
+                patched.context(orientation=ori, kind=kind)
+                patched.u.mem_write(STATE + control['state_offset'] + 16, struct.pack('<2I', ori | pu.SLIDER_MODE, 0))
+                out = run(patched, name, site, stop, data, regs)
+                if out['pc'] != stop:
+                    failures.append(dict(test='slider', entry=name, ori=ori, field='pc', pc=hex(out['pc'])))
+                    continue
+                if name in ('rect', 'clear'):
+                    want = model_rect(ori, name, data, menu='slider')
+                    got = out['desc'][:len(want)]
+                elif name == 'frame':
+                    box = struct.pack('<4i', *[v - (1 << 32) if v >> 31 else v for v in regs[:4]]) + bytes(4)
+                    want = model_rect(ori, 'frame', box, menu='slider')[:16]
+                    got = struct.pack('<4I', *out['regs'][:4])
+                    want = struct.pack('<4I', *[v & 0xFFFFFFFF for v in struct.unpack('<4i', want)])
+                elif name == 'text':
+                    want = struct.pack('<9I', *model_text(ori, data, menu='slider'))
+                    got = patched.loaded[0] if patched.loaded else b''
+                else:
+                    want = model_image(ori, name, data, menu='slider')
+                    got = out['desc'][:len(want)]
+                if got != want:
+                    failures.append(dict(test='slider', entry=name, ori=ori, kind=kind, input=data.hex(),
+                                         regs=[hex(v) for v in regs[:4]], got=got.hex(), want=want.hex()))
+                count += 1
+            slider_cases[f'{name}-{ori}'] = count
+    results['slider_cases'] = slider_cases
+    # The drawing hooks enter the slider mode on a slider page, with one full clear.
+    for kind in pu.SLIDER_VIEWS:
+        patched.context(orientation=2, kind=kind)
+        out = run(patched, 'clear', clear_site0, clear_stop0, rect_bytes(100, 400, 40, 20), [DESC] + [0] * 12)
+        got_mode = patched.runtime()
+        if (struct.unpack('<4i', out['desc'][:16]), got_mode) != ((0, 0, 720, 480), (2 | pu.SLIDER_MODE, 0)):
+            failures.append(dict(test='slider_enter', kind=kind, box=struct.unpack('<4i', out['desc'][:16]), runtime=got_mode))
+
     # 2e. Touch at entry C: sequences of events against touch_map; inert where it must be.
     touch_stop = pu.TOUCH + len(pu.TOUCH_EXPECTED)
     touch_at = STATE + control['state_offset'] + control['touch_offset']
@@ -592,13 +651,13 @@ def main():
         e[8], e[9] = flag, kind
         struct.pack_into('<2H', e, 0x12, X, Y)
         return bytes(e)
-    live_rows, menu_rows = pu.touch_tables()
+    live_rows, menu_rows, slider_rows = pu.touch_tables()
     def landscape_point(ori, px, py):   # inverse of portrait_point
         return (py, 480 - px) if ori == 2 else (720 - py, px)
     def strokes(ori, mode):
         """Presses on every control (portrait), on the empty landscape places, on the picture; with drags."""
         points = []
-        rows = menu_rows if mode & pu.MENU_MODE else live_rows
+        rows = menu_rows if mode & pu.MENU_MODE else slider_rows if mode & pu.SLIDER_MODE else live_rows
         for kind, a0, a1, a2, a3, _, _ in rows:
             if kind == pu.T_MAPPED:
                 points.append(landscape_point(ori, (a0 + a2) // 2, (a1 + a3) // 2))
@@ -620,7 +679,8 @@ def main():
     touch_cases = dict(mapped=0, inert=0)
     for ori in (1, 2):
         for mode_bits, state in ((0, dict()), (pu.MENU_MODE, dict(kind=pu.MENU_VIEW)),
-                                 (pu.MINI_MODE, dict(kind=pu.MENU_VIEW, nav_state=3, nav_count=7))):
+                                 (pu.MINI_MODE, dict(kind=pu.MENU_VIEW, nav_state=3, nav_count=7)),
+                                 (pu.SLIDER_MODE, dict(kind=11)), (pu.SLIDER_MODE, dict(kind=13))):
             mode = ori | mode_bits
             for seq in strokes(ori, mode):
                 patched.context(orientation=ori, **state)
@@ -678,6 +738,8 @@ def main():
         for label, state, mode, turned in (('setting_page', dict(kind=3, nav_state=3, nav_count=7), ori | pu.MINI_MODE, True),
                                            ('grid', dict(kind=3), ori | pu.MENU_MODE, False),
                                            ('live', dict(kind=0), ori, False),
+                                           ('slider', dict(kind=12), ori | pu.SLIDER_MODE, True),
+                                           ('slider_stale', dict(kind=0), ori | pu.SLIDER_MODE, False),
                                            ('stale_mode', dict(kind=3, nav_state=0), ori | pu.MINI_MODE, False)):
             for code in (0, 2, 3, 4, 5, 6, 0x13, 0x18):
                 patched.context(orientation=ori, **state)
