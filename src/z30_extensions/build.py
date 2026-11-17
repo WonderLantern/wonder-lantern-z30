@@ -7,11 +7,11 @@ from .platform.z30_120 import BASE
 
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot',
            'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
-           'nef-menu', 'nef-uncompressed', 'nef-compressed')
+           'gyro-evr', '3d-tracking', 'af-frame-colour', 'nef-menu', 'nef-uncompressed', 'nef-compressed')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
                  'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
-                 'nef-menu', 'nef-uncompressed', 'nef-compressed')
+                 'gyro-evr', '3d-tracking', 'af-frame-colour', 'nef-menu', 'nef-uncompressed', 'nef-compressed')
 NEF_FIXED_FEATURES = ('nef-uncompressed', 'nef-compressed')
 NEF_COMPRESSION_FEATURES = ('nef-menu',) + NEF_FIXED_FEATURES
 FULL_FEATURES = tuple(name for name in FEATURE_ORDER if name not in NEF_FIXED_FEATURES)
@@ -39,19 +39,35 @@ def resolve_presets(preset='full'):
     if sum(name in features for name in NEF_COMPRESSION_FEATURES) > 1:
         raise ValueError('Select only one NEF compression preset')
     # These pages share the sound menu/state framework.
-    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui', 'nef-menu')):
+    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui', 'nef-menu',
+                                   'gyro-evr', '3d-tracking', 'af-frame-colour')):
         features.add('shutter-sound')
     return list(dict.fromkeys(selected)), [f for f in FEATURE_ORDER if f in features]
 
 
 def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
           aspect_border_diagnostic=False, aspect_border_lease=False,
-          aspect_mask=None, aspect_mask_trial=False, module_host=False, ptp_read=False):
+          aspect_mask=None, aspect_mask_trial=False, module_host=False, ptp_read=False,
+          evr_hook=False, imu_hook=False, face_hook=False):
     # module_host is a research option only: the SD module host is no longer a
     # patcher preset, but its tools still build it on top of the sound framework.
     selected, features = resolve_presets(preset)
     if module_host and 'shutter-sound' not in features:
         raise ValueError('The module host requires the shutter-sound framework')
+    # evr_hook is research-only: a dormant e-VR result hook that only SD modules
+    # can arm, so it is never built without the module host.
+    if evr_hook and not module_host:
+        raise ValueError('The e-VR hook requires the module host')
+    if imu_hook and not module_host:
+        raise ValueError('The IMU hook requires the module host')
+    if face_hook and not module_host:
+        raise ValueError('The detection result hook requires the module host')
+    # 3d-tracking runs on the same stock site as the research detection hook.
+    if face_hook and '3d-tracking' in features:
+        raise ValueError('3d-tracking already hooks the detection result writer')
+    # gyro-evr installs the e-VR and IMU hooks itself (with its built-in autostart).
+    if 'gyro-evr' in features and (evr_hook or imu_hook):
+        raise ValueError('gyro-evr already installs the e-VR and IMU hooks')
     # Photo aspect and its live-view mask are one public preset. Historical
     # border/static-mask experiments keep their own explicitly selected path;
     # researchers may still pass False for a no-mask comparison build.
@@ -76,6 +92,10 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
                       selected_presets=selected, enabled_features=features)
         return output, report
     plan = Plan(source)
+    if 'gyro-evr' in features:
+        # The SD host (research builds) drives the built-in copy from its Run row.
+        from .features.gyro_evr import layout
+        plan.evr_builtin_layout = layout()
     if 'liveview-dual' in features:
         dual, report = build_dual(source)
         plan.tail.extend(dual[len(source) - 2:-2])
@@ -91,6 +111,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         add(plan, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
             nef='nef-menu' in features,
+            gyro='gyro-evr' in features, trk3d='3d-tracking' in features, afcol='af-frame-colour' in features,
             aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
             aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial)
@@ -122,9 +143,27 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'nef-menu' in features:
         from .features.nef_menu import add
         add(plan)
+    if 'gyro-evr' in features:
+        from .features.gyro_evr import add
+        add(plan)
+    if '3d-tracking' in features:
+        from .features.tracking3d import add
+        add(plan)
+    if 'af-frame-colour' in features:
+        from .features.af_frame_colour import add
+        add(plan)
     if ptp_read:
         # Research only: read-only USB PTP 0x9FF1 ReadMemory for live readouts.
         from .features.ptp_read import add
+        add(plan)
+    if evr_hook:
+        from .features.evr_hook import add
+        add(plan)
+    if imu_hook:
+        from .features.imu_hook import add
+        add(plan)
+    if face_hook:
+        from .features.face_hook import add
         add(plan)
     output, report = plan.finish()
     for address, expected in VIDEO_STOCK_WINDOWS:
@@ -132,6 +171,10 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
             raise ValueError('Video shutter differs from stock')
     report['preset'] = selected[0] if len(selected) == 1 else selected
     report['selected_presets'] = selected
-    report['enabled_features'] = features + (['module-host'] if module_host else []) + (['ptp-read-memory'] if ptp_read else [])
+    report['enabled_features'] = (features + (['module-host'] if module_host else [])
+                                  + (['ptp-read-memory'] if ptp_read else [])
+                                  + (['evr-hook'] if evr_hook else [])
+                                  + (['imu-hook'] if imu_hook else [])
+                                  + (['face-hook'] if face_hook else []))
     report['video_shutter_stock'] = True
     return output, report

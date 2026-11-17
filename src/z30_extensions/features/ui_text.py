@@ -51,6 +51,13 @@ TRANSLATIONS = {
     'Glow': ('光晕', '光暈'),
     'OFF (stock)': ('关闭', '關閉'),
     'Video bitrate': ('视频码率', '影片位元率'),
+    'Gyro e-VR': ('Gyro 电子减震', 'Gyro 電子減震'),
+    '3D tracking': ('3D 跟踪', '3D 追蹤'),
+    'AF frame colour': ('对焦框颜色', '對焦色彩'),   # Traditional fonts lack 框
+    'Disable': ('关闭', '關閉'), 'Enable': ('开启', '開啟'),
+    'Standard': ('标准', '標準'),
+    'Enhanced': ('增强', '增強'),
+    'Native crop': ('原厂裁切', '原廠裁切'),
     'Stock': ('原厂', '原廠'),
     'Balanced': ('均衡', '均衡'),
     'High quality': ('高质量', '高品質'),
