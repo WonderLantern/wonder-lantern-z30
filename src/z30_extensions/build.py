@@ -48,10 +48,16 @@ def resolve_presets(preset='full'):
 def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
           aspect_border_diagnostic=False, aspect_border_lease=False,
           aspect_mask=None, aspect_mask_trial=False, module_host=False, ptp_read=False,
-          evr_hook=False, imu_hook=False, face_hook=False):
+          evr_hook=False, imu_hook=False, face_hook=False, auto_arm=None):
+    # auto_arm: research option, the code of the built-in auto_arm module
+    # (modules/auto_arm built with -DREMAP -DDIRECT -DBUILTIN, tools/build_auto_arm.py), or None.
     # module_host is a research option only: the SD module host is no longer a
     # patcher preset, but its tools still build it on top of the sound framework.
     selected, features = resolve_presets(preset)
+    if auto_arm is not None and ('gyro-evr' in features or imu_hook or evr_hook):
+        raise ValueError('auto-arm owns the IMU hook and the built-in cell (no gyro-evr, imu_hook or evr_hook)')
+    if auto_arm is not None and 'shutter-sound' not in features:
+        raise ValueError('auto-arm needs the shutter-sound menu framework for its menu row')
     if module_host and 'shutter-sound' not in features:
         raise ValueError('The module host requires the shutter-sound framework')
     # evr_hook is research-only: a dormant e-VR result hook that only SD modules
@@ -112,7 +118,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
             zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
             nef='nef-menu' in features,
             gyro='gyro-evr' in features, trk3d='3d-tracking' in features, afcol='af-frame-colour' in features,
-            aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
+            autoarm=auto_arm is not None, aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
             aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial)
     if 'mtp-fast' in features:
@@ -152,6 +158,9 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'af-frame-colour' in features:
         from .features.af_frame_colour import add
         add(plan)
+    if auto_arm is not None:
+        from .features.auto_arm import add
+        add(plan, auto_arm)
     if ptp_read:
         # Research only: read-only USB PTP 0x9FF1 ReadMemory for live readouts.
         from .features.ptp_read import add
@@ -175,6 +184,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
                                   + (['ptp-read-memory'] if ptp_read else [])
                                   + (['evr-hook'] if evr_hook else [])
                                   + (['imu-hook'] if imu_hook else [])
-                                  + (['face-hook'] if face_hook else []))
+                                  + (['face-hook'] if face_hook else [])
+                                  + (['auto-arm'] if auto_arm is not None else []))
     report['video_shutter_stock'] = True
     return output, report
