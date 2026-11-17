@@ -44,7 +44,7 @@ class Tracking3dCaveTest(unittest.TestCase):
             build(self.stock, ['3d-tracking'], module_host=True, face_hook=True)
 
     def run_site(self, choice, tracking=1, live=0x10007, flag=0, subjects=0, face=(29, 19, 2, 3), box=(2508, 1580),
-                 af=0, shown=0, armed=0, result=None, area=6, detect=1, select=1):
+                 af=0, shown=0, armed=0, result=None, area=6, detect=1, select=0):
         from z30_extensions.features.tracking3d import (SITE, RETURN, TRACKING, TRACKER_LIVE, TOUCH_FLAG,
                                                          SUBJECTS, AF_WORKING, BOX_SHOWN,
                                                          ARMED_OFFSET, ENTER_TRACKING_MODE, AREA_MODE,
@@ -131,7 +131,7 @@ class Tracking3dCaveTest(unittest.TestCase):
             self.assertEqual((flag, writes), (1, [TOUCH_FLAG]), detect)
             self.assertEqual(r['keys'], [(0xC3D, 0)])               # 8-byte aligned stack
         r = {}
-        self.run_site(1, subjects=1, select=0, result=r)            # the stock code's other (movie) key
+        self.run_site(1, subjects=1, select=1, result=r)            # movie (+0x3FD = 1 on the camera)
         self.assertEqual(r['keys'], [(0x58C, 0)])
         # only the low byte counts, as in the stock uxtb (0x1039CC2C)
         self.assertEqual(self.run_site(1, subjects=1, detect=0x7F01)[0], 1)
@@ -153,7 +153,7 @@ class Tracking3dCaveTest(unittest.TestCase):
         movw_r0 = lambda k: (0xF2400000 | ((k >> 12) << 16) | (((k >> 11) & 1) << 26)
                              | (((k >> 8) & 7) << 12) | (k & 0xFF))
         enc = lambda k: struct.pack('<2H', movw_r0(k) >> 16, movw_r0(k) & 0xFFFF)
-        self.assertEqual(DETECT_KEYS, (0x58C, 0xC3D))
+        self.assertEqual(DETECT_KEYS, (0xC3D, 0x58C))   # photo when +0x3FD is 0 (camera, 2026-11-17)
         self.assertEqual(at(0x1042B2F2, 2), bytes.fromhex('062c'))          # photo setter: cmp r4,#6
         self.assertEqual(at(0x1042B2F8), enc(0xC3D))
         self.assertEqual(at(0x1042B306), enc(0xC3C))                        # base 4 (wide-area L)
