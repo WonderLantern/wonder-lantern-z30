@@ -27,7 +27,7 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的实验
 | `photo-zebra` | 把原厂斑马纹扩展到照片取景，独立开关 | [文档](docs/photo-zebra.md) |
 | `wifi-5ghz` | 全部有效无线配置请求 US/-1 国家码，解锁 5 GHz 连接 | 见注¹ |
 | `date-stamp` | JPEG 右下角的胶片风格日期水印，五种格式、四种颜色、可选光晕，随竖拍转向 | [文档](docs/date-stamp.md) |
-| `portrait-ui` | 竖拿时照片取景信息和 i 菜单改为竖版，转动后自动补全，默认关闭；触摸跟着竖版位置，i 菜单设置页按 2/3 竖版显示；快门、光圈、ISO 滑条页竖版；直方图仍为横版 | [文档](docs/portrait-ui.md) |
+| `portrait-ui` | 竖拿时照片取景信息和 i 菜单改为竖版，转动后自动补全，默认关闭；触摸跟着竖版位置，i 菜单设置页按 2/3 竖版显示；快门、光圈、ISO 滑条页竖版；直方图页竖拿时显示竖版直方图 | [文档](docs/portrait-ui.md) |
 | `nef-menu` | 在扩展菜单里选择 NEF 压缩类型（无失真压缩／压缩／未压缩），保存到 `WL-NEF.CFG` | [文档](docs/nef-compression.md)，12/14 位下三个选项已有实机确认 |
 
 ¹ `wifi-5ghz` 只改无线国家请求，不写整机销售地区或 NVRAM。原本可用 2.4 GHz 第 12、13 信道的机身可能无法再连接这些信道（推断，未实测）。它不保证相机自身的 5 GHz 热点，也不保证提速；有效信道与功率需符合使用地点的规定。

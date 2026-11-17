@@ -45,7 +45,11 @@ WID_STRIDE = 8  # widget, last-draw stamp; header +0 count, +4 stamp counter
 # before and after, the type and contact bytes, the view kind, the touch state and the
 # layout mode. See portrait_ui portrait_touch.
 TCH, TCH_MAGIC, TCH_CAPACITY, TCH_STRIDE = WID + 16 + WID_CAPACITY * WID_STRIDE, 0x31485657, 64, 16  # WVH1
-STATE_SIZE = TCH + 16 + TCH_CAPACITY * TCH_STRIDE
+# Portrait histogram: drawn ori (0 none), dirty, last draw ms, masks saved, primitive
+# ori/colour/function, counters, the 9 saved stock masks, then the 64 drawn bar heights.
+# See portrait_ui portrait_hist and portrait_hmask.
+HST, HST_SIZE = TCH + 16 + TCH_CAPACITY * TCH_STRIDE, 160
+STATE_SIZE = HST + HST_SIZE
 LOG_FILE = 'WL-VUI.DBG'
 SIZES = dict(portrait_get=96, portrait_labels=768, portrait_open=192,
              portrait_action=256, portrait_save=640, portrait_restore=640, portrait_close=128,
@@ -150,6 +154,6 @@ def finish(plan, f, extension, identifiers):
         state_offset=extension['state_offset'], runtime_offset=RUNTIME_OFFSET,
         settings_file=SETTINGS_FILE, diagnostics=DIAGNOSTICS, log_file=LOG_FILE if DIAGNOSTICS else None, log_offset=LOG, log_capacity=LOG_CAPACITY,
         log_stride=LOG_STRIDE, state_size=STATE_SIZE, request_offset=REQ, request_capacity=REQ_CAPACITY, event_offset=EVT, event_capacity=EVT_CAPACITY, traversal_offset=TRV, traversal_capacity=TRV_CAPACITY, widget_offset=WID, widget_capacity=WID_CAPACITY,
-        touch_offset=TCH, touch_capacity=TCH_CAPACITY,
+        touch_offset=TCH, touch_capacity=TCH_CAPACITY, histogram_offset=HST, histogram_size=HST_SIZE,
         restore_policy='First custom-menu initialization; OFF before initialization',
         functions={k: hex(f[k] | 1) for k in SIZES}, physical_verified=False)

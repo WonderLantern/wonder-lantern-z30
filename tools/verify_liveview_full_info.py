@@ -7,6 +7,7 @@ from pathlib import Path
 from z30_extensions.build import build
 from z30_extensions.container import extract_eg
 from z30_extensions.features.liveview_dual import SNAPSHOT
+from z30_extensions.features.liveview_full_info import HISTOGRAM_MASK
 from z30_extensions.features.liveview_full_info_windows import WINDOWS, PREFIXES
 from z30_extensions.platform.z30_120 import BASE
 
@@ -29,6 +30,7 @@ def verify(source):
             u.mem_map(BASE, (len(image) + 4095) & ~4095)
             u.mem_write(BASE, image)
             u.mem_map(SNAPSHOT & ~4095, 4096)
+            u.mem_map(HISTOGRAM_MASK & ~4095, 4096)
             u.mem_map(scratch, 0x20000)
             u.mem_write(scratch, struct.pack('<I', scratch + 0x8000) * (0x10000 // 4))
             machines.append(u)
@@ -38,7 +40,9 @@ def verify(source):
                 if not (site <= pc < site + size or BASE + len(source) - 2 <= pc < BASE + len(candidate) - 2):
                     emulator.emu_stop()
             u.hook_add(UC_HOOK_CODE, stop)
-            for disp in range(256):
+            for disp, hidden in [(d, False) for d in range(256)] + [(d, True) for d in range(256)]:
+                # hidden: portrait-ui cleared the histogram masks; page 5 must not add its bit then.
+                u.mem_write(HISTOGRAM_MASK, struct.pack('<I', 0 if hidden else 0xCCC))
                 for flags in (0, 0xF8000000):
                     # For state 5, compare with the native presentation state.
                     reference_disp = mode if index == 0 and disp == 5 else disp
@@ -52,7 +56,7 @@ def verify(source):
                     seed[base_reg] = SNAPSHOT
                     if classifier is not None:
                         seed[classifier] = 31
-                        if index == 0 and disp == 5:
+                        if index == 0 and disp == 5 and not hidden:
                             seed[4] |= 0x111
                     for register, value in zip(registers, seed):
                         u.reg_write(register, value)
@@ -63,7 +67,7 @@ def verify(source):
                     observations[index].append(state)
         for case, (stock, patched) in enumerate(zip(*observations)):
             if stock != patched:
-                raise AssertionError(f'Adapter {site:#x}, DISP {case // 2}, flags {case % 2}: {stock} != {patched}')
+                raise AssertionError(f'Adapter {site:#x}, DISP {case // 2 % 256}, hidden {case >= 512}, flags {case % 2}: {stock} != {patched}')
         results.append(dict(site=hex(site), cases=len(observations[0]), passed=True))
     return dict(passed=True, sha256=report['sha256'], adapters=results,
                 adapter_executions=sum(r['cases'] * 2 for r in results),

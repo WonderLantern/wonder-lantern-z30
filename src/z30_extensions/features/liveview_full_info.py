@@ -10,6 +10,11 @@ from ..platform.z30_120 import BASE
 from .liveview_full_info_windows import WINDOWS, PREFIXES
 
 FULL_INFO_DISP = 5
+# The histogram widget's first visibility mask (liveview_dual.HISTOGRAM + 4, RAM). Stock it
+# is never 0 (0x444, 0xCCC with liveview-dual); portrait-ui clears all nine while it draws its
+# own upright histogram. The extra page-5 bit below would otherwise show the stock one too
+# (camera, portrait v25: two histograms on the full-information page).
+HISTOGRAM_MASK = 0xC1826718
 CYCLE_SITE = 0x10372536
 CYCLE_EXPECTED = bytes.fromhex('90f89601083d2c5c022c')
 
@@ -61,6 +66,8 @@ def add(stock, tail, edits):
             # unrelated output/recording masks. r4 is local to the classifier.
             source += f'''
                 cmp r{classifier}, #31; bne unchanged;
+                movw r12, #{HISTOGRAM_MASK & 0xFFFF}; movt r12, #{HISTOGRAM_MASK >> 16}; ldr r12, [r12];
+                cmp r12, #0; beq unchanged;
                 movw r12, #0x111; orr.w r4, r4, r12;
             '''
         source += f'''

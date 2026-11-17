@@ -51,6 +51,7 @@ class Machine:
         u.mem_map(STATE, 0x100000)
         u.mem_map(DESC, 0x1000)
         u.mem_map(0xC2016000, 0x1000)  # overlay words
+        u.mem_map(0xC2017000, 0x1000)  # histogram counts (HIST_BINS)
         u.mem_map(STACK, 0x100000)
         u.mem_map(SENTINEL_LR & ~0xFFF, 0x1000)
         self.orientation = 0
@@ -753,6 +754,171 @@ def main():
                 key_turn += 1
     patched.u.hook_del(hook)
     results['setting_key_cases'] = key_turn
+
+    # 2g. Histogram: the stock one hidden (masks) and our own drawn (portrait_hist), against hist_prims.
+    hist = report['features']['portrait_ui']['histogram']
+    hfun = report['features']['portrait_ui']['functions']
+    hst_at = STATE + control['state_offset'] + control['histogram_offset']
+    raw = {int(hist['raw_rect'], 16) & ~1: 'rect', int(hist['raw_clear'], 16) & ~1: 'clear'}
+    prims = []
+    def raw_call(mu, address, size, data):
+        d = bytes(mu.mem_read(mu.reg_read(UC_ARM_REG_R0), 28))
+        x, y, w, h, colour, z1, z2 = struct.unpack('<4iIII', d)
+        prims.append((raw[address], (x, y, w, h), colour, z1, z2))
+        mu.reg_write(UC_ARM_REG_PC, mu.reg_read(UC_ARM_REG_LR))
+    raw_hooks = [patched.u.hook_add(UC_HOOK_CODE, raw_call, begin=a, end=a) for a in raw]
+    blends = []
+    BLEND_BEFORE = 0x2003   # whatever the stock had set: it must come back
+    def vg_call(mu, address, size, data):
+        if address == pu.VG_GETI:
+            blends.append(('get', mu.reg_read(UC_ARM_REG_R0)))
+            mu.reg_write(UC_ARM_REG_R0, BLEND_BEFORE)
+        else:
+            blends.append(('set', mu.reg_read(UC_ARM_REG_R0), mu.reg_read(UC_ARM_REG_R1)))
+        mu.reg_write(UC_ARM_REG_PC, mu.reg_read(UC_ARM_REG_LR))
+    raw_hooks += [patched.u.hook_add(UC_HOOK_CODE, vg_call, begin=a, end=a) for a in (pu.VG_GETI, pu.VG_SETI)]
+    blend_pair = [('get', pu.VG_BLEND_MODE), ('set', pu.VG_BLEND_MODE, pu.VG_BLEND_SRC), ('set', pu.VG_BLEND_MODE, BLEND_BEFORE)]
+    stock_masks = struct.pack('<9I', *([0xCCC] * 9))
+    pages = hist['pages']
+    off_pages = [d for d in (0, 1, 2, 3, 4, 5, 6) if d not in pages]
+    def hist_state(ori, disp=None, mode_bits=0, saved=True, clock=1000):
+        disp = rng.choice(pages) if disp is None else disp
+        patched.context(orientation=ori)
+        patched.u.mem_write(STATE + control['state_offset'] + pu.R_MODE, struct.pack('<I', ori | mode_bits))
+        patched.u.mem_write(pu.HIST_DISP, bytes([disp]))
+        patched.u.mem_write(pu.HIST_MASKS, stock_masks)
+        patched.u.mem_write(pu.MS_CLOCK, struct.pack('<I', clock))
+        if saved:
+            patched.u.mem_write(hst_at + pu.H_SAVED, struct.pack('<I', 1))
+    def hword(offset):
+        return struct.unpack('<I', patched.u.mem_read(hst_at + offset, 4))[0]
+    def call_hist(ori, box=(0, 0, 0, 0)):
+        prims.clear()
+        blends.clear()
+        patched.u.mem_write(DESC, struct.pack('<4i', *box))
+        out = patched.run(int(hfun['portrait_hist'], 16) & ~1, SENTINEL_LR & ~1,
+                          [STATE + control['state_offset'], ori, DESC] + [rng.getrandbits(32) for _ in range(10)])
+        return out, [(fn, box, colour) for fn, box, colour, _, _ in prims], [p[3:] for p in prims]
+    def set_bins(bins):
+        patched.u.mem_write(pu.HIST_BINS, struct.pack('<256I', *bins))
+    def random_bins():
+        kind = rng.choice(('flat', 'dark', 'bright', 'spike', 'zero', 'random'))
+        if kind == 'zero':
+            return [0] * 256
+        if kind == 'random':
+            return [rng.randrange(0, 5000) for _ in range(256)]
+        centre = dict(flat=128, dark=8, bright=247, spike=rng.randrange(256))[kind]
+        width = 4 if kind == 'spike' else 40
+        return [max(0, int(3000 * (1 - abs(i - centre) / width))) + rng.randrange(0, 50) for i in range(256)]
+    hist_cases = dict(full=0, partial=0, throttled=0, overlap=0, erase=0, masks=0, end_to_end=0)
+    for ori in (1, 2):
+        for _ in range(a.cases // 6):
+            # First draw: full.
+            hist_state(ori, clock=rng.randrange(0, 1 << 30))
+            bins = random_bins()
+            set_bins(bins)
+            out, got, extra = call_hist(ori)
+            bars = pu.hist_bars(bins)
+            want = pu.hist_prims(ori, bars, None, True)
+            stored = list(patched.u.mem_read(hst_at + pu.H_PREV, 64))
+            if (out['pc'] | 1) != SENTINEL_LR or got != want or any(e != (0, 0) for e in extra) or stored != bars or blends != blend_pair \
+                    or hword(pu.H_ON) != ori or out['regs'][4:12] != [out['regs'][i] for i in range(4, 12)]:
+                failures.append(dict(test='hist_full', ori=ori, got=got[:6], want=want[:6], stored=stored[:8], bars=bars[:8]))
+            hist_cases['full'] += 1
+            # Within the interval: nothing.
+            clock = struct.unpack('<I', patched.u.mem_read(pu.MS_CLOCK, 4))[0]
+            patched.u.mem_write(pu.MS_CLOCK, struct.pack('<I', (clock + pu.HIST_INTERVAL - 1) & 0xFFFFFFFF))
+            set_bins(random_bins())
+            _, got, _ = call_hist(ori)
+            if got or blends:
+                failures.append(dict(test='hist_throttle', ori=ori, got=got[:4], blends=blends))
+            hist_cases['throttled'] += 1
+            # After it: only the changed bars.
+            patched.u.mem_write(pu.MS_CLOCK, struct.pack('<I', (clock + pu.HIST_INTERVAL) & 0xFFFFFFFF))
+            new = list(bins)
+            for i in rng.sample(range(256), rng.randrange(0, 40)):
+                new[i] = rng.randrange(0, 6000)
+            set_bins(new)
+            _, got, _ = call_hist(ori)
+            want = pu.hist_prims(ori, pu.hist_bars(new), bars, False)
+            if got != want or blends != blend_pair:
+                failures.append(dict(test='hist_partial', ori=ori, got=got[:6], want=want[:6]))
+            hist_cases['partial'] += 1
+            # A stock clear over the box: nothing now, then a full draw.
+            own = pu.hist_box(ori, pu.HIST_X, pu.HIST_Y, pu.HIST_W, pu.HIST_H)
+            cover = (own[0] + rng.randrange(-20, own[2]), own[1] + rng.randrange(-20, own[3]), rng.randrange(21, 80), rng.randrange(21, 80))
+            patched.u.mem_write(pu.MS_CLOCK, struct.pack('<I', (clock + 10 * pu.HIST_INTERVAL) & 0xFFFFFFFF))
+            _, got, _ = call_hist(ori, cover)
+            got = got + blends
+            dirty = hword(pu.H_DIRTY)
+            _, got2, _ = call_hist(ori, (0, 0, 10, 10) if ori == 1 else (700, 470, 10, 10))
+            want2 = pu.hist_prims(ori, pu.hist_bars(new), None, True)
+            if got or dirty != 1 or got2 != want2 or hword(pu.H_DIRTY) != 0:
+                failures.append(dict(test='hist_overlap', ori=ori, cover=cover, got=got[:3], dirty=dirty, got2=got2[:3]))
+            hist_cases['overlap'] += 1
+            # Off the histogram page (or a menu, setting or slider layout): erased once, then nothing.
+            disp, bits = rng.choice([(d, 0) for d in off_pages] + [(rng.choice(pages), b) for b in (pu.MENU_MODE, pu.MINI_MODE, pu.SLIDER_MODE)])
+            patched.u.mem_write(pu.HIST_DISP, bytes([disp]))
+            patched.u.mem_write(STATE + control['state_offset'] + pu.R_MODE, struct.pack('<I', ori | bits))
+            _, got, _ = call_hist(ori)
+            erase_blends = list(blends)
+            _, got2, _ = call_hist(ori)
+            got2 = got2 + blends
+            want = [('rect', own, 0)]
+            if got != want or erase_blends != blend_pair or got2 or hword(pu.H_ON) != 0:
+                failures.append(dict(test='hist_erase', ori=ori, disp=disp, bits=bits, got=got, got2=got2))
+            hist_cases['erase'] += 1
+    # Masks: hidden only while switched on, upright, in the live-view layout and on DISP 2; restored otherwise.
+    mask_states = [(dict(orientation=1 + i % 2), 1 + i % 2, page, True) for i, page in enumerate(pages)]
+    mask_states += [(dict(orientation=1), 1, page, False) for page in off_pages]
+    mask_states += [(dict(orientation=0), 0, 2, False), (dict(orientation=2), 2 | pu.MENU_MODE, 2, False),
+                    (dict(orientation=2), 2 | pu.SLIDER_MODE, 2, False), (dict(orientation=1, switch=0), 1, 2, False)]
+    for state, mode, disp, hidden in mask_states:
+        for start_saved in (False, True):
+            patched.context(**state)
+            patched.u.mem_write(STATE + control['state_offset'] + pu.R_MODE, struct.pack('<I', mode))
+            patched.u.mem_write(pu.HIST_DISP, bytes([disp]))
+            original_masks = struct.pack('<9I', *[rng.getrandbits(24) for _ in range(9)])
+            if start_saved:   # hidden earlier: masks zero, the saved copy in the block
+                patched.u.mem_write(pu.HIST_MASKS, bytes(36))
+                patched.u.mem_write(hst_at + pu.H_MASKS, original_masks)
+                patched.u.mem_write(hst_at + pu.H_SAVED, struct.pack('<I', 1))
+            else:
+                patched.u.mem_write(pu.HIST_MASKS, original_masks)
+            patched.run(int(hfun['portrait_hmask'], 16) & ~1, SENTINEL_LR & ~1, [STATE + control['state_offset']] + [0] * 12)
+            masks = bytes(patched.u.mem_read(pu.HIST_MASKS, 36))
+            want = bytes(36) if hidden else original_masks
+            if masks != want or hword(pu.H_SAVED) != int(hidden) or (hidden and bytes(patched.u.mem_read(hst_at + pu.H_MASKS, 36)) != original_masks):
+                failures.append(dict(test='hist_masks', state=state, mode=mode, disp=disp, start_saved=start_saved,
+                                     masks=masks.hex(), saved=hword(pu.H_SAVED)))
+            hist_cases['masks'] += 1
+    # End to end through the clear entry: the hook hides the stock masks and draws on the same clear.
+    for ori in (1, 2):
+        patched.context(orientation=ori)
+        patched.u.mem_write(STATE + control['state_offset'] + pu.R_MODE, struct.pack('<2I', ori, 0))
+        patched.u.mem_write(pu.HIST_DISP, bytes([pages[-1]]))
+        patched.u.mem_write(pu.HIST_MASKS, stock_masks)
+        patched.u.mem_write(pu.MS_CLOCK, struct.pack('<I', 5000))
+        bins = random_bins()
+        set_bins(bins)
+        prims.clear()
+        clear_site1, clear_stop1 = next((s_, e_) for n_, s_, e_ in entries if n_ == 'clear')
+        run(patched, 'clear', clear_site1, clear_stop1, rect_bytes(2, 4, 10, 10), [DESC] + [0] * 12)
+        got = [(fn, box, colour) for fn, box, colour, _, _ in prims]
+        if bytes(patched.u.mem_read(pu.HIST_MASKS, 36)) != bytes(36) or got != pu.hist_prims(ori, pu.hist_bars(bins), None, True):
+            failures.append(dict(test='hist_end_to_end', ori=ori, masks=bytes(patched.u.mem_read(pu.HIST_MASKS, 36)).hex(), got=got[:4]))
+        # Back to landscape: the masks come back on the next command.
+        patched.orientation = 0
+        run(patched, 'clear', clear_site1, clear_stop1, rect_bytes(2, 4, 10, 10), [DESC] + [0] * 12)
+        run(patched, 'clear', clear_site1, clear_stop1, rect_bytes(2, 4, 10, 10), [DESC] + [0] * 12)
+        if bytes(patched.u.mem_read(pu.HIST_MASKS, 36)) != stock_masks:
+            failures.append(dict(test='hist_restore', ori=ori, masks=bytes(patched.u.mem_read(pu.HIST_MASKS, 36)).hex()))
+        hist_cases['end_to_end'] += 1
+    for h in raw_hooks:
+        patched.u.hook_del(h)
+    patched.u.mem_write(pu.HIST_DISP, bytes([0]))   # the later tests run with no histogram page
+    results['histogram_cases'] = hist_cases
+    results['histogram_pages'] = pages
 
     # 3. Image 3 goes through image 1 (and its hook) and is then skipped.
     image3 = 0

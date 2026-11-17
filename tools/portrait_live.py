@@ -123,7 +123,15 @@ def main():
     if a.command == 'status':
         result = decode(live.read(block, pm.STATE_SIZE))
         result.pop('records')
-        print(json.dumps(dict(block=hex(block), **result, context=live.context()), indent=1))
+        hst = live.read(block + pm.HST, pm.HST_SIZE)
+        word = lambda o: struct.unpack_from('<I', hst, o)[0]
+        histogram = dict(drawn_grip=word(pu.H_ON), dirty=word(pu.H_DIRTY), last_ms=word(pu.H_MS), masks_hidden=word(pu.H_SAVED),
+                         full_draws=word(pu.H_FULL), partial_draws=word(pu.H_PART), covered=word(pu.H_OVERLAP),
+                         saved_masks=[hex(v) for v in struct.unpack_from('<9I', hst, pu.H_MASKS)],
+                         live_masks=[hex(v) for v in struct.unpack('<9I', live.read(pu.HIST_MASKS, 36))],
+                         disp=live.read(pu.HIST_DISP, 1)[0], clock_ms=live.word(pu.MS_CLOCK),
+                         bars=list(hst[pu.H_PREV:pu.H_PREV + 64]))
+        print(json.dumps(dict(block=hex(block), **result, histogram=histogram, context=live.context()), indent=1))
         return
     if a.command == 'requests':
         periodic, = struct.unpack('<I', live.read(block + pm.REQ + 8, 4))

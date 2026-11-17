@@ -195,6 +195,85 @@ SLIDER_BUTTONS = (                # landscape box, portrait dx (dy SLIDER_DY)
 SLIDER_ROW_BOX = (93, 358, 534, 48)
 SLIDER_CORNER = (636, 4, 80, 48)
 
+# Histogram (camera USB readout, 2026-11-17). The stock histogram is not drawn through
+# the drawing entries (as on the Z 5), so upright on the histogram page (DISP 2) the
+# stock one is hidden (its 9 visibility masks cleared; the sampling gate reads the DISP
+# state, not the masks) and the counts are drawn with the stock rectangle and clear
+# functions, called past the hooks. 256 counts (u32) at HIST_BINS, total 92928, fresh
+# only on DISP 2/3/5; the same addresses after a restart. MS_CLOCK: the kernel's 64-bit
+# millisecond time (low word), read by the scheduler with ldrd.
+HIST_BINS = 0xC201768C
+HIST_MASKS, HIST_MASK_COUNT = 0xC1826718, 9   # descriptor 0xC1826714 + 4, RAM
+HIST_DISP, HIST_PAGE = 0xC2016A68 + 0x196, 2  # liveview_dual's DISP state byte; the histogram page
+# With liveview-dual the histogram also shows on the level page (3) and the full-information
+# page (5); v24 only handled 2 and the other two kept the stock landscape histogram (camera).
+HIST_DUAL_PAGES = (2, 3, 5)
+MS_CLOCK = 0xC18EB098
+# Bottom right, in the empty space right of the "OK: focus point" hint, under the exposure
+# scale (x 440.., y ..546) and above the shots remaining (y 627..), left of the AF frame's
+# bottom-right corner line (x ~432) -- camera screenshot 2026-11-17 (v24 sat top middle).
+# v25's 128 x 64 looked small on the camera; v26 uses the whole gap: x 288..480 (the hint
+# frame ends at 292, so 4 px overlap), y 550..622.
+HIST_X, HIST_Y, HIST_CW, HIST_H = 288, 550, 3, 72   # portrait box: 64 bars of 3 px, 192 x 72
+HIST_LW = 1                                         # divider and frame lines
+HIST_W = 64 * HIST_CW
+HIST_INTERVAL = 80                                  # ms between redraws, as on the Z 5
+HIST_BG, HIST_BAR, HIST_LINE = 0x00000080, 0xE6E6E6FF, 0xFFFFFFFF
+# Offsets in the histogram block (portrait_menu.HST).
+H_ON, H_DIRTY, H_MS, H_SAVED, H_ORI, H_COLOR, H_FN = 0, 4, 8, 12, 16, 20, 24
+H_FULL, H_PART, H_OVERLAP, H_MASKS, H_BLEND, H_PREV = 28, 32, 36, 40, 76, 80
+# v24 on the camera: the stock clear (vgClear, descriptor +0x14 = 0) called from here left
+# the old bars and stacked the translucent backdrop; rectangles drew. The stock clear's
+# other path (+0x14 set) draws a rectangle with the blend mode set to VG_BLEND_SRC, which
+# replaces the pixels. v25 does the same around all its drawing: the backdrop replaces
+# whatever was there, and erasing is a rectangle of colour 0.
+VG_SETI, VG_GETI, VG_BLEND_MODE, VG_BLEND_SRC = 0x1050A406, 0x1050A47C, 0x1104, 0x2000
+LAYOUT_BITS = 4 | 8 | 16   # MENU_MODE | MINI_MODE | SLIDER_MODE
+
+
+def hist_bars(bins):
+    """Python model: 64 bar heights; the peak is the smaller of the largest count and 4x the mean."""
+    peak = min(max(bins), sum(bins) >> 6)
+    d = peak * 4
+    out = []
+    for i in range(64):
+        s = sum(bins[4 * i:4 * i + 4]) * HIST_H
+        out.append(0 if not d else min(HIST_H, s // d))
+    return out
+
+
+def hist_box(ori, px, py, w, h):
+    """Portrait box -> physical (x, y-up, w, h), as panel_box."""
+    return panel_box(ori, px, py, w, h)
+
+
+def hist_prims(ori, bars, prev, full):
+    """Python model of portrait_hist's drawing: [(fn, (x, y-up, w, h), colour)], all 'rect' with the blend mode SRC."""
+    out = []
+    def prim(fn, px, py, w, h, colour):
+        out.append((fn, hist_box(ori, px, py, w, h), colour))
+    changed = bool(full)
+    if full:
+        prim('rect', HIST_X, HIST_Y, HIST_W, HIST_H, HIST_BG)
+    for i, h in enumerate(bars):
+        cx = HIST_X + i * HIST_CW
+        if not full:
+            if h == prev[i]:
+                continue
+            prim('rect', cx, HIST_Y, HIST_CW, HIST_H, HIST_BG)
+            changed = True
+        if h:
+            prim('rect', cx, HIST_Y + HIST_H - h, HIST_CW, h, HIST_BAR)
+    if changed:
+        for i in (1, 2, 3):
+            prim('rect', HIST_X + i * (HIST_W // 4), HIST_Y, HIST_LW, HIST_H, HIST_LINE)
+        prim('rect', HIST_X, HIST_Y, HIST_W, HIST_LW, HIST_LINE)
+        prim('rect', HIST_X, HIST_Y + HIST_H - HIST_LW, HIST_W, HIST_LW, HIST_LINE)
+        prim('rect', HIST_X, HIST_Y, HIST_LW, HIST_H, HIST_LINE)
+        prim('rect', HIST_X + HIST_W - HIST_LW, HIST_Y, HIST_LW, HIST_H, HIST_LINE)
+    return out
+
+
 CODE_DIR = {4: 0, 5: 1, 2: 2, 3: 3}
 DIR_CODE = {v: k for k, v in CODE_DIR.items()}
 CODE_TURN = {ori: sum(DIR_CODE[(turn >> (CODE_DIR[code] * 4)) & 15] << ((code - 2) * 4) for code in (2, 3, 4, 5))
@@ -336,7 +415,8 @@ TEXT_EXPECTED = bytes.fromhex('bbf770fe022141f22210')
 
 SIZES = dict(portrait_f2fix=96, portrait_fix2f=96, portrait_focus=96, portrait_locate=768,
              portrait_rect=320, portrait_image=320, portrait_image3=320, portrait_text=448,
-             portrait_hook=768, portrait_log=512, portrait_touch=640)
+             portrait_hook=768, portrait_log=512, portrait_touch=640,
+             portrait_hprim=128, portrait_hist=1536, portrait_hmask=192)
 # Runtime words after the switch word (see portrait_menu): mode, pending full
 # clear, repaint wanted, refresh passes, forced repaints, then the readout.
 R_MODE, R_PENDING, R_REPAINT, R_PASSES, R_FORCED = 16, 20, 24, 28, 32
@@ -452,7 +532,92 @@ def panel_box(ori, px, py, pw, ph):
     return 720 - py - ph, 480 - px - pw, ph, pw
 
 
-def sources(f, state_offset, runtime, layout, touch=None, slider_layout=None):
+def hist_page_test(reg, pages, yes):
+    """Branch to yes when the DISP byte in reg is one of pages."""
+    return ''.join(f'cmp {reg},#{page};beq {yes};' for page in pages)
+
+
+def hist_sources(f, hst, pages=(HIST_PAGE,)):
+    """The portrait histogram (modelled by hist_bars / hist_prims); hst: the block's offset in the state block."""
+    code = {}
+    bx = {ori: hist_box(ori, HIST_X, HIST_Y, HIST_W, HIST_H) for ori in (1, 2)}
+    # r0 px, r1 py, r2 w, r3 h, r4 (the caller's) -> histogram block (H_ORI, H_COLOR, H_FN): one stock
+    # rectangle or clear, called past the hooks, with the box turned to the panel.
+    code['portrait_hprim'] = f"""push {{r4-r6,lr}};sub sp,#32;ldr r5,[r4,#{H_ORI}];cmp r5,#2;bne grip1;
+        str r1,[sp];str r0,[sp,#4];str r3,[sp,#8];str r2,[sp,#12];b colour;
+        grip1:rsb r6,r1,#720;sub r6,r6,r3;str r6,[sp];rsb r6,r0,#480;sub r6,r6,r2;str r6,[sp,#4];str r3,[sp,#8];str r2,[sp,#12];
+        colour:ldr r6,[r4,#{H_COLOR}];str r6,[sp,#16];movs r6,#0;str r6,[sp,#20];str r6,[sp,#24];str r6,[sp,#28];
+        ldr r6,[r4,#{H_FN}];mov r0,sp;blx r6;add sp,#32;pop {{r4-r6,pc}};"""
+
+    def prim(fn, x, y, w, h, colour):
+        """x, y, w, h: registers or constants."""
+        def load(reg, v):
+            return f'movw {reg},#{v};' if isinstance(v, int) else f'mov {reg},{v};'
+        return (f"{c('r0', colour)}str r0,[r4,#{H_COLOR}];{c('r0', f[fn] | 1)}str r0,[r4,#{H_FN}];"
+                + load('r0', x) + load('r1', y) + load('r2', w) + load('r3', h) + n(f['portrait_hprim']))
+    lw = HIST_LW
+    lines = ''.join(prim('raw_rect', HIST_X + i * (HIST_W // 4), HIST_Y, lw, HIST_H, HIST_LINE) for i in (1, 2, 3))
+    lines += prim('raw_rect', HIST_X, HIST_Y, HIST_W, lw, HIST_LINE) + prim('raw_rect', HIST_X, HIST_Y + HIST_H - lw, HIST_W, lw, HIST_LINE)
+    lines += prim('raw_rect', HIST_X, HIST_Y, lw, HIST_H, HIST_LINE) + prim('raw_rect', HIST_X + HIST_W - lw, HIST_Y, lw, HIST_H, HIST_LINE)
+    # r0 state block, r1 grip (1/2), r2 -> the current clear's panel box (x, y-up, w, h), already
+    # turned. Called on screen-layer clears while upright. r4 block, r5 bar index, r6 height,
+    # r8 changed, r9 full, r10 grip, r11 box (then the column x); the bars on the stack.
+    code['portrait_hist'] = f"""push {{r4-r11,lr}};sub sp,#72;ldr r9,[r0,#{R_MODE}];{c('r3',hst)}add r4,r0,r3;mov r10,r1;mov r11,r2;
+        movs r5,#0;tst r9,#{LAYOUT_BITS};bne decided;ldr r0,[r4,#{H_SAVED}];cmp r0,#0;beq decided;
+        {c('r0',HIST_DISP)}ldrb r0,[r0];{hist_page_test('r0', pages, 'on_page')}b decided;on_page:movs r5,#1;
+        decided:ldr r6,[r4,#{H_ON}];cmp r6,#0;beq fresh;cmp r5,#0;beq erase;cmp r6,r10;beq fresh;
+        erase:str r6,[r4,#{H_ORI}];{c('r0',VG_BLEND_MODE)}{n(VG_GETI)}str r0,[r4,#{H_BLEND}];movw r0,#{VG_BLEND_MODE};movw r1,#{VG_BLEND_SRC};{n(VG_SETI)}{prim('raw_rect', HIST_X, HIST_Y, HIST_W, HIST_H, 0)}movw r0,#{VG_BLEND_MODE};ldr r1,[r4,#{H_BLEND}];{n(VG_SETI)}movs r0,#0;str r0,[r4,#{H_ON}];
+        fresh:cmp r5,#0;beq done;
+        cmp r10,#2;bne own1;movw r0,#{bx[2][0]};movw r1,#{bx[2][1]};b own;own1:movw r0,#{bx[1][0]};movw r1,#{bx[1][1]};
+        own:ldm r11,{{r2,r3,r6,r7}};cmp r6,#0;ble clear_ok;cmp r7,#0;ble clear_ok;
+        add r8,r0,#{HIST_H};cmp r2,r8;bge clear_ok;add r8,r2,r6;cmp r0,r8;bge clear_ok;
+        add r8,r1,#{HIST_W};cmp r3,r8;bge clear_ok;add r8,r3,r7;cmp r1,r8;bge clear_ok;
+        movs r0,#1;str r0,[r4,#{H_DIRTY}];ldr r0,[r4,#{H_OVERLAP}];adds r0,#1;str r0,[r4,#{H_OVERLAP}];b done;
+        clear_ok:{c('r0',MS_CLOCK)}ldr r8,[r0];
+        ldr r0,[r4,#{H_ON}];cmp r0,#0;beq go;ldr r0,[r4,#{H_DIRTY}];cmp r0,#0;bne go;
+        ldr r0,[r4,#{H_MS}];sub r0,r8,r0;cmp r0,#{HIST_INTERVAL};blo done;
+        go:str r8,[r4,#{H_MS}];
+        {c('r0',HIST_BINS)}movs r1,#0;movs r2,#0;movs r3,#0;
+        total:ldr r6,[r0,r3,lsl #2];add r1,r1,r6;cmp r6,r2;it hi;movhi r2,r6;adds r3,#1;cmp r3,#256;blo total;
+        lsr r1,r1,#6;cmp r2,r1;it hi;movhi r2,r1;lsl r7,r2,#2;
+        movs r5,#0;
+        bar:add r1,r0,r5,lsl #4;ldm r1,{{r1,r2,r3,r6}};add r1,r1,r2;add r1,r1,r3;add r1,r1,r6;
+        movs r2,#{HIST_H};mul r1,r1,r2;movs r6,#0;cmp r7,#0;beq stored;
+        divide:cmp r6,#{HIST_H};bhs stored;cmp r1,r7;blo stored;sub r1,r1,r7;adds r6,#1;b divide;
+        stored:strb r6,[sp,r5];adds r5,#1;cmp r5,#64;blo bar;
+        ldr r0,[r4,#{H_ON}];movs r9,#1;cmp r0,#0;beq full_set;ldr r9,[r4,#{H_DIRTY}];
+        full_set:str r10,[r4,#{H_ORI}];{c('r0',VG_BLEND_MODE)}{n(VG_GETI)}str r0,[r4,#{H_BLEND}];movw r0,#{VG_BLEND_MODE};movw r1,#{VG_BLEND_SRC};{n(VG_SETI)}movs r8,#0;cmp r9,#0;beq columns;movs r8,#1;
+        ldr r0,[r4,#{H_FULL}];adds r0,#1;str r0,[r4,#{H_FULL}];
+        {prim('raw_rect', HIST_X, HIST_Y, HIST_W, HIST_H, HIST_BG)}
+        columns:movs r5,#0;
+        column:ldrb r6,[sp,r5];cmp r9,#0;bne draw_bar;add r0,r4,#{H_PREV};ldrb r0,[r0,r5];cmp r0,r6;beq next_bar;
+        movs r8,#1;movs r0,#{HIST_CW};mul r11,r5,r0;add r11,r11,#{HIST_X};
+        {prim('raw_rect', 'r11', HIST_Y, HIST_CW, HIST_H, HIST_BG)}
+        draw_bar:ldrb r6,[sp,r5];cmp r6,#0;beq next_bar;movs r0,#{HIST_CW};mul r11,r5,r0;add r11,r11,#{HIST_X};movw r7,#{HIST_Y + HIST_H};sub r7,r7,r6;
+        {prim('raw_rect', 'r11', 'r7', HIST_CW, 'r6', HIST_BAR)}
+        next_bar:ldrb r6,[sp,r5];add r0,r4,#{H_PREV};strb r6,[r0,r5];adds r5,#1;cmp r5,#64;blo column;
+        cmp r8,#0;beq settled;cmp r9,#0;bne lines;ldr r0,[r4,#{H_PART}];adds r0,#1;str r0,[r4,#{H_PART}];
+        lines:{lines}
+        settled:movw r0,#{VG_BLEND_MODE};ldr r1,[r4,#{H_BLEND}];{n(VG_SETI)}str r10,[r4,#{H_ON}];movs r0,#0;str r0,[r4,#{H_DIRTY}];
+        done:add sp,#72;pop {{r4-r11,pc}};"""
+    # r0 state block: hide the stock histogram (save and clear its 9 masks) while the
+    # switch is on, upright, the live-view layout (no menu, setting or slider page) and DISP 2;
+    # restore them otherwise.
+    code['portrait_hmask'] = f"""push {{r4-r6,lr}};{c('r1',hst)}add r4,r0,r1;movs r5,#0;
+        ldr r1,[r0];cmp r1,#1;bne decided;ldr r1,[r0,#{R_MODE}];tst r1,#3;beq decided;tst r1,#{LAYOUT_BITS};bne decided;
+        {c('r1',HIST_DISP)}ldrb r1,[r1];{hist_page_test('r1', pages, 'on_page')}b decided;on_page:movs r5,#1;
+        decided:ldr r1,[r4,#{H_SAVED}];{c('r2',HIST_MASKS)}add r12,r4,#{H_MASKS};movs r3,#0;
+        cmp r5,#0;beq restore;cmp r1,#0;bne out;
+        save:ldr r6,[r2,r3,lsl #2];str r6,[r12,r3,lsl #2];movs r6,#0;str r6,[r2,r3,lsl #2];adds r3,#1;cmp r3,#{HIST_MASK_COUNT};blo save;
+        movs r1,#1;str r1,[r4,#{H_SAVED}];b out;
+        restore:cmp r1,#0;beq out;
+        back:ldr r6,[r12,r3,lsl #2];str r6,[r2,r3,lsl #2];adds r3,#1;cmp r3,#{HIST_MASK_COUNT};blo back;
+        movs r1,#0;str r1,[r4,#{H_SAVED}];
+        out:pop {{r4-r6,pc}};"""
+    return code
+
+
+def sources(f, state_offset, runtime, layout, touch=None, slider_layout=None, hst=None, hist_pages=(HIST_PAGE,)):
     if slider_layout is None:
         slider_layout = layout
     if runtime != R_MODE:
@@ -652,9 +817,16 @@ def sources(f, state_offset, runtime, layout, touch=None, slider_layout=None):
         return (f"{c('r1', source)}ldrb r0,[r1];cmp r0,#31;it hi;movhi r0,#31;movs r2,#1;lsl r2,r2,r0;"
                 f"ldr r3,[r6,#{slot}];orr r3,r3,r2;str r3,[r6,#{slot}];")
     record = bit(VIEW_KIND, R_KINDS) + bit(TARGET, R_TARGETS) + bit(UI_SERVICE_PHASE, R_PHASES)
+    if hst is None:
+        hmask = hist_off = hist_draw = ''
+    else:
+        code.update(hist_sources(f, hst, hist_pages))
+        hmask = f"mov r0,r6;{n(f['portrait_hmask'])}"
+        hist_off = f"{c('r1',hst + H_ON)}str r0,[r6,r1];"
+        hist_draw = f"mov r0,r6;mov r1,r7;ldr r2,[r5];{n(f['portrait_hist'])}"
     code['portrait_hook'] = f'''push {{r4-r8,lr}};mov r4,r0;mov r5,r1;
         {n(f['get'])}cmp r0,#0;beq out;{c('r1',state_offset)}add r6,r0,r1;
-        ldr r0,[r6];cmp r0,#1;bne out;
+        {hmask}ldr r0,[r6];cmp r0,#1;bne out;
         {n(ORIENTATION)}mov r7,r0;movs r8,#0;
         cmp r7,#1;beq record;cmp r7,#2;bne gate;
         record:{record}
@@ -681,12 +853,12 @@ def sources(f, state_offset, runtime, layout, touch=None, slider_layout=None):
         same:and r7,r0,#3;cmp r8,#0;bne live;movs r2,#0;str r2,[r6,#{R_PENDING}];b out;
         live:{c('r1',TARGET)}ldrb r0,[r1];cmp r0,#{OSD_TARGET};bne out;
         cmp r4,#{k['clear']};bne draw;ldr r0,[r6,#{R_PENDING}];cmp r0,#0;beq draw;
-        movs r0,#0;str r0,[r6,#{R_PENDING}];ldr r1,[r5];str r0,[r1];str r0,[r1,#4];
+        movs r0,#0;str r0,[r6,#{R_PENDING}];{hist_off}ldr r1,[r5];str r0,[r1];str r0,[r1,#4];
         movw r0,#720;str r0,[r1,#8];movw r0,#480;str r0,[r1,#12];b out;
         draw:cmp r7,#0;beq out;
         cmp r4,#{k['rect']};bne not_rect;ldr r0,[r5,#20];{c('r1',CLEAR_INNER_RECT_RETURN)}cmp r0,r1;beq out;
         ldr r0,[r5];mov r1,r7;mov r2,r4;{n(f['portrait_rect'])}b out;
-        not_rect:cmp r4,#{k['clear']};bne not_clear;ldr r0,[r5];mov r1,r7;mov r2,r4;{n(f['portrait_rect'])}b out;
+        not_rect:cmp r4,#{k['clear']};bne not_clear;ldr r0,[r5];mov r1,r7;mov r2,r4;{n(f['portrait_rect'])}{hist_draw}b out;
         not_clear:cmp r4,#{k['frame']};bne not_frame;mov r0,r5;mov r1,r7;mov r2,r4;{n(f['portrait_rect'])}b out;
         not_frame:cmp r4,#{k['image3']};bne not_image3;mov r0,r5;mov r1,r7;{n(f['portrait_image3'])}b out;
         not_image3:cmp r4,#{k['text']};bne image;ldr r0,[r5];mov r1,r7;{n(f['portrait_text'])}b out;
@@ -785,6 +957,15 @@ def add(plan):
         raise ValueError('Unexpected shooting touch entry')
     for name, size in SIZES.items():
         f[name] = plan.alloc(bytes(size))
+    # Stock rectangle and clear past the hooks (the displaced window replayed, then the
+    # stock body): the portrait histogram draws with these.
+    for name, kind in (('raw_rect', 'rect'), ('raw_clear', 'clear')):
+        _, site, expected, replay = next(h for h in HOOKS if h[0] == kind)
+        f[name] = plan.address
+        plan.alloc(assemble(f"{replay}ldr.w pc,={(site + len(bytes.fromhex(expected))) | 1};", f[name], 32))
+    if (control['histogram_size'] < H_PREV + 64 or im.words(0x1073F830 + 31 * 4, 1)[0] != HIST_MASKS - 4
+            or im.words(0x104501A8, 1)[0] != 0xC2016A68):
+        raise ValueError('Unexpected histogram widget or state layout')
     def rules(table):
         return b''.join(struct.pack('<8h', *rule, 0) for rule in table) + struct.pack('<8h', 0x7FFF, *[0] * 7)
     layout = plan.alloc(rules(LAYOUT))
@@ -794,7 +975,10 @@ def add(plan):
         return b''.join(struct.pack('<8h', *row, 0) for row in table) + struct.pack('<8h', TOUCH_END, *[0] * 7)
     touch = dict(offset=control['touch_offset'], magic=TCH_MAGIC, capacity=TCH_CAPACITY,
                  live=plan.alloc(rows(live_rows)), menu=plan.alloc(rows(menu_rows)), slider=plan.alloc(rows(slider_rows)))
-    for name, source in sources(f, control['state_offset'], control['runtime_offset'], layout, touch, slider_layout).items():
+    # liveview-dual shows the histogram on DISP 2, 3 and 5; without it only on 2.
+    hist_pages = HIST_DUAL_PAGES if 'liveview_dual' in plan.features else (HIST_PAGE,)
+    for name, source in sources(f, control['state_offset'], control['runtime_offset'], layout, touch, slider_layout,
+                                control['histogram_offset'], hist_pages).items():
         plan.put(f[name], assemble(source, f[name], SIZES[name]))
     hooks = []
     for name, site, expected, replay in HOOKS:
@@ -1092,6 +1276,13 @@ def add(plan):
                           keys='direction codes turn with the screen, as on the 2/3 setting pages',
                           source='camera USB draw log, 2026-11-17 (shutter 12, aperture 11, ISO 13)',
                           camera_verified='2026-11-17: layout, buttons, bottom-bar switch, corner button and keys in both grips'),
+        histogram=dict(bins=hex(HIST_BINS), masks=hex(HIST_MASKS), mask_count=HIST_MASK_COUNT, disp=hex(HIST_DISP),
+                       pages=list(hist_pages), clock=hex(MS_CLOCK), box=[HIST_X, HIST_Y, HIST_W, HIST_H], interval_ms=HIST_INTERVAL,
+                       raw_rect=hex(f['raw_rect'] | 1), raw_clear=hex(f['raw_clear'] | 1), block_offset=control['histogram_offset'],
+                       blend=dict(mode=hex(VG_BLEND_MODE), value=hex(VG_BLEND_SRC), set=hex(VG_SETI), get=hex(VG_GETI),
+                                  why='v24 camera: vgClear from the hook left old bars; the stock SRC-blend rectangle path replaces pixels'),
+                       source='camera USB RAM readout, 2026-11-17; drawing after the Z 5 (wonder-lantern-z5 PORTRAIT_UI 5)',
+                       camera_verified='2026-11-17 (v26): DISP 2, 3 and 5, one upright histogram, no trails'),
         touch=dict(site=hex(TOUCH), caller=hex(TOUCH_CALL), view_limit=hex(TOUCH_VIEW_LIMIT),
                    event='+8 contact, +9 type, +0x12/+0x14 landscape point',
                    live_controls={name: list(box) for name, box in LIVE_CONTROLS}, live_cancel=[list(b) for b in LIVE_CANCEL],
