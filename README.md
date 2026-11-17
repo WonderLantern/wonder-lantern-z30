@@ -44,6 +44,10 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的实验
 | `nef-uncompressed` | 构建时把 NEF 固定为未压缩 | [文档](docs/nef-compression.md)，已有实机确认 |
 | `nef-compressed` | 构建时把 NEF 固定为压缩（有损） | [文档](docs/nef-compression.md)，已有实机确认 |
 
+### 研究构建：自动跟踪框（不是预设）
+
+`tools/build_auto_arm.py` 构建 `full` 去掉 `gyro-evr`，加 SD 模块宿主和内置的 auto_arm 模块：照片拍摄、自动区域 AF 时跟踪框自动出现，半按即开始跟踪。照片拍摄菜单里有 "Auto tracking box"（Enable / Disable，默认开启）。需要 arm-none-eabi-gcc。[文档](docs/auto-arm.md)，一台相机实机确认（2026-11-17）。
+
 ## 快速开始
 
 ### 准备原厂固件
