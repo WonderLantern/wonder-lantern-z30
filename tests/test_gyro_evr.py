@@ -1,7 +1,9 @@
 """The built-in gyro e-VR feature (gyro-evr, part of full)."""
 import hashlib
 import runpy
+import shutil
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -26,10 +28,16 @@ class GyroEvrPayloadTest(unittest.TestCase):
         # the Gyro e-VR menu page lives in the extension menu framework
         self.assertEqual(resolve_presets(['gyro-evr'])[1], ['shutter-sound', 'gyro-evr'])
 
-    @unittest.skipUnless(subprocess.run(['sh', '-c', 'command -v arm-none-eabi-gcc'],
-                                        capture_output=True).returncode == 0, 'needs arm-none-eabi-gcc')
     def test_payload_matches_source(self):
-        result = subprocess.run(['python3', str(ROOT / 'tools' / 'build_gyro_evr.py'), '--check'],
+        # The committed payload is only reproducible with the pinned compiler
+        # (tools/build_gyro_evr.py GCC_VERSION); other versions emit other code.
+        tool = runpy.run_path(str(ROOT / 'tools' / 'build_gyro_evr.py'), run_name='build_gyro_evr')
+        if not (shutil.which('arm-none-eabi-gcc') and shutil.which('sh')):
+            self.skipTest('needs arm-none-eabi-gcc and sh')
+        found = tool['compiler_version']()
+        if found != tool['GCC_VERSION']:
+            self.skipTest(f"needs arm-none-eabi-gcc {tool['GCC_VERSION']} (found {found})")
+        result = subprocess.run([sys.executable, str(ROOT / 'tools' / 'build_gyro_evr.py'), '--check'],
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

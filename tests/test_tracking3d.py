@@ -129,15 +129,38 @@ class Tracking3dCaveTest(unittest.TestCase):
             r = {}
             flag, writes = self.run_site(1, subjects=1, detect=detect, result=r)
             self.assertEqual((flag, writes), (1, [TOUCH_FLAG]), detect)
-            self.assertEqual(r['keys'], [(0xC3C, 0)])               # 8-byte aligned stack
+            self.assertEqual(r['keys'], [(0xC3D, 0)])               # 8-byte aligned stack
         r = {}
-        self.run_site(1, subjects=1, select=0, result=r)            # the stock code's other key
-        self.assertEqual(r['keys'], [(0x58B, 0)])
+        self.run_site(1, subjects=1, select=0, result=r)            # the stock code's other (movie) key
+        self.assertEqual(r['keys'], [(0x58C, 0)])
+        # only the low byte counts, as in the stock uxtb (0x1039CC2C)
+        self.assertEqual(self.run_site(1, subjects=1, detect=0x7F01)[0], 1)
+        self.assertEqual(self.run_site(1, subjects=1, detect=0xFFFFFF02)[0], 1)
         for case in (dict(detect=0),                                 # plain Auto-area AF
+                     dict(detect=0x100),                             # low byte 0
                      dict(detect=3),
                      dict(area=4), dict(area=0), dict(area=5)):      # not auto area
             flag, writes = self.run_site(1, subjects=1, **case)
             self.assertEqual((flag, writes), (0, []), case)
+
+    def test_detection_keys_are_the_stock_auto_area_sub_modes(self):
+        # PR 36 second review: revision 6 read 0xC3C / 0x58B, the wide-area L sub-modes.
+        # The stock area setters store base * 100 + sub: base 4 -> 0xC3C / 0x58B, base 6 -> 0xC3D / 0x58C,
+        # and the stock menu reads 0xC3D for base 6 (0 plain, 1 people, 2 animals).
+        from z30_extensions.features.tracking3d import DETECT_KEYS
+        from z30_extensions.platform.z30_120 import BASE
+        def at(a, n=4): return self.stock[a - BASE:a - BASE + n]
+        movw_r0 = lambda k: (0xF2400000 | ((k >> 12) << 16) | (((k >> 11) & 1) << 26)
+                             | (((k >> 8) & 7) << 12) | (k & 0xFF))
+        enc = lambda k: struct.pack('<2H', movw_r0(k) >> 16, movw_r0(k) & 0xFFFF)
+        self.assertEqual(DETECT_KEYS, (0x58C, 0xC3D))
+        self.assertEqual(at(0x1042B2F2, 2), bytes.fromhex('062c'))          # photo setter: cmp r4,#6
+        self.assertEqual(at(0x1042B2F8), enc(0xC3D))
+        self.assertEqual(at(0x1042B306), enc(0xC3C))                        # base 4 (wide-area L)
+        self.assertEqual(at(0x1042B328, 2), bytes.fromhex('062c'))          # movie setter: cmp r4,#6
+        self.assertEqual(at(0x1042B32E), enc(0x58C))
+        self.assertEqual(at(0x10489858, 2), bytes.fromhex('0628'))          # menu: cmp r0,#6
+        self.assertEqual(at(0x10489888), enc(0xC3D))
 
     def test_nothing_is_written_otherwise(self):
         for case in (dict(choice=0, subjects=1),                      # OFF (default)

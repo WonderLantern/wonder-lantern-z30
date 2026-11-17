@@ -34,6 +34,15 @@ through the stock settings getter 0x10465984 (key 0xC3C when the block's +0x3FD
 is set, else 0x58B; 1 = people, 2 = animals, as it uses them for the wide-area
 people / animal columns). The cave reads both the same way.
 
+Revision 7 (2026-11-17, second review of PR 36): revision 6 never handed over
+on the camera. 0xC3C / 0x58B are the wide-area L sub-modes; the stock AF-area
+setter 0x1042B2D8 stores the area as base * 100 + sub, the base in 0xC2B and the
+sub-mode in 0xC3C for base 4 (wide-area L) but in 0xC3D for base 6 (auto area);
+the movie setter 0x1042B30E uses 0x56D / 0x58B / 0x58C the same way. The stock
+menu 0x10489888 reads 0xC3D for base 6 (0 plain, 1 people, 2 animals). The cave
+now reads 0xC3D (0x58C when +0x3FD is 0, as 0x1039CC14 picks the photo / movie
+key) and truncates the result with uxtb as 0x1039CC2C does.
+
 Each detection update, with the switch on, tracking (0xC237F688), a live tracker
 (0xC23AA024 != 0, cleared at the handover), the flag still 0, a detected subject
 (0xC237E3E4 = 1..5), auto area and people / animal detection, it sets the flag.
@@ -62,8 +71,10 @@ TOUCH_FLAG = 0xC18C7240
 AF_DISPLAY = 0xC237C7B4         # stock AF display block
 AREA_MODE = AF_DISPLAY + 0x44   # 0xC237C7F8: AF-area mode, 6 = auto area
 AUTO_AREA = 6
-DETECT_SELECT = AF_DISPLAY + 0x3FD   # 0x1039CC18: non-zero -> setting 0xC3C, else 0x58B
-DETECT_KEYS = (0x58B, 0xC3C)
+DETECT_SELECT = AF_DISPLAY + 0x3FD   # 0x1039CC18: non-zero -> photo key, else movie key
+# auto-area sub-mode (0 plain, 1 people, 2 animals): movie 0x58C, photo 0xC3D
+# (setters 0x1042B30E / 0x1042B2D8; 0x58B / 0xC3C are the wide-area L sub-modes)
+DETECT_KEYS = (0x58C, 0xC3D)
 GET_SETTING = 0x10465984        # stock settings getter (r0 = key)
 PEOPLE, ANIMALS = 1, 2
 
@@ -92,7 +103,7 @@ def cave_source(choice, get):
         @ only with Auto-area AF (people) / (animals), read as the stock frame-column code does
         {c('r1',AREA_MODE)}ldrb r0,[r1];cmp r0,#{AUTO_AREA};bne out;
         {c('r1',DETECT_SELECT)}ldrb r1,[r1];{c('r0',DETECT_KEYS[0])}cmp r1,#0;beq detect_key;{c('r0',DETECT_KEYS[1])}
-        detect_key:{invoke(GET_SETTING)}subs r0,#{PEOPLE};cmp r0,#{ANIMALS - PEOPLE};bhi out;
+        detect_key:{invoke(GET_SETTING)}uxtb r0,r0;subs r0,#{PEOPLE};cmp r0,#{ANIMALS - PEOPLE};bhi out;
         {c('r4',TOUCH_FLAG)}
         movs r0,#1;str r0,[r4];dmb ish;
         {c('r1',AF_WORKING)}ldr r1,[r1];cmp r1,#0;beq out;
@@ -112,5 +123,5 @@ def add(plan):
     plan.alloc(code)
     plan.edit(SITE, jump(SITE, entry, len(STOCK)), '3D tracking: detection result writer', STOCK)
     plan.features['tracking3d'] = dict(
-        revision=6, site=hex(SITE), area_mode=hex(AREA_MODE), detection_keys=[hex(k) for k in DETECT_KEYS], requires='Auto-area AF (people) or (animals)', enter_tracking_mode=hex(ENTER_TRACKING_MODE), cave=hex(entry | 1), size=len(code), flag=hex(TOUCH_FLAG),
+        revision=7, site=hex(SITE), area_mode=hex(AREA_MODE), detection_keys=[hex(k) for k in DETECT_KEYS], requires='Auto-area AF (people) or (animals)', enter_tracking_mode=hex(ENTER_TRACKING_MODE), cave=hex(entry | 1), size=len(code), flag=hex(TOUCH_FLAG),
         settings_file='WL-3DTRK.CFG', default='off', camera_verified=False)

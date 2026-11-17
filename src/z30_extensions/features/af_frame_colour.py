@@ -19,14 +19,15 @@ AF frame style from a table at 0x107277B0, 29 rows x 11 columns of u16:
   uses), high byte the display mode (0 hidden, 1 shown, 2 blinking).
 Colour codes as the stock rows use them: 0 the subject / tracking box while
 idle, 1 the AF point idle, 2 green, 3 the white screen-1 tracking box, 4 red
-(not in focus, blinking).
+(not in focus, blinking), 5 the special state of columns 8..10 (yellow on the
+camera at the start of a half-press, PR 36 review).
 
 The edits only change table entries; no code runs.
 """
 TABLE = 0x107277B0
 COLUMNS = 11
 AF_S, AF_C, AF_F = 0, 5, 10     # first row of each focus mode (AF-F: movie, focus mode byte 4)
-IDLE, WORKING, IN_FOCUS = 0, 2, 3
+IDLE, SPECIAL, WORKING, IN_FOCUS = 0, 1, 2, 3
 PLAIN_AUTO, SUBJECT, SCREEN1, TRACKING = 7, 8, 9, 10
 WHITE, GREEN = 0x0103, 0x0102    # shown, colour 3 / 2
 
@@ -56,6 +57,16 @@ EDITS = (
     # turned green / red on its own; white in every AF-F state (v44). A
     # half-press in movie mode switches to the AF-S rows (white / green / red).
     (AF_F + IN_FOCUS, SUBJECT, 0x0102, WHITE), (AF_F + 4, SUBJECT, 0x0204, WHITE),
+    # PR 36 review (camera): the subject / tracking boxes flashed yellow at the
+    # start of a half-press before turning green / red. The special state (+1)
+    # of every mode still had the stock colour 5 (0x0105) in columns 8..10;
+    # white like the idle state.
+    (AF_S + SPECIAL, SUBJECT, 0x0105, WHITE), (AF_S + SPECIAL, SCREEN1, 0x0105, WHITE),
+    (AF_S + SPECIAL, TRACKING, 0x0105, WHITE),
+    (AF_C + SPECIAL, SUBJECT, 0x0105, WHITE), (AF_C + SPECIAL, SCREEN1, 0x0105, WHITE),
+    (AF_C + SPECIAL, TRACKING, 0x0105, WHITE),
+    (AF_F + SPECIAL, SUBJECT, 0x0105, WHITE), (AF_F + SPECIAL, SCREEN1, 0x0105, WHITE),
+    (AF_F + SPECIAL, TRACKING, 0x0105, WHITE),
 )
 # v42 kept the AF-C subject box (column 8) at its stock colour while half-pressed
 # (with colour 2 its eye-selection arrows looked jagged, v41); v44 restores green
