@@ -29,6 +29,8 @@ SIZES = dict(afcol_get=96, afcol_choice=96, afcol_labels=384, afcol_open=160,
              afcol_action=320, afcol_save=640, afcol_restore=640, afcol_close=128, afcol_table=96)
 LOOKUP_SITE = 0x1039CAEA
 LOOKUP_EXPECTED = bytes.fromhex('92 49 02 eb 42 03 03 eb c2 02')   # ldr r1,[pc,#0x248]; add.w r3,r2,r2,lsl #1; add.w r2,r3,r2,lsl #3
+# the literal that ldr reads (thumb ldr literal: Align(pc + 4, 4) + imm8 * 4) must be the stock table
+LOOKUP_LITERAL = ((LOOKUP_SITE + 4) & ~3) + LOOKUP_EXPECTED[0] * 4   # 0x1039CD34
 LOOKUP_RETURN = 0x1039CAF4
 TABLE_BYTES = 29 * fc.COLUMNS * 2
 
@@ -48,6 +50,8 @@ def prepare(plan, f, resources, allocation_size):
         f[name] = plan.alloc(bytes(size))
     if plan.image.read(LOOKUP_SITE, len(LOOKUP_EXPECTED)) != LOOKUP_EXPECTED:
         raise ValueError('Unexpected AF frame style lookup')
+    if struct.unpack('<I', plan.image.read(LOOKUP_LITERAL, 4))[0] != fc.TABLE:
+        raise ValueError(f'AF frame style lookup does not load {fc.TABLE:#x}')
     table = plan.alloc(edited_table(plan.image.read(fc.TABLE, TABLE_BYTES)))
     page_offset, state_offset = allocation_size, allocation_size + 44
     strings = {k: resources.alloc(v) for k, v in dict(title=TITLE, empty='', mark='*').items()}

@@ -42,6 +42,40 @@ class TableTest(unittest.TestCase):
         from z30_extensions.platform.z30_120 import BASE
         return list(struct.unpack_from('<%dH' % (29 * fc.COLUMNS), image, address - BASE))
 
+    def test_lookup_literal_is_the_stock_table(self):
+        import struct
+        from z30_extensions.features import af_frame_colour_ui as ui
+        from z30_extensions.platform.z30_120 import BASE
+        self.assertEqual(ui.LOOKUP_LITERAL, 0x1039CD34)
+        self.assertEqual(struct.unpack_from('<I', self.stock, ui.LOOKUP_LITERAL - BASE)[0], fc.TABLE)
+
+    def test_prepare_refuses_a_lookup_that_loads_another_table(self):
+        import struct
+        from z30_extensions.features import af_frame_colour_ui as ui
+        from z30_extensions.platform.z30_120 import BASE
+
+        class Image:
+            def __init__(self, data): self.data = data
+            def read(self, address, n): return bytes(self.data[address - BASE: address - BASE + n])
+
+        class Plan:
+            def __init__(self, data): self.image, self.next = Image(data), 0x11000000
+            def alloc(self, blob):
+                self.next += 0x1000
+                return self.next
+
+        for literal, refused in ((fc.TABLE, False), (fc.TABLE + 0x100, True)):
+            data = bytearray(self.stock)
+            struct.pack_into('<I', data, ui.LOOKUP_LITERAL - BASE, literal)
+            try:
+                ui.prepare(Plan(data), {}, None, 0)
+                raised = None
+            except ValueError as e:
+                raised = str(e)
+            except Exception:
+                raised = None          # past the checks (the stand-in plan has no resources)
+            self.assertEqual(raised is not None and 'does not load' in raised, refused, hex(literal))
+
     def test_stock_table_untouched_and_copy_edited(self):
         control = self.report['features']['af_frame_colour_control']
         stock, kept = self.words(self.stock, fc.TABLE), self.words(self.image, fc.TABLE)

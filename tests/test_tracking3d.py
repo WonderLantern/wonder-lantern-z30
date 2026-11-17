@@ -44,10 +44,11 @@ class Tracking3dCaveTest(unittest.TestCase):
             build(self.stock, ['3d-tracking'], module_host=True, face_hook=True)
 
     def run_site(self, choice, tracking=1, live=0x10007, flag=0, subjects=0, face=(29, 19, 2, 3), box=(2508, 1580),
-                 af=0, shown=0, armed=0, result=None):
+                 af=0, shown=0, armed=0, result=None, area=6, detect=1, select=1):
         from z30_extensions.features.tracking3d import (SITE, RETURN, TRACKING, TRACKER_LIVE, TOUCH_FLAG,
                                                          SUBJECTS, AF_WORKING, BOX_SHOWN,
-                                                         ARMED_OFFSET, ENTER_TRACKING_MODE)
+                                                         ARMED_OFFSET, ENTER_TRACKING_MODE, AREA_MODE,
+                                                         DETECT_SELECT, GET_SETTING)
         BOX0, BOX1 = 0xC237D59C, 0xC237D5A0   # tracking box (no longer read by the cave)
         from z30_extensions.platform.z30_120 import BASE
         image, report = self.image, self.report
@@ -57,12 +58,13 @@ class Tracking3dCaveTest(unittest.TestCase):
         u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
         u.mem_map(BASE, (len(image) + 0xFFFF) & ~0xFFFF)
         u.mem_write(BASE, image)
-        for a in (0xC18C7000, 0xC237D000, 0xC237E000, 0xC237F000, 0xC23AA000):
+        for a in (0xC18C7000, 0xC237C000, 0xC237D000, 0xC237E000, 0xC237F000, 0xC23AA000):
             u.mem_map(a, 0x1000)
         u.mem_map(0x20000000, 0x80000)
         W = lambda a, v: u.mem_write(a, struct.pack('<I', v))
         W(TRACKING, tracking); W(TRACKER_LIVE, live); W(TOUCH_FLAG, flag); W(SUBJECTS, subjects)
         W(AF_WORKING, af); W(BOX_SHOWN, shown); W(STATE + ARMED_OFFSET, armed)
+        u.mem_write(AREA_MODE, bytes([area])); u.mem_write(DETECT_SELECT, bytes([select]))
         W(BOX0, box[0] << 16); W(BOX1, ((box[0] + 552) << 16) | box[1])
         XY, WH = 0x20001000, 0x20002000
         u.mem_write(XY, struct.pack('<2h', face[0], face[1])); u.mem_write(WH, struct.pack('<2h', face[2], face[3]))
@@ -76,6 +78,13 @@ class Tracking3dCaveTest(unittest.TestCase):
             uc.reg_write(UC_ARM_REG_R0, STATE); uc.reg_write(UC_ARM_REG_R1, 0xDEAD)
             uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
         u.hook_add(UC_HOOK_CODE, stub_get, begin=get, end=get + 1)
+        keys = []
+        def stub_setting(uc, addr, size, _):
+            keys.append((uc.reg_read(UC_ARM_REG_R0), uc.reg_read(UC_ARM_REG_SP) % 8))
+            for r in (UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3):
+                uc.reg_write(r, 0xDEAD)
+            uc.reg_write(UC_ARM_REG_R0, detect); uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
+        u.hook_add(UC_HOOK_CODE, stub_setting, begin=GET_SETTING, end=GET_SETTING + 1)
         enters = []
         def stub_enter(uc, addr, size, _):
             ptr = uc.reg_read(UC_ARM_REG_R0)
@@ -102,7 +111,7 @@ class Tracking3dCaveTest(unittest.TestCase):
         self.assertEqual((r0, r1, r2, r4, r5, r6, r7, sp), (RESULT, XY, 0xF0, WH, XY, 0x66, 0x77, 0x20008000 - 16))
         self.assertEqual(struct.unpack('<4I', u.mem_read(sp, 16)), (0x44, 0x55, 0x66, 0x10000001))
         if result is not None:
-            result.update(enters=enters, armed=struct.unpack('<I', u.mem_read(STATE + ARMED_OFFSET, 4))[0])
+            result.update(keys=keys, enters=enters, armed=struct.unpack('<I', u.mem_read(STATE + ARMED_OFFSET, 4))[0])
         return struct.unpack('<I', u.mem_read(TOUCH_FLAG, 4))[0], writes
 
     def test_enable_sets_the_flag_for_any_detected_subject(self):
@@ -113,6 +122,22 @@ class Tracking3dCaveTest(unittest.TestCase):
         # no area: stock hands over only when the subject is on the box anyway (AF000207)
         self.assertEqual(self.run_site(1, subjects=1, face=(54, 35, 2, 3))[0], 1)
         self.assertEqual(self.run_site(1, subjects=1, face=(2, 2, 2, 3))[0], 1)
+
+    def test_only_with_auto_area_people_or_animals(self):
+        from z30_extensions.features.tracking3d import TOUCH_FLAG
+        for detect in (1, 2):                                        # people, animals
+            r = {}
+            flag, writes = self.run_site(1, subjects=1, detect=detect, result=r)
+            self.assertEqual((flag, writes), (1, [TOUCH_FLAG]), detect)
+            self.assertEqual(r['keys'], [(0xC3C, 0)])               # 8-byte aligned stack
+        r = {}
+        self.run_site(1, subjects=1, select=0, result=r)            # the stock code's other key
+        self.assertEqual(r['keys'], [(0x58B, 0)])
+        for case in (dict(detect=0),                                 # plain Auto-area AF
+                     dict(detect=3),
+                     dict(area=4), dict(area=0), dict(area=5)):      # not auto area
+            flag, writes = self.run_site(1, subjects=1, **case)
+            self.assertEqual((flag, writes), (0, []), case)
 
     def test_nothing_is_written_otherwise(self):
         for case in (dict(choice=0, subjects=1),                      # OFF (default)

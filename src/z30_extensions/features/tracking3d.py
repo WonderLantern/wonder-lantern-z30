@@ -13,22 +13,31 @@ Stock behaviour (camera logs AF000272, TF000093):
 - an OK / half-press start never sets the flag and never hands over; setting it
   (research module af_touchflag) makes those hand over too.
 
-Revision 2 (2026-11-14): revision 1 hooked the tracker's frame callback tables
-and read the switch without restoring it; on the camera it had no effect. This
-one runs where the research modules ran on the camera: the stock detection
-result writer 0x101944B0 (about 10-20 Hz in live view, with or without a
-subject; the same site as the research face_hook, so the two never build
-together), and reads the switch through trk3d_choice, which restores
-WL-3DTRK.CFG on first use from any task (as gyro_choice does from the IMU task).
+Revisions: 1 hooked the tracker's frame callback tables and read the switch
+without restoring it (no effect on the camera); 2 runs where the research
+modules ran on the camera, the stock detection result writer 0x101944B0 (about
+10-20 Hz in live view, with or without a subject; the same site as the research
+face_hook, so the two never build together), and reads the switch through
+trk3d_choice, which restores WL-3DTRK.CFG on first use from any task; 3 limited
+the handover to an area around the tracking box; 4 went back to any detected
+subject (the stock search only hands over when the subject is on the box,
+camera AF000207) and the menu became Disable / Enable; 5 added the return to the
+tracking mode after a half-press handover (method B, below).
+
+Revision 6 (2026-11-17, review of PR 36): the handover is only armed with the
+AF-area mode "Auto-area AF (people)" or "(animals)". Camera (review): with plain
+Auto-area AF a face crossing the tracking box ends the tracking and the camera
+falls back to normal AF without focusing on that face. The stock frame-column
+code 0x1039CC14 reads the AF-area mode from the AF display block
+0xC237C7B4 + 0x44 (0xC237C7F8; 6 = auto area) and the subject detection setting
+through the stock settings getter 0x10465984 (key 0xC3C when the block's +0x3FD
+is set, else 0x58B; 1 = people, 2 = animals, as it uses them for the wide-area
+people / animal columns). The cave reads both the same way.
 
 Each detection update, with the switch on, tracking (0xC237F688), a live tracker
-(0xC23AA024 != 0, cleared at the handover), the flag still 0 and a detected
-subject (0xC237E3E4 = 1..5) whose box centre (this update's arguments, coarse
-cells) lies inside the handover area around the tracking box centre, it sets
-the flag. The areas follow the user's drawing on the camera screen (2026-11-14,
-box 552 units = 186 px of a 1880 px wide screen): Standard about 4.3 x 3.4
-boxes, Close about 2.7 x 2.0 boxes. Then the eight displaced stock bytes run and
-the writer continues.
+(0xC23AA024 != 0, cleared at the handover), the flag still 0, a detected subject
+(0xC237E3E4 = 1..5), auto area and people / animal detection, it sets the flag.
+Then the eight displaced stock bytes run and the writer continues.
 """
 from ..assembly import assemble, constant, invoke, jump
 
@@ -50,6 +59,13 @@ TRACKING = 0xC237F688
 TRACKER_LIVE = 0xC23AA024
 SUBJECTS = 0xC237E3E4
 TOUCH_FLAG = 0xC18C7240
+AF_DISPLAY = 0xC237C7B4         # stock AF display block
+AREA_MODE = AF_DISPLAY + 0x44   # 0xC237C7F8: AF-area mode, 6 = auto area
+AUTO_AREA = 6
+DETECT_SELECT = AF_DISPLAY + 0x3FD   # 0x1039CC18: non-zero -> setting 0xC3C, else 0x58B
+DETECT_KEYS = (0x58B, 0xC3C)
+GET_SETTING = 0x10465984        # stock settings getter (r0 = key)
+PEOPLE, ANIMALS = 1, 2
 
 
 def cave_source(choice, get):
@@ -73,6 +89,11 @@ def cave_source(choice, get):
         {c('r1',TRACKER_LIVE)}ldr r0,[r1];cmp r0,#0;beq out;
         {c('r4',TOUCH_FLAG)}ldr r0,[r4];cmp r0,#0;bne out;
         {c('r1',SUBJECTS)}ldr r0,[r1];subs r0,#1;cmp r0,#4;bhi out;
+        @ only with Auto-area AF (people) / (animals), read as the stock frame-column code does
+        {c('r1',AREA_MODE)}ldrb r0,[r1];cmp r0,#{AUTO_AREA};bne out;
+        {c('r1',DETECT_SELECT)}ldrb r1,[r1];{c('r0',DETECT_KEYS[0])}cmp r1,#0;beq detect_key;{c('r0',DETECT_KEYS[1])}
+        detect_key:{invoke(GET_SETTING)}subs r0,#{PEOPLE};cmp r0,#{ANIMALS - PEOPLE};bhi out;
+        {c('r4',TOUCH_FLAG)}
         movs r0,#1;str r0,[r4];dmb ish;
         {c('r1',AF_WORKING)}ldr r1,[r1];cmp r1,#0;beq out;
         movs r1,#1;str r1,[r8,#{ARMED_OFFSET}];
@@ -91,5 +112,5 @@ def add(plan):
     plan.alloc(code)
     plan.edit(SITE, jump(SITE, entry, len(STOCK)), '3D tracking: detection result writer', STOCK)
     plan.features['tracking3d'] = dict(
-        revision=5, site=hex(SITE), enter_tracking_mode=hex(ENTER_TRACKING_MODE), cave=hex(entry | 1), size=len(code), flag=hex(TOUCH_FLAG),
+        revision=6, site=hex(SITE), area_mode=hex(AREA_MODE), detection_keys=[hex(k) for k in DETECT_KEYS], requires='Auto-area AF (people) or (animals)', enter_tracking_mode=hex(ENTER_TRACKING_MODE), cave=hex(entry | 1), size=len(code), flag=hex(TOUCH_FLAG),
         settings_file='WL-3DTRK.CFG', default='off', camera_verified=False)

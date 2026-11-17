@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE = ROOT / 'Z_30_0120.bin'
 
 try:
-    from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE
+    from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
     from unicorn.arm_const import (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R4,
                                    UC_ARM_REG_R11, UC_ARM_REG_SP, UC_ARM_REG_PC, UC_ARM_REG_LR)
 except ImportError:  # pragma: no cover
@@ -30,7 +30,7 @@ class SubjectBoxesTest(unittest.TestCase):
         cls.full = build(cls.stock, 'full')
         cls.alone = build(cls.stock, ['3d-tracking'])
 
-    def run_drawer(self, built=None, on=1, shown=1, tracking=0, phase=2, subjects=(), eyes=(), frame=None, history=()):
+    def run_drawer(self, built=None, on=1, shown=1, tracking=0, phase=2, subjects=(), eyes=(), frame=None, history=(), raw_hist=None):
         from z30_extensions.platform.z30_120 import BASE
         from z30_extensions.features import tracking3d_boxes as tb
         image, report = built or self.full
@@ -52,7 +52,11 @@ class SubjectBoxesTest(unittest.TestCase):
             u.mem_write(tb.STOCK_FRAME, struct.pack('<4h', *frame))
         if history:
             u.mem_write(STATE + tb.HIST, struct.pack('<II', 1, len(history)) + b''.join(struct.pack('<4h', *h) for h in history))
-        log = dict(fills=[], calls=[])
+        if raw_hist is not None:                                 # (active, count) as left by an older pass
+            u.mem_write(STATE + tb.HIST, struct.pack('<II', *raw_hist))
+        log = dict(fills=[], calls=[], overflow=[])
+        end = STATE + tb.HIST + 8 + 8 * tb.MAX_BOXES               # first byte after the record
+        u.hook_add(UC_HOOK_MEM_WRITE, lambda uc, acc, a, sz, v, _: log['overflow'].append(hex(a)) if end <= a < end + 0x100 else None)
         vg = {0x1104: 3, 0x1131: 1, 0x1100: 0x1401, 0x1105: 0x1F01, 0xC1A0: 0xC201}
         paint = [0x77]
 
@@ -85,7 +89,7 @@ class SubjectBoxesTest(unittest.TestCase):
                          (0x4444, 0xBBBB, 0x20008000))
         log['vg'], log['paint'] = vg, paint[0]
         log['hist'] = struct.unpack('<II', u.mem_read(STATE + tb.HIST, 8))
-        log['rects'] = [struct.unpack_from('<4h', u.mem_read(STATE + tb.HIST + 8 + 8 * i, 8)) for i in range(log['hist'][1])]
+        log['rects'] = [struct.unpack_from('<4h', u.mem_read(STATE + tb.HIST + 8 + 8 * i, 8)) for i in range(min(log['hist'][1], tb.MAX_BOXES))]
         return log
 
     @staticmethod
@@ -136,6 +140,33 @@ class SubjectBoxesTest(unittest.TestCase):
     def test_outside_the_shooting_screen_history_is_dropped_untouched(self):
         log = self.run_drawer(phase=4, subjects=[(200, 140, 24, 24)], history=[(50, 60, 110, 120)])
         self.assertEqual((log['fills'], log['calls'], log['hist'][0]), ([], [], 0))
+
+    def test_leaving_the_shooting_screen_clears_the_box_count(self):
+        # review (camera): leaving for a menu kept HIST + 4, the next screen-1 pass appended to it
+        log = self.run_drawer(phase=4, subjects=[(200, 140, 24, 24)], history=[(50, 60, 110, 120)] * 6)
+        self.assertEqual((log['fills'], log['hist']), ([], (0, 0)))
+
+    def test_a_stale_count_never_writes_past_the_record(self):
+        from z30_extensions.features import tracking3d_boxes as tb
+        many = [(40 + 40 * i, 60 + 20 * (i % 3), 20, 20) for i in range(tb.MAX_BOXES)]
+        # the state a build without the fix left behind: no boxes flagged, but a count kept
+        for stale in (6, tb.MAX_BOXES, tb.MAX_BOXES + 5, 0xFFFFFFFF):
+            log = self.run_drawer(subjects=many, raw_hist=(0, stale))
+            self.assertEqual(log['overflow'], [], stale)
+            self.assertEqual(log['hist'], (1, tb.MAX_BOXES), stale)
+            self.assertEqual(log["rects"], [self.box(m[0], m[1], m[2]) for m in many], stale)
+            self.assertEqual(len(log['fills']), 4 * tb.MAX_BOXES, stale)
+
+    def test_screen_1_menu_round_trips_keep_the_record_bounded(self):
+        from z30_extensions.features import tracking3d_boxes as tb
+        many = [(40 + 40 * i, 60 + 20 * (i % 3), 20, 20) for i in range(tb.MAX_BOXES)]
+        hist = None
+        for k in range(4):                                       # screen 1, menu, screen 1, menu ...
+            log = self.run_drawer(subjects=many, raw_hist=hist)
+            self.assertEqual((log['overflow'], log['hist']), ([], (1, tb.MAX_BOXES)), k)
+            log = self.run_drawer(phase=4, subjects=many, raw_hist=log['hist'])
+            self.assertEqual((log['overflow'], log['hist']), ([], (0, 0)), k)
+            hist = log['hist']
 
     def test_eye_first_and_white_only_on_the_focused_eye(self):
         from z30_extensions.features import tracking3d_boxes as tb

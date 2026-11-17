@@ -1,14 +1,17 @@
 # SPDX-License-Identifier: LicenseRef-Wonder-Lantern-Community
 # Copyright (c) 2026 Wonder Lantern Z30 contributors
 # See licenses/Wonder-Lantern.txt and THIRD_PARTY_NOTICES.md.
-"""3D tracking switch (Disable / Enable), saved to WL-3DTRK.CFG; read by tracking3d.py."""
+"""3D tracking switch (Disable / Enable), saved to WL-3DTRK.CFG; read by tracking3d.py.
+
+The Enable row names the prerequisite (review of PR 36): the handover only works
+with the AF-area mode Auto-area AF (people) or (animals) (tracking3d.py, revision 6)."""
 import struct
 from ..assembly import constant as c, invoke as n, assemble
 from .menu_slots import page_slots
 
 PAGE_INDEX = 968   # 965 portrait, 966 NEF compression, 967 gyro e-VR
 OFF, ENABLE = 0, 1
-LABELS = ('Disable', 'Enable')
+LABELS = ('Disable', 'Enable (people/animals)')
 ROWS = len(LABELS)
 TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('trk3d', ROWS)
 from .tracking3d_boxes import SIZE as BOX_SIZE, HOOK_SIZE

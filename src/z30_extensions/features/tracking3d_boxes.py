@@ -82,7 +82,7 @@ def source(f):
         @ left over in screens 2 / 3), so the boxes drawn last time are erased here first.
         @ Outside the shooting screen the canvas belongs to others: forget, never touch.
         {c('r1',UI_SERVICE_PHASE)}ldrb r1,[r1];cmp r1,#1;beq phase_ok;cmp r1,#2;beq phase_ok;
-        movs r0,#0;str r0,[r4,#{HIST}];b out;
+        movs r0,#0;str r0,[r4,#{HIST}];str r0,[r4,#{HIST + 4}];b out;
         phase_ok:
         movs r6,#0;
         ldr r0,[r4];cmp r0,#1;bne need_done;
@@ -112,7 +112,7 @@ def source(f):
         movs r0,#0;{n(CLIP_RESET)}
         {c('r0',VG_BLEND_MODE)}{c('r1',VG_BLEND_SRC)}{n(VG_SETI)}
         @ erase the previous boxes: transparent bars (SRC), as the QEMU underlay probe erased
-        ldr r0,[r4,#{HIST}];cmp r0,#0;beq erased;
+        ldr r0,[r4,#{HIST}];cmp r0,#0;beq forget;      @ no boxes: also drop any stale count
         add r5,r4,#{HIST + 8};ldr r6,[r4,#{HIST + 4}];cmp r6,#{MAX_BOXES};bhi forget;movs r8,#0;
         erase_loop:cmp r6,#0;beq forget;
         ldrsh r0,[r5];ldrsh r1,[r5,#2];ldrsh r2,[r5,#4];ldrsh r3,[r5,#6];bl outline;
@@ -143,6 +143,8 @@ def source(f):
         cmp r2,#720;it gt;movgt r2,#720;cmp r3,#480;it gt;movgt r3,#480;
         sub r12,r2,r0;cmp r12,#{MIN_SIZE};blt box_next;
         sub r12,r3,r1;cmp r12,#{MIN_SIZE};blt box_next;
+        @ the record holds MAX_BOXES boxes: never draw one it cannot remember (and erase)
+        ldr r12,[r4,#{HIST + 4}];cmp r12,#{MAX_BOXES};bhs box_next;
         bl outline;
         @ remember it for the next erase (outline keeps r0-r3)
         ldr r12,[r4,#{HIST + 4}];add r7,r4,#{HIST + 8};add r7,r7,r12,lsl #3;
