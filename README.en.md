@@ -44,6 +44,10 @@ The two presets below fix NEF to one compression type at build time, without a m
 | `nef-uncompressed` | Fixes NEF to uncompressed at build time | [Doc](docs/nef-compression.md), confirmed on a camera |
 | `nef-compressed` | Fixes NEF to compressed (lossy) at build time | [Doc](docs/nef-compression.md), confirmed on a camera |
 
+### Research build: Auto tracking box (not a preset)
+
+`tools/build_auto_arm.py` builds `full` without `gyro-evr`, plus the SD module host and the auto_arm module built in. In photo with Auto-area AF the tracking box comes up by itself, and a half-press then tracks. The photo shooting menu has an "Auto tracking box" row (Enable / Disable, Enable by default). Needs arm-none-eabi-gcc. [Doc](docs/auto-arm.md) (Chinese); confirmed on one camera (2026-11-17).
+
 ## Quick start
 
 ### Stock firmware

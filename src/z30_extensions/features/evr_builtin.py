@@ -58,7 +58,12 @@ def layout(code_size):
     return dict(ctx=ctx, api=api, slot=slot, total=slot + 32)
 
 
-def add(plan, code, choice=None):
+def add(plan, code, choice=None, key=GYRO_KEY, gate=True, runs=2, name='evr_builtin',
+        trigger='e-VR path-1 hook requests; IMU task starts unless the menu says OFF',
+        escape='Boot in photo mode (or menu OFF): the module never starts'):
+    # key / gate / runs (auto_arm, 2026-11-17): the property key the shim answers,
+    # whether autostart drops the request when the choice is OFF, and how many
+    # times the run handler is called. The defaults are gyro e-VR's, unchanged.
     code = bytes(code)
     if not code or len(code) > BUILTIN_MAX or len(code) % 4:
         raise ValueError(f'Built-in module code must be 4-byte aligned and 1..{BUILTIN_MAX} bytes')
@@ -77,7 +82,7 @@ def add(plan, code, choice=None):
     if choice:
         getter = plan.alloc(bytes(32))
         plan.put(getter, assemble(f'''
-            {constant('r12', GYRO_KEY)} cmp r0,r12; beq mine;
+            {constant('r12', key)} cmp r0,r12; beq mine;
             ldr.w pc,={GET_PROPERTY | 1};
             mine: ldr.w pc,={choice | 1};
         ''', getter, 32))
@@ -92,7 +97,7 @@ def add(plan, code, choice=None):
     plan.put(auto, assemble(f'''
         push {{r4-r7,lr}};
         {c('r4', AUTO_CELL)} movs r0,#{BUSY}; str r0,[r4];
-        {f"{c('r0', GYRO_KEY)} {invoke(getter)} cmp r0,#{CHOICE_OFF}; beq idle;" if choice else ''}
+        {f"{c('r0', key)} {invoke(getter)} cmp r0,#{CHOICE_OFF}; beq idle;" if choice and gate else ''}
         {c('r0', lay['total'])} movs r1,#0; {invoke(POOL_ALLOC)}
         cmp r0,#0; beq fail; mov r5,r0; tst r5,#7; bne fail;
         mov r0,r5; {c('r1', blob)} {c('r2', len(code))} {invoke(MEMCPY, thumb=False)}
@@ -109,18 +114,17 @@ def add(plan, code, choice=None):
         cmp r0,#1; bne fail;
         {c('r0', lay['slot'])} ldr r3,[r5,r0]; tst r3,#1; beq fail;
         mov r0,r6; mov r1,r7; blx r3;
-        {c('r0', lay['slot'])} ldr r3,[r5,r0];
-        mov r0,r6; mov r1,r7; blx r3;
+        {f"{c('r0', lay['slot'])} ldr r3,[r5,r0]; mov r0,r6; mov r1,r7; blx r3;" if runs == 2 else ''}
         pop {{r4-r7,pc}};
         fail: {c('r0', FAILED)} str r0,[r4];
         pop {{r4-r7,pc}};
         idle: movs r0,#0; str r0,[r4];
         pop {{r4-r7,pc}};
     ''', auto, 384))
-    plan.features['evr_builtin'] = dict(
+    plan.features[name] = dict(
         cell=hex(AUTO_CELL), code=hex(blob), code_bytes=len(code), autostart=hex(auto),
         layout={k: hex(v) for k, v in lay.items()},
-        trigger='e-VR path-1 hook requests; IMU task starts unless the menu says OFF',
-        property_shim=hex(getter) if choice else None, gyro_key=hex(GYRO_KEY),
-        escape='Boot in photo mode (or menu OFF): the module never starts')
+        trigger=trigger,
+        property_shim=hex(getter) if choice else None, gyro_key=hex(key),
+        escape=escape)
     return dict(autostart=auto, layout=lay)

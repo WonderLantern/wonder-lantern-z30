@@ -11,6 +11,7 @@
 - `src/z30_extensions/features/aspect_mask_trace.py`
 - `src/z30_extensions/features/aspect_trace.py`
 - `src/z30_extensions/features/aspect_ui.py`
+- `src/z30_extensions/features/auto_arm_ui.py`
 - `src/z30_extensions/features/bitrate_ui.py`
 - `src/z30_extensions/date_stamp.py`
 - `src/z30_extensions/features/date_stamp.py`

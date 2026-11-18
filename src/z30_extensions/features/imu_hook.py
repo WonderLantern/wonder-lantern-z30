@@ -27,7 +27,7 @@ STOCK = bytes.fromhex('fff76afc 0128 c7d1')
 IMU_CELL = 0xC1832D48
 
 
-def source(autostart=None):
+def source(autostart=None, boot=False):
     # autostart (evr_builtin): while the module cell is still zero, a good stock
     # read with the built-in request pending starts the built-in module here.
     auto = ''
@@ -36,7 +36,7 @@ def source(autostart=None):
         auto = f'''
         idle: cmp r4, #1; bne stock;
         movw r3, #{AUTO_CELL & 0xFFFF}; movt r3, #{AUTO_CELL >> 16}; ldr r3, [r3];
-        cmp r3, #{REQUESTED}; bne stock;
+        cmp r3, #{0 if boot else REQUESTED}; bne stock;
         ldr.w r12, ={autostart | 1}; blx r12;'''
     return f'''
         push {{r4, r5}};
@@ -54,14 +54,16 @@ def source(autostart=None):
     '''
 
 
-def add(plan, autostart=None):
+def add(plan, autostart=None, boot=False):
+    # boot (auto_arm): start the built-in copy on the first good read after power-on
+    # (cell still 0) instead of waiting for an e-VR request.
     if plan.image.read(SITE, len(STOCK)) != STOCK:
         raise ValueError('Unexpected stock bytes at the IMU hook site')
     if plan.image.words(IMU_CELL, 1) != (0,):
         raise ValueError('IMU hook cell is not zero in stock data')
     size = 128 if autostart else 96
     code = plan.alloc(bytes(size))
-    raw = assemble(source(autostart), code, size)
+    raw = assemble(source(autostart, boot), code, size)
     for target in (ACCEL_READ, SUCCESS, FAILURE) + ((autostart,) if autostart else ()):
         if (target | 1).to_bytes(4, 'little') not in raw:
             raise ValueError('IMU hook lost a stock call or branch target')
@@ -70,5 +72,6 @@ def add(plan, autostart=None):
     plan.features['imu_hook'] = dict(
         site=hex(SITE), code=hex(code), cell=hex(IMU_CELL),
         callback='cb(stock_accel_result r0) in the stock IMU task after its accel read',
-        dormant='Stock call and branches run unchanged while the cell is zero')
+        dormant='Stock call and branches run unchanged while the cell is zero',
+        autostart=('boot' if boot else 'request') if autostart else None)
     return code

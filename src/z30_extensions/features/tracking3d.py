@@ -71,10 +71,10 @@ TOUCH_FLAG = 0xC18C7240
 AF_DISPLAY = 0xC237C7B4         # stock AF display block
 AREA_MODE = AF_DISPLAY + 0x44   # 0xC237C7F8: AF-area mode, 6 = auto area
 AUTO_AREA = 6
-DETECT_SELECT = AF_DISPLAY + 0x3FD   # 0x1039CC18: non-zero -> photo key, else movie key
+DETECT_SELECT = AF_DISPLAY + 0x3FD   # 0x1039CC18; camera (2026-11-17, Z30 C 1.20): 0 in photo, 1 in movie
 # auto-area sub-mode (0 plain, 1 people, 2 animals): movie 0x58C, photo 0xC3D
 # (setters 0x1042B30E / 0x1042B2D8; 0x58B / 0xC3C are the wide-area L sub-modes)
-DETECT_KEYS = (0x58C, 0xC3D)
+DETECT_KEYS = (0xC3D, 0x58C)   # [0] when DETECT_SELECT is 0 (photo), [1] otherwise (movie)
 GET_SETTING = 0x10465984        # stock settings getter (r0 = key)
 PEOPLE, ANIMALS = 1, 2
 
