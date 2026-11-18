@@ -95,7 +95,34 @@ class TableTest(unittest.TestCase):
                 self.assertEqual(at(base + 4, col), 0x0204)
         self.assertEqual(at(fc.AF_C + fc.IN_FOCUS, fc.PLAIN_AUTO), fc.GREEN)
         for col in (fc.SUBJECT, fc.SCREEN1, fc.TRACKING):
+            for state in (fc.IDLE, fc.SPECIAL, fc.WORKING):
+                self.assertEqual(at(fc.AF_A_S + state, col), fc.WHITE, (state, col))
+            self.assertEqual(at(fc.AF_A_S + fc.IN_FOCUS, col), fc.GREEN)
+            for state in (fc.IDLE, fc.SPECIAL):
+                self.assertEqual(at(fc.AF_A_C + state, col), fc.WHITE, (state, col))
+            for state in (fc.WORKING, fc.IN_FOCUS):
+                self.assertEqual(at(fc.AF_A_C + state, col), fc.GREEN, (state, col))
+            for group in (fc.AF_A_S, fc.AF_A_C):
+                self.assertEqual(at(group + 4, col), 0x0204)
+        for col in (fc.SUBJECT, fc.SCREEN1, fc.TRACKING):
             self.assertEqual(at(fc.AF_F + fc.IDLE, col), fc.WHITE)
+
+    def test_no_yellow_left_in_the_subject_and_tracking_columns(self):
+        copy = self.words(self.image, int(self.report['features']['af_frame_colour_control']['table'], 16))
+        for row in range(25):
+            for col in (fc.SUBJECT, fc.SCREEN1, fc.TRACKING):
+                self.assertNotIn(copy[row * fc.COLUMNS + col] & 0xFF, (0, 5), (row, col))
+
+    def test_af_a_rows_are_the_ones_the_stock_lookup_picks(self):
+        # 0x1039C930: focus mode 3 (AF-A) with the byte at +5 = 1 uses state codes 0xF..0x13,
+        # = 2 uses 0x14..0x18 (movw-free movs / mov.w immediates in the two branches).
+        from z30_extensions.platform.z30_120 import BASE
+        at = lambda a, n: self.stock[a - BASE:a - BASE + n]
+        self.assertEqual(at(0x1039C97A, 4), bytes.fromhex('bef1030f'))     # cmp.w lr,#3
+        self.assertEqual(at(0x1039C9E2, 4), bytes.fromhex('92f8 05e0'.replace(' ', '')))   # ldrb.w lr,[r2,#5]
+        self.assertEqual(at(0x1039C9FA, 4), bytes.fromhex('4ff0130 3'.replace(' ', '')))   # mov.w r3,#0x13
+        self.assertEqual(at(0x1039CA2A, 4), bytes.fromhex('4ff01803'))     # mov.w r3,#0x18
+        self.assertEqual((fc.AF_A_S, fc.AF_A_C), (0x13 - 4, 0x18 - 4))
 
     @unittest.skipUnless(Uc, 'needs Unicorn')
     def test_lookup_hook_switches_tables_and_keeps_the_stock_contract(self):

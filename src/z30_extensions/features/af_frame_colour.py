@@ -2,13 +2,15 @@
 # Copyright (c) 2026 Wonder Lantern Z30 contributors
 # See licenses/Wonder-Lantern.txt and THIRD_PARTY_NOTICES.md.
 """AF frame colour: green in focus / red not in focus / white otherwise for the
-tracking box and the subject (person / animal) box, in AF-S and AF-C alike; the
+tracking box and the subject (person / animal) box, in AF-S, AF-C and AF-A alike; the
 plain auto-area AF-C frames turn green in focus. See docs/af-frame-colour.md.
 
 Stock (static analysis, camera snapshot SN000119): 0x1039C930 picks the live view
 AF frame style from a table at 0x107277B0, 29 rows x 11 columns of u16:
-- row = state code, five per focus mode (0xC237C7F9: 1 AF-S rows 0..4, 2 AF-C
-  rows 5..9, 3 AF-A, 4 ...): +0 AF not working, +1 a special state, +2 AF
+- row = state code, five per group (0x1039C930 picks the group from the focus mode
+  0xC237C7F9: 1 AF-S rows 0..4, 2 AF-C rows 5..9, 4 AF-F rows 10..14, 3 AF-A rows 15..19
+  when the byte at +5 of the same block is 1 (AF-S like) and rows 20..24 when it is 2
+  (AF-C like)): +0 AF not working, +1 a special state, +2 AF
   working with no result yet, +3 in focus, +4 not in focus (focus result
   0xC25A1E70: 2 / 1);
 - column = frame kind (0x1039CC14, from AF-area mode 0xC237C7F8 and the tracking
@@ -27,6 +29,7 @@ The edits only change table entries; no code runs.
 TABLE = 0x107277B0
 COLUMNS = 11
 AF_S, AF_C, AF_F = 0, 5, 10     # first row of each focus mode (AF-F: movie, focus mode byte 4)
+AF_A_S, AF_A_C = 15, 20         # AF-A (focus mode byte 3): AF-S like / AF-C like (byte +5 = 1 / 2)
 IDLE, SPECIAL, WORKING, IN_FOCUS = 0, 1, 2, 3
 PLAIN_AUTO, SUBJECT, SCREEN1, TRACKING = 7, 8, 9, 10
 WHITE, GREEN = 0x0103, 0x0102    # shown, colour 3 / 2
@@ -67,6 +70,24 @@ EDITS = (
     (AF_C + SPECIAL, TRACKING, 0x0105, WHITE),
     (AF_F + SPECIAL, SUBJECT, 0x0105, WHITE), (AF_F + SPECIAL, SCREEN1, 0x0105, WHITE),
     (AF_F + SPECIAL, TRACKING, 0x0105, WHITE),
+    # PR 36 review (camera, AF-A): the subject / tracking boxes were yellow (colour 0 / 5)
+    # because only AF-S, AF-C and AF-F rows were edited. 0x1039C930 sends AF-A to rows
+    # 15..19 (byte +5 = 1) or 20..24 (byte +5 = 2). Rows 15..19 have the AF-S layout (in
+    # focus is already green) and follow the AF-S rule; rows 20..24 have the AF-C layout
+    # (in focus is colour 0) and follow the AF-C rule, working and in focus both green so
+    # the box does not flicker between AF cycles. Not in focus stays the stock red.
+    (AF_A_S + IDLE, SUBJECT, 0x0100, WHITE), (AF_A_S + IDLE, TRACKING, 0x0100, WHITE),
+    (AF_A_S + SPECIAL, SUBJECT, 0x0105, WHITE), (AF_A_S + SPECIAL, SCREEN1, 0x0105, WHITE),
+    (AF_A_S + SPECIAL, TRACKING, 0x0105, WHITE),
+    (AF_A_S + WORKING, SUBJECT, 0x0100, WHITE), (AF_A_S + WORKING, SCREEN1, 0x0100, WHITE),
+    (AF_A_S + WORKING, TRACKING, 0x0100, WHITE),
+    (AF_A_C + IDLE, SUBJECT, 0x0100, WHITE), (AF_A_C + IDLE, TRACKING, 0x0100, WHITE),
+    (AF_A_C + SPECIAL, SUBJECT, 0x0105, WHITE), (AF_A_C + SPECIAL, SCREEN1, 0x0105, WHITE),
+    (AF_A_C + SPECIAL, TRACKING, 0x0105, WHITE),
+    (AF_A_C + WORKING, SUBJECT, 0x0100, GREEN), (AF_A_C + WORKING, SCREEN1, 0x0100, GREEN),
+    (AF_A_C + WORKING, TRACKING, 0x0100, GREEN),
+    (AF_A_C + IN_FOCUS, SUBJECT, 0x0100, GREEN), (AF_A_C + IN_FOCUS, SCREEN1, 0x0100, GREEN),
+    (AF_A_C + IN_FOCUS, TRACKING, 0x0100, GREEN),
 )
 # v42 kept the AF-C subject box (column 8) at its stock colour while half-pressed
 # (with colour 2 its eye-selection arrows looked jagged, v41); v44 restores green
