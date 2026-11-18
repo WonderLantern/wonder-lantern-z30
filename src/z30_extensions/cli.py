@@ -7,7 +7,7 @@ from .build import build, PRESETS, resolve_presets
 from .container import extract_eg, CONTAINER_SHA256
 
 PRESET_LABELS = {
-    'full': '全部十二项功能，包含自定义画幅与半透明遮幅、胶片风格日期水印、竖拍显示和 NEF 压缩菜单',
+    'full': '全部十五项功能，包含自定义画幅与半透明遮幅、胶片风格日期水印、竖拍显示、NEF 压缩菜单、陀螺仪电子防抖、3D 跟踪及对焦框颜色',
     'liveview-dual': '直方图与水平仪同屏，新增全信息 DISP 页',
     'shutter-sound': '自定义电子快门声音',
     'm900': 'M 档 900 秒曝光',
@@ -22,6 +22,9 @@ PRESET_LABELS = {
     'nef-compressed': '实验性：NEF 固定为压缩（有损）（实机已确认变为 Lossy type 2）；不包含在 full 中，与 full 同选时替换其中的 nef-menu',
     'nef-menu': '实验性：扩展菜单中选择 NEF 压缩（无失真压缩/压缩/未压缩），保存到 WL-NEF.CFG；包含在 full 中，三个选项实机已确认',
     'date-stamp': '在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，竖拍自动转向，默认关闭；包含在 full 中',
+    'gyro-evr': '陀螺仪电子防抖：录像模式下开启电子减震即生效，修正偏航、俯仰、滚转，与镜头 VR 协同；自定义菜单可选标准/增强/原厂裁切/关闭；包含在 full 中',
+    '3d-tracking': '3D 跟踪：按 OK 或半按快门开始的跟踪，识别到人物或动物后像触摸跟踪一样转为主体识别（细框），半按时也有效；照片拍摄菜单里选关闭/开启，默认关闭；包含在 full 中',
+    'af-frame-colour': '对焦框颜色改为类似尼康 EXPEED 7 机型（Z9、Z8、Z6III 等）的风格：跟踪框和人物 / 动物框平时白色，半按对上绿色、没对上红色，AF-S 和 AF-C 相同；录像模式的人物 / 动物框为白色；AF-C 普通自动区域框对上时绿色；其他框不变；照片拍摄菜单里可选开启 / 关闭（默认开启）；包含在 full 中',
 }
 
 
@@ -69,7 +72,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('feature', nargs='*', metavar='PRESET',
                         help='Combine presets with spaces: ' + ', '.join(PRESETS) +
-                             '; full enables twelve features including wifi-5ghz (all valid profiles US/-1), date-stamp, portrait-ui and nef-menu; '
+                             '; full enables fifteen features including wifi-5ghz (all valid profiles US/-1), date-stamp, portrait-ui, nef-menu, gyro-evr, 3d-tracking and af-frame-colour; '
                              'nef-uncompressed and nef-compressed are optional, and replace the nef-menu inside full; '
                              'aspect-profiles includes a translucent live-view mask; '
                              'photo-zebra includes an independent photo live-view switch; '

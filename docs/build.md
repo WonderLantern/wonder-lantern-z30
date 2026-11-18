@@ -1,5 +1,7 @@
 # 从原始固件包构建功能扩展
 
+2026-11-11 新增 `gyro-evr`（陀螺仪电子防抖）并纳入 `full`；2026-11-13 上游加入 `portrait-ui`、2026-11-14 上游加入 `nef-menu`、同日新增 `3d-tracking`（[3D 跟踪](3d-tracking.md)）后共十四项功能（2026-11-14 再加 `af-frame-colour`，[对焦框颜色](af-frame-colour.md)，共十五项）；见[陀螺仪电子防抖](gyro-evr.md)。2026-11-12 起 `gyro-evr` 带有自定义菜单页（标准 / 增强 / 原厂裁切 / 关闭；2026-11-14 去掉标准 (RS)），单独选择时会自动带上 `shutter-sound` 菜单框架。
+
 2026-11-03 `date-stamp`（JPEG 胶片风格日期水印）纳入 `full`，机内默认关闭；SD 模块宿主不再作为构建预设提供，`full` 不再包含它。见[日期水印说明](date-stamp.md)。
 
 2026-11-02 新增 `date-stamp`。
@@ -9,7 +11,7 @@
 
 各功能的机身验证覆盖范围见专题文档，离线结果与硬件验证分别记录。
 
-当前用户流程只需准备原始 Z30 C 1.20 固件包和本项目 patch 程序。默认 full 包含同屏、自定义电子快门声音、M 档 900 秒曝光、MTP 加速、视频自动方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz 和日期水印，不包含状态页面。
+当前用户流程只需准备原始 Z30 C 1.20 固件包和本项目 patch 程序。默认 full 包含同屏、自定义电子快门声音、M 档 900 秒曝光、MTP 加速、视频自动方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印和陀螺仪电子防抖，不包含状态页面。
 
 ## 发布 Windows 图形界面程序
 
@@ -35,13 +37,13 @@ New-Item -ItemType Directory -Force output | Out-Null
 python patch.py --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 ```
 
-可自由组合 `full`、`liveview-dual`、`shutter-sound`、`m900`、`mtp-fast`、`video-rot`、`bitrate-slowmo-uncap`、`aspect-profiles`、`photo-zebra`、`wifi-5ghz` 和 `date-stamp`。菜单第 6 项为视频方向，第 7 项为高码率与慢动作扩展，第 11 项为日期水印。旧别名 `modular` 保留命令行和手动输入兼容，不在菜单中显示。终端中省略预设会显示多选菜单，输入编号或名称（空格或逗号分隔）；直接回车选择 full。非交互脚本省略预设时仍默认 full，可用 `--interactive` 强制显示菜单。命令行的多个预设用空格分隔：
+可自由组合 `full`、`liveview-dual`、`shutter-sound`、`m900`、`mtp-fast`、`video-rot`、`bitrate-slowmo-uncap`、`aspect-profiles`、`photo-zebra`、`wifi-5ghz`、`date-stamp` 和 `gyro-evr`。菜单第 6 项为视频方向，第 7 项为高码率与慢动作扩展，第 11 项为日期水印，第 12 项为竖拍显示，第 13 项为陀螺仪电子防抖，第 14 项为 3D 跟踪。旧别名 `modular` 保留命令行和手动输入兼容，不在菜单中显示。终端中省略预设会显示多选菜单，输入编号或名称（空格或逗号分隔）；直接回车选择 full。非交互脚本省略预设时仍默认 full，可用 `--interactive` 强制显示菜单。命令行的多个预设用空格分隔：
 
 ```powershell
 python patch.py liveview-dual m900 mtp-fast --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 ```
 
-`full` 展开为全部十二项功能：同屏、M900、快门声音、MTP 加速、视频方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印、竖拍显示和 NEF 压缩菜单（`nef-menu`）。`nef-uncompressed` 和 `nef-compressed` 不在 `full` 中，和 `full` 一起选时替换其中的 `nef-menu`，三者互斥。`modular` 现为同屏、M900 和快门声音；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra wifi-5ghz date-stamp portrait-ui nef-menu` 与 full 启用同一功能集合。SD 模块宿主的代码保留给研究工具，通过 `build(..., module_host=True)` 构建，不再出现在 patch 程序和图形界面中。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
+`full` 展开为全部十五项功能：同屏、M900、快门声音、MTP 加速、视频方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印、竖拍显示、陀螺仪电子防抖（`gyro-evr`）、3D 跟踪（`3d-tracking`）、对焦框颜色（`af-frame-colour`）和 NEF 压缩菜单（`nef-menu`）。`nef-uncompressed` 和 `nef-compressed` 不在 `full` 中，和 `full` 一起选时替换其中的 `nef-menu`，三者互斥。`modular` 现为同屏、M900 和快门声音；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra wifi-5ghz date-stamp portrait-ui gyro-evr 3d-tracking af-frame-colour nef-menu` 与 full 启用同一功能集合。SD 模块宿主的代码保留给研究工具，通过 `build(..., module_host=True)` 构建，不再出现在 patch 程序和图形界面中。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
 
 ### 视频码率与慢动作限制
 
@@ -131,7 +133,7 @@ python tools/verify_extended_features.py --source path/to/Z_30_0120.bin
 
 输出为独立 EG 模块，不重建外层 Z_30_0120.bin。固件版本菜单保留原厂 1.20，构建身份通过 JSON 报告的 SHA-256 核对。该模块的机身安装已完成实机测试。
 
-默认组合包含同屏、自定义声音、M900、MTP 加速、视频自动方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz 和日期水印。900 秒补丁改变扩展标志读取，不写入其保存值；原厂模式判断和曝光路径保留。视频快门窗口在构建后核对为原厂字节。
+默认组合包含同屏、自定义声音、M900、MTP 加速、视频自动方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印和陀螺仪电子防抖。900 秒补丁改变扩展标志读取，不写入其保存值；原厂模式判断和曝光路径保留。视频快门窗口在构建后核对为原厂字节。
 
 默认 `full` 构建不包含 SD 模块宿主，不添加状态页、计数、CFW 版本标记或视频慢快门。离线检查不能保证真实显示、声音或曝光行为。
 

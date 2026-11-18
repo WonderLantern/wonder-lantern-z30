@@ -9,10 +9,10 @@ from .sound_layout import *
 from .sound_audio import audio_code
 from .sound_ui import ui_code
 
-ROOT_ORDER = ('aspect', 'zebra', 'portrait', 'stamp', 'nef', 'bitrate', 'sound', 'modules')
+ROOT_ORDER = ('aspect', 'zebra', 'portrait', 'stamp', 'nef', 'bitrate', 'gyro', 'sound', 'modules')
 
 
-def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, nef=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
+def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
     if precapture_probe and (wireless or bitrate):
@@ -42,7 +42,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     sizes['page_return'] = 96
     if aspect:
         sizes.update(ensure=1024, getter=512, route=448, row=384)
-    grouped = bool(modules or bitrate or aspect or zebra or stamp or portrait or nef)
+    grouped = bool(modules or bitrate or aspect or zebra or stamp or portrait or nef or gyro or trk3d or afcol)
     if grouped:
         sizes.update(ensure=1280, getter=640, route=640, action=1280)
     if stamp:
@@ -52,7 +52,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
                      route=sizes['route'] + 64, action=sizes['action'] + 128)
     # Research builds keep their single-purpose page inside the custom menu only.
     native_menus = () if wireless or lut_sd or precapture_probe else tuple(
-        menu for menu in NATIVE_MENUS if any(dict(aspect=aspect, zebra=zebra, portrait=portrait, stamp=stamp, bitrate=bitrate)[key] for key in menu[3]))
+        menu for menu in NATIVE_MENUS if any(dict(aspect=aspect, zebra=zebra, portrait=portrait, stamp=stamp, bitrate=bitrate, trk3d=trk3d, afcol=afcol)[key] for key in menu[3]))
     if native_menus:
         sizes.update(row=768)
         for name, _, _, keys in native_menus:
@@ -145,6 +145,18 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     if nef:
         from . import nef_ui as nu
         register('nef', nu, 3, restore=('nef_restore',))
+    if gyro:
+        from . import gyro_ui as gu
+        register('gyro', gu, gu.ROWS, restore=('gyro_restore',))
+    if trk3d:
+        # Native-only page: a direct row in the stock photo shooting menu. The custom
+        # root already holds MAX_ROWS rows in full, so this page has no root row.
+        from . import tracking3d_ui as fu
+        register('trk3d', fu, fu.ROWS, restore=('trk3d_restore',))
+    if afcol:
+        # Native-only page too: a direct row in the stock photo shooting menu.
+        from . import af_frame_colour_ui as au_col
+        register('afcol', au_col, au_col.ROWS, restore=('afcol_restore',))
     by_key = {page['key']: page for page in pages}
     # Scan stock row IDs now: direct rows need theirs before the row hook assembles.
     used = set()
@@ -172,6 +184,8 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
                      template=child_templates[SOUND_GROUP_INDEX],
                      labels={'sound': SOUND_GROUP_TITLE_SLOT}, values={'sound': ENABLED_VALUE_SLOT})
         for page in pages:
+            if page['key'] not in order:
+                continue
             page['root_row'] = order.index(page['key'])
             group['labels'][page['key']], group['values'][page['key']] = page['root_slot'], page['value_slot']
         if modules:

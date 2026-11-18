@@ -29,7 +29,8 @@ def ui_code(f, strings, fixed, file_names, errors, file_ids, switch_ids, anchor_
         # A native shooting-menu row may have pointed this page's parent at the tab container.
         parent = (f"{constant('r0',page['page_offset'])}add r0,r4,r0;add r1,r4,#{PAGE_OFFSET};str r1,[r0,#4];"
                   if page.get('direct') else '')
-        action_extra = f"cmp r5,#{page['root_row']};bne not_{key}_root;{parent}{invoke(f[fn+'_open'])}b done;not_{key}_root:" + action_extra
+        if 'root_row' in page:   # native-only pages (no custom root row) open from their stock menu row
+            action_extra = f"cmp r5,#{page['root_row']};bne not_{key}_root;{parent}{invoke(f[fn+'_open'])}b done;not_{key}_root:" + action_extra
     c = constant
     def call(name): return invoke(f[name])
     native = lambda address: invoke(address, thumb=address != 0x10199bdc)

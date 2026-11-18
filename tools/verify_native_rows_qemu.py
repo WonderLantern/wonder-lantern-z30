@@ -17,9 +17,10 @@ from z30_extensions.features.ui_text import TRANSLATIONS
 TAB = 0xc1832d50
 TAB_X, PHOTO_TAB_Y = 32, 90
 EVENT_UP, EVENT_DOWN, EVENT_RIGHT = 0x253, 0x254, 0x25b
-LABELS = dict(aspect='Photo aspect', zebra='Photo zebra', portrait='Portrait UI', stamp='Date stamp', bitrate='Video bitrate')
+LABELS = dict(aspect='Photo aspect', zebra='Photo zebra', portrait='Portrait UI', stamp='Date stamp', bitrate='Video bitrate',
+              trk3d='3D tracking', afcol='AF frame colour')
 # A choice that writes the record without depending on the area of the current lens.
-CHOICE = {'aspect': 2, 'zebra': 1, 'portrait': 1, 'stamp': 1, 'bitrate': 1}
+CHOICE = {'aspect': 2, 'zebra': 1, 'portrait': 1, 'stamp': 1, 'bitrate': 1, 'trk3d': 1, 'afcol': 1}
 
 
 def main():
@@ -222,6 +223,14 @@ def main():
                 assert active() == menu_object, (key, 'after choice', hex(active()))
                 s.run_for(1)
                 frame(f'{name}-{key}-4-after-choice')
+                if key in ('trk3d', 'afcol'):
+                    # Native-only pages (the custom root is full): the choice is saved in the page state.
+                    control = report['features']['tracking3d_control' if key == 'trk3d' else 'af_frame_colour_control']
+                    assert word(state+control['state_offset']) == choice, (key, word(state+control['state_offset']))
+                    observations.append(dict(menu=name, key=key, row=row, label=label, state=choice))
+                    s.audit.append(dict(native_row=observations[-1]))
+                    s.write_audit()
+                    continue
 
                 # Opened from the custom menu the page answers to the custom menu again.
                 s.input(int(sound['functions']['open'], 16) & ~1, [])

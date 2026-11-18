@@ -35,7 +35,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 
 | 编号 | 预设 | 内容 |
 | --- | --- | --- |
-| 1 | `full` | 全部十二项：同屏＋快门声音＋M900＋MTP 加速＋视频方向＋高码率与慢动作扩展＋多画幅＋照片斑马纹＋Wi-Fi 5 GHz＋日期水印＋竖拍显示＋NEF 压缩菜单 |
+| 1 | `full` | 全部十五项：同屏＋快门声音＋M900＋MTP 加速＋视频方向＋高码率与慢动作扩展＋多画幅＋照片斑马纹＋Wi-Fi 5 GHz＋日期水印＋竖拍显示＋陀螺仪电子防抖＋3D 跟踪＋对焦框颜色＋NEF 压缩菜单 |
 | 2 | `liveview-dual` | 直方图与水平仪同屏，新增全信息 DISP 页 |
 | 3 | `shutter-sound` | 自定义电子快门声音 |
 | 4 | `m900` | M 档 900 秒曝光 |
@@ -47,9 +47,12 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 | 10 | `wifi-5ghz` | 全部 22 个有效配置请求 US/-1，5 GHz 地区解锁；包含在 full 中，也可单独选择 |
 | 11 | `date-stamp` | JPEG 胶片风格日期水印，五种格式、四种颜色和柔光，竖拍自动转向；包含在 full 中，菜单里默认关闭，见[日期水印说明](docs/date-stamp.md) |
 | 12 | `portrait-ui` | 竖拿相机时照片取景信息改为竖版，转动后自动重排；包含在 full 中，菜单里默认关闭，见[竖拍显示说明](docs/portrait-ui.md) |
-| 13 | `nef-menu` | 扩展菜单里选择 NEF 压缩类型（无失真压缩／压缩／未压缩），保存到 `WL-NEF.CFG`；包含在 full 中，12/14 位下三个选项实机已确认，见[NEF 压缩说明](docs/nef-compression.md) |
-| 14 | `nef-uncompressed` | 构建时把 NEF 固定为未压缩，没有菜单；不包含在 full 中，和 full 一起选时替换其中的 `nef-menu`；实机已确认 |
-| 15 | `nef-compressed` | 构建时把 NEF 固定为压缩（有损），没有菜单；不包含在 full 中，和 full 一起选时替换其中的 `nef-menu`；实机已确认 |
+| 13 | `gyro-evr` | 陀螺仪电子防抖：录像时打开电子减震即生效；扩展菜单选标准 / 增强 / 原厂裁切 / 关闭；包含在 full 中，见[陀螺仪电子防抖](docs/gyro-evr.md) |
+| 14 | `3d-tracking` | 3D 跟踪：按 OK 或半按快门开始的跟踪，识别到人物或动物后像触摸跟踪一样转为主体识别（细框）；照片拍摄菜单里选关闭 / 开启，默认关闭；包含在 full 中，见[3D 跟踪](docs/3d-tracking.md) |
+| 15 | `af-frame-colour` | 对焦框颜色改为类似尼康 EXPEED 7 机型（Z9、Z8、Z6III 等）的风格：跟踪框和人物 / 动物框平时白色，半按对上绿色、没对上红色，AF-S 和 AF-C 相同；录像模式的人物 / 动物框为白色；AF-C 普通自动区域框对上时绿色；其他框不变；照片拍摄菜单里可选开启 / 关闭（默认开启），没有菜单；包含在 full 中，见[对焦框颜色](docs/af-frame-colour.md)  |
+| 16 | `nef-menu` | 扩展菜单里选择 NEF 压缩类型（无失真压缩／压缩／未压缩），保存到 `WL-NEF.CFG`；包含在 full 中，12/14 位下三个选项实机已确认，见[NEF 压缩说明](docs/nef-compression.md) |
+| 17 | `nef-uncompressed` | 构建时把 NEF 固定为未压缩，没有菜单；不包含在 full 中，和 full 一起选时替换其中的 `nef-menu`；实机已确认 |
+| 18 | `nef-compressed` | 构建时把 NEF 固定为压缩（有损），没有菜单；不包含在 full 中，和 full 一起选时替换其中的 `nef-menu`；实机已确认 |
 
 例如输入 `2 4 5` 或 `liveview-dual,m900,mtp-fast`；输入 `1` 或直接回车选完整功能 full，重复功能自动去重。
 

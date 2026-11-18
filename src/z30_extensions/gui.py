@@ -18,7 +18,7 @@ OUTPUT_STEM = 'EG209020'
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
-    'full': 'All twelve features, including aspect profiles, the film-style date stamp, the portrait layout and the NEF compression menu',
+    'full': 'All fifteen features, including aspect profiles, the film-style date stamp, the portrait layout, the NEF compression menu, gyro e-VR, 3D tracking and the AF frame colours',
     'liveview-dual': 'Histogram and level together on a new full-info DISP page',
     'shutter-sound': 'Custom electronic shutter sound',
     'm900': '900-second exposure in M mode',
@@ -33,6 +33,9 @@ PRESET_LABELS_EN = {
     'nef-compressed': 'Experimental: NEF fixed to compressed (lossy), confirmed on the camera as Lossy type 2; not in full, replaces the nef-menu inside full',
     'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; included in full, all three choices confirmed on the camera',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
+    'gyro-evr': 'Gyro e-VR: in-body gyro stabilization in movie mode when electronic VR is on; yaw, pitch and roll, cooperates with lens VR; Extensions menu Standard/Enhanced/Native crop/OFF; included in full',
+    '3d-tracking': '3D tracking: tracking started with OK or a half-press hands over to a detected person or animal (the fine subject box) as touch tracking does, also during a half-press; photo shooting menu Disable/Enable, OFF by default; included in full',
+    'af-frame-colour': 'AF frame colours in the style of Nikon EXPEED 7 cameras (Z9, Z8, Z6III and others): the tracking and person / animal boxes are white, green when a half-press focuses and red when it does not, in AF-S and AF-C alike; the movie-mode person / animal box is white; plain auto-area AF-C frames turn green in focus; other frames unchanged; photo shooting menu Enable / Disable (Enable by default); included in full',
 }
 
 TEXT = {

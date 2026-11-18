@@ -39,7 +39,13 @@ FUNCTION_SIZES = dict(module_get=128, module_labels=512, module_open=128,
 
 
 def prepare(plan, f, text_resources):
-    for name, size in FUNCTION_SIZES.items():
+    # Research option: a built-in EVRSTAB copy (evr_builtin) that the Run row
+    # drives while no SD module is loaded. None keeps the stock host unchanged.
+    builtin = getattr(plan, 'evr_builtin_layout', None)
+    sizes = dict(FUNCTION_SIZES)
+    if builtin:
+        sizes.update(module_run=448, module_load=2112)
+    for name, size in sizes.items():
         f[name] = plan.alloc(bytes(size))
     api = plan.alloc(struct.pack('<5I', ABI, API_BYTES, 0x10465985,
                                  f['module_set_text'] | 1, f['module_set_handler'] | 1))
@@ -111,8 +117,14 @@ def prepare(plan, f, text_resources):
         good: mvn r0,#0; str r0,[r4,#{FD}]; movs r0,#0; str r0,[r4,#{FILE_STATE}]; movs r0,#1; b done;
         bad: movs r0,#0; done: pop {{r4,pc}};
     '''
+    guard = ''
+    if builtin:
+        from .evr_builtin import AUTO_CELL
+        guard = (f"{c('r0', AUTO_CELL)} ldr r0,[r0]; {c('r1', 0xC0000000)} cmp r0,r1; "
+                 f"bhs builtin_busy;")
     code['module_load'] = f'''
         push {{r4-r11,lr}}; sub sp,#12; {call('module_get')} mov r4,r0; cmp r4,#0; beq bad_return;
+        {guard}
         ldr r0,[r4,#{PHASE}]; cmp r0,#2; beq already;
         cmp r0,#0; bne bad_return;
         ldr r0,[r4,#{ALLOCATION}]; cmp r0,#0; beq close_pending;
@@ -164,6 +176,7 @@ def prepare(plan, f, text_resources):
         retain_failed: movs r8,#12;
         failed: str r8,[r4,#{ERROR}]; movs r0,#0; str r0,[r4,#{PHASE}]; b bad_return;
         already: movs r0,#9; str r0,[r4,#{ERROR}]; b bad_return;
+        {"builtin_busy: movs r0,#11; str r0,[r4,#" + str(ERROR) + "]; b bad_return;" if builtin else ""}
         retained: movs r0,#12; str r0,[r4,#{ERROR}];
         bad_return: movs r0,#0;
         done: add sp,#12; pop {{r4-r11,pc}};
@@ -192,17 +205,36 @@ def prepare(plan, f, text_resources):
         movs r0,#1; b done;
         bad: movs r0,#0; done: pop {{r4-r8,pc}};
     '''
+    regs = '{r4-r6,lr}' if builtin else '{r4,lr}'
+    pops = '{r4-r6,pc}' if builtin else '{r4,pc}'
+    fallback = f'bad: movs r0,#0; pop {pops};'
+    if builtin:
+        from .evr_builtin import AUTO_CELL
+        # No SD module: drive the built-in copy with its own API and context,
+        # then show its status text (context +8, NUL within 40) on the page.
+        fallback = f'''
+        bad: {c('r0', AUTO_CELL)} ldr r5,[r0]; {c('r1', 0xC0000000)} cmp r5,r1; blo none;
+        cmp r4,#0; beq none;
+        {c('r0', builtin['slot'])} ldr r3,[r5,r0]; tst r3,#1; beq none;
+        {c('r0', builtin['api'])} add r0,r5,r0; {c('r1', builtin['ctx'])} add r1,r5,r1; blx r3;
+        mov r6,r0;
+        add r0,r4,#{TEXT}; {c('r1', builtin['ctx'] + 8)} add r1,r5,r1; movs r2,#{MAX_TEXT - 1};
+        {native(0x10199BDC)} movs r0,#0; strb r0,[r4,#{TEXT + MAX_TEXT - 1}];
+        cmp r6,#1; ite eq; moveq r1,#0; movne r1,#10; str r1,[r4,#{ERROR}];
+        mov r0,r6; pop {{r4-r6,pc}};
+        none: movs r0,#0; pop {{r4-r6,pc}};
+        '''
     code['module_run'] = f'''
-        push {{r4,lr}}; {call('module_get')} mov r4,r0; cmp r4,#0; beq bad;
+        push {regs}; {call('module_get')} mov r4,r0; cmp r4,#0; beq bad;
         ldr r0,[r4,#{PHASE}]; cmp r0,#2; bne bad;
         ldr r3,[r4,#{HANDLER}]; cmp r3,#0; beq bad;
         movs r0,#3; str r0,[r4,#{PHASE}]; {c('r0',api)} add r1,r4,#{CONTEXT}; blx r3;
         cmp r0,#1; ite eq; moveq r1,#0; movne r1,#10;
-        str r1,[r4,#{ERROR}]; movs r1,#2; str r1,[r4,#{PHASE}]; pop {{r4,pc}};
-        bad: movs r0,#0; pop {{r4,pc}};
+        str r1,[r4,#{ERROR}]; movs r1,#2; str r1,[r4,#{PHASE}]; pop {pops};
+        {fallback}
     '''
     for name, source in code.items():
-        raw = assemble(source, f[name], FUNCTION_SIZES[name])
+        raw = assemble(source, f[name], sizes[name])
         plan.put(f[name], raw)
     validator = validator_code(f['module_validate'])
     sync = sync_shared_code(f['module_sync'])

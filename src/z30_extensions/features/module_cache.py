@@ -7,12 +7,12 @@ is not a liveness check, and timeout/error behavior was not validated.
 from ..thumb import Thumb
 
 
-def sync_shared_code(address):
+def sync_shared_code(address, max_code=16384):
     a=Thumb(address)
     a.emit('f0b5 83b0 0446 0d46')
     a.emit('002c');a.branch(0,'reject')
     a.emit('002d');a.branch(0,'reject')
-    a.load(0,'max_code',16384)
+    a.load(0,'max_code',max_code)
     a.emit('8542');a.branch(8,'reject')
     a.emit('6019');a.branch(2,'reject')
     a.load(6,'smp_registry',0xc2abc8b8)
