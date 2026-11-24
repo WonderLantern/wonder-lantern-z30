@@ -12,14 +12,21 @@ from .sound_ui import ui_code
 ROOT_ORDER = ('aspect', 'zebra', 'portrait', 'stamp', 'nef', 'bitrate', 'gyro', 'sound', 'modules')
 
 
-def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
+
+
+def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, cmos_dump=False, cmos_trace=False, cmos_spi=False, cmos_window=False, lut_sd=False, lut_cube_text=None, lut_size=17):
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
     if precapture_probe and (wireless or bitrate):
         raise ValueError('JPG capture probe needs the independent experimental page slot')
+    if sum(map(bool, (cmos_dump, cmos_trace, cmos_spi, cmos_window))) > 1:
+        raise ValueError('Choose one CMOS research page: dump, trace, spi or window')
+    cmos_dump = cmos_dump or cmos_trace or cmos_spi or cmos_window
+    if cmos_dump and (wireless or bitrate or precapture_probe or lut_sd):
+        raise ValueError('CMOS data dump needs the independent experimental page slot')
     if wireless and bitrate:
         raise ValueError('Wireless research menu and bitrate menu currently share one owned page slot')
-    bitrate = bitrate or wireless or precapture_probe or lut_sd
+    bitrate = bitrate or wireless or precapture_probe or lut_sd or cmos_dump
     im = plan.image
     if im.read(STATE_ANCHOR, 44) != bytes(44):
         raise ValueError('Sound state requires the unused stock page-zero slot')
@@ -51,7 +58,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
         sizes.update(ensure=sizes['ensure'] + 128, getter=sizes['getter'] + 64,
                      route=sizes['route'] + 64, action=sizes['action'] + 128)
     # Research builds keep their single-purpose page inside the custom menu only.
-    native_menus = () if wireless or lut_sd or precapture_probe else tuple(
+    native_menus = () if wireless or lut_sd or precapture_probe or cmos_dump else tuple(
         menu for menu in NATIVE_MENUS if any(dict(aspect=aspect, zebra=zebra, portrait=portrait, stamp=stamp, bitrate=bitrate, trk3d=trk3d, afcol=afcol)[key] for key in menu[3]))
     if native_menus:
         sizes.update(row=768)
@@ -121,11 +128,19 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
             from . import lut_ui as bu
         elif precapture_probe:
             from . import precapture_probe as bu
+        elif cmos_window:
+            from . import cmos_window as bu
+        elif cmos_spi:
+            from . import cmos_spi as bu
+        elif cmos_trace:
+            from . import cmos_trace as bu
+        elif cmos_dump:
+            from . import cmos_dump as bu
         elif wireless:
             from . import wireless_ui as bu
         else:
             from . import bitrate_ui as bu
-        video = register('bitrate', bu, 4 if wireless or lut_sd else 3, restore=('bitrate_restore',),
+        video = register('bitrate', bu, getattr(bu, 'ROWS', 4 if wireless or lut_sd else 3), restore=('bitrate_restore',),
                          **(dict(cube_text=lut_cube_text, size=lut_size) if lut_sd else {}))
         video['default'] = video.get('default', 2)
     if aspect:
