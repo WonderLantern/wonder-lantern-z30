@@ -1,0 +1,146 @@
+# Builds WonderLanternZ30-windows-x64.zip and attaches it to the GitHub release.
+#
+# The stock firmware is never stored in the repository or uploaded anywhere by
+# this workflow. Set the repository secret Z30_FIRMWARE_URL to a URL that serves
+# Z_30_0120.bin directly, or a .zip that contains it; the SHA-256 is checked
+# before anything is built.
+name: Release build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to upload to (leave empty to only build an Actions artifact)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FIRMWARE_SHA256: 1a5449ef505f1f347ed4e066a6a3f588ea542240680e83f4ebcae3b16da3434a
+  FIRMWARE_SIZE: 34496798
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install '.[gui-exe,verify]'
+
+      - name: Restore stock firmware cache
+        id: firmware-cache
+        uses: actions/cache@v4
+        with:
+          path: Z_30_0120.bin
+          key: z30-firmware-${{ env.FIRMWARE_SHA256 }}
+
+      - name: Download stock firmware
+        if: steps.firmware-cache.outputs.cache-hit != 'true'
+        env:
+          FIRMWARE_URL: ${{ secrets.Z30_FIRMWARE_URL }}
+        run: |
+          if (-not $env:FIRMWARE_URL) { throw 'Repository secret Z30_FIRMWARE_URL is not set' }
+          $download = Join-Path $env:RUNNER_TEMP 'firmware-download'
+          Invoke-WebRequest -Uri $env:FIRMWARE_URL -OutFile $download
+          $bytes = [IO.File]::ReadAllBytes($download)
+          if ($bytes.Length -ge 2 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B) {
+            $unpacked = Join-Path $env:RUNNER_TEMP 'firmware-unpacked'
+            Expand-Archive -Path $download -DestinationPath $unpacked -Force
+            $found = Get-ChildItem $unpacked -Recurse -Filter 'Z_30_0120.bin' | Select-Object -First 1
+            if (-not $found) { throw 'Z_30_0120.bin not found in the downloaded archive' }
+            Copy-Item $found.FullName Z_30_0120.bin
+          } else {
+            Copy-Item $download Z_30_0120.bin
+          }
+
+      - name: Verify stock firmware
+        run: |
+          $file = Get-Item Z_30_0120.bin
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+          if ($file.Length -ne [int64]$env:FIRMWARE_SIZE -or $hash -ne $env:FIRMWARE_SHA256) {
+            throw "Unexpected firmware: $($file.Length) bytes, SHA-256 $hash"
+          }
+          "Firmware OK: $hash"
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      # The cache only depends on the patch sources, the cache builder and the
+      # pinned Keystone version, so unchanged code reuses the previous result.
+      # Tag runs can restore caches saved by runs on the default branch.
+      - name: Restore pre-assembled code
+        id: asm-cache
+        uses: actions/cache@v4
+        with:
+          path: src/z30_extensions/asm_cache.gz
+          key: asm-cache-${{ env.FIRMWARE_SHA256 }}-${{ hashFiles('src/**/*.py', 'src/**/*.json', 'tools/build_asm_cache.py', 'pyproject.toml') }}
+
+      - name: Pre-assemble every preset combination
+        if: steps.asm-cache.outputs.cache-hit != 'true'
+        run: python tools/build_asm_cache.py --source Z_30_0120.bin
+
+      - name: Build GUI program
+        run: python tools/build_gui_exe.py
+
+      - name: Record checksums
+        id: sums
+        run: |
+          $zip = 'dist/WonderLanternZ30-windows-x64.zip'
+          $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          New-Item -ItemType Directory -Force output | Out-Null
+          python patch.py full --source Z_30_0120.bin --output output/EG209020.BIN
+          if ($LASTEXITCODE) { throw 'full build failed' }
+          $fullHash = (Get-FileHash output/EG209020.BIN -Algorithm SHA256).Hash.ToLower()
+          "zip=$zipHash" >> $env:GITHUB_OUTPUT
+          "full=$fullHash" >> $env:GITHUB_OUTPUT
+          @"
+          ## Checksums
+          | File | SHA-256 |
+          | --- | --- |
+          | WonderLanternZ30-windows-x64.zip | ``$zipHash`` |
+          | full EG209020.BIN | ``$fullHash`` |
+          "@ >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WonderLanternZ30-windows-x64
+          path: dist/WonderLanternZ30-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: github.ref_type == 'tag' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+          ZIP_SHA: ${{ steps.sums.outputs.zip }}
+          FULL_SHA: ${{ steps.sums.outputs.full }}
+        run: |
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE) {
+            # New releases start as drafts so the notes can be written before publishing.
+            $notes = "``WonderLanternZ30-windows-x64.zip`` SHA-256:`n`n``$env:ZIP_SHA```n`n" +
+                     "full ``EG209020.BIN`` SHA-256:`n`n``$env:FULL_SHA``"
+            gh release create $env:TAG --draft --verify-tag --title "Wonder Lantern Z30 $env:TAG" --notes $notes
+            if ($LASTEXITCODE) { throw 'gh release create failed' }
+          }
+          gh release upload $env:TAG dist/WonderLanternZ30-windows-x64.zip --clobber
+          if ($LASTEXITCODE) { throw 'gh release upload failed' }
