@@ -1,8 +1,9 @@
 # Builds WonderLanternZ30-windows-x64.zip and attaches it to the GitHub release.
 #
 # The stock firmware is never stored in the repository or uploaded anywhere by
-# this workflow. Set the repository secret Z30_FIRMWARE_URL to a URL that serves
-# Z_30_0120.bin directly, or a .zip that contains it; the SHA-256 is checked
+# this workflow. It is fetched from Nikon's official download server; the
+# repository secret Z30_FIRMWARE_URL, when set, overrides that URL and may serve
+# Z_30_0120.bin directly or a .zip that contains it. The SHA-256 is checked
 # before anything is built.
 name: Release build
 
@@ -55,9 +56,8 @@ jobs:
       - name: Download stock firmware
         if: steps.firmware-cache.outputs.cache-hit != 'true'
         env:
-          FIRMWARE_URL: ${{ secrets.Z30_FIRMWARE_URL }}
+          FIRMWARE_URL: ${{ secrets.Z30_FIRMWARE_URL || 'https://download.nikonimglib.com/archive7/0tErF003na2o07Cel9919YVUzB70/Z_30_0120.bin' }}
         run: |
-          if (-not $env:FIRMWARE_URL) { throw 'Repository secret Z30_FIRMWARE_URL is not set' }
           $download = Join-Path $env:RUNNER_TEMP 'firmware-download'
           Invoke-WebRequest -Uri $env:FIRMWARE_URL -OutFile $download
           $bytes = [IO.File]::ReadAllBytes($download)
