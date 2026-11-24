@@ -13,12 +13,8 @@ from ..assembly import assemble, constant as c, invoke as n, jump
 from . import lut_core, lut_session
 from .lut_retouch import GATE
 from .menu_slots import page_slots
-from .sound_layout import STATE_ANCHOR
 
 PAGE_INDEX = 960
-# Owned word inside the unused page-zero descriptor: +16 anchors the host block
-# and +20 is its open lock, so +24 stays free for the committed session pointer.
-ACTIVATION_CELL = STATE_ANCHOR + 24
 TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('video', 4)
 SIZES = dict(bitrate_get=96, bitrate_labels=768, bitrate_open=128,
              bitrate_action=384, bitrate_restore=128)
@@ -40,8 +36,12 @@ def prepare(plan, f, resources, allocation_size, cube_text=None, size=17):
     manager_bytes = lut_session.build_manager(manager)
     plan.alloc(manager_bytes)
     entry = plan.address
+    # The gate resolves the session through the framework getter (host block
+    # anchor + state offset), which stays valid after the settings page closes;
+    # v6's fixed activation cell inside a stock page descriptor regressed
+    # loading on hardware, so no extra stock RAM word is used anymore.
     core = lut_core.build_lut_core(0, entry, active_payload=True, session_lock=True,
-                                   cell=ACTIVATION_CELL)
+                                   block_getter=f['bitrate_get'], simd=True)
     plan.alloc(core)
     address, expected, name = GATE
     plan.edit(address, jump(address, entry, len(expected)), name + ' with menu-owned SD session', expected)
@@ -58,7 +58,6 @@ def prepare(plan, f, resources, allocation_size, cube_text=None, size=17):
     codes['bitrate_restore'] = ('push {r4, lr};' + call('bitrate_get') +
         'cmp r0, #0; beq done; mov r4, r0;' + c('r1', template) + 'movs r2, #48;'
         + n(0x10199BDC, thumb=False) + 'movs r0, #0; str r0, [r4, #48];'
-        + c('r1', ACTIVATION_CELL) + 'str r0, [r1];'
         'done: movs r0, #1; pop {r4, pc};')
     codes['bitrate_open'] = ('push {r4, lr};' + call('ensure') +
         'cmp r0, #0; beq done;' + call('bitrate_labels') +
@@ -73,7 +72,6 @@ def prepare(plan, f, resources, allocation_size, cube_text=None, size=17):
         'result: str r0, [r6, #48]; cmp r0, #0; beq committed;'
         'cmp r0, #8; bne refresh; committed: movs r0, #0; cmp r5, #2; beq enable;'
         + c('r0', lut_core.LUT_FLAG) + 'enable: dmb sy; str r0, [r6];'
-        + c('r1', ACTIVATION_CELL) + 'cmp r0, #0; it eq; moveq r6, #0; str r6, [r1];'
         'refresh: ' + call('bitrate_labels') + 'mov r0, r4;' + call('render') +
         'done: movs r0, #0; pop {r4-r6, pc};')
     codes['bitrate_labels'] = (
@@ -95,7 +93,6 @@ def prepare(plan, f, resources, allocation_size, cube_text=None, size=17):
         'adds r5, #1; cmp r5, #4; bne label_loop; movs r0, #0; pop {r4-r8, pc};')
     return dict(page_offset=page_offset, state_offset=state_offset,
                 allocation_size=state_offset + 52, default=0, codes=codes,
-                activation_cell=hex(ACTIVATION_CELL),
                 manager=manager, manager_bytes=len(manager_bytes), core=entry, core_bytes=len(core),
                 fallback=fallback, fallback_bytes=len(binary), path=path,
                 embedded_identity=cube_text is None, lut_size=parsed['size'])
@@ -106,7 +103,7 @@ def finish(plan, f, extension, identifiers):
         plan.put(f[name], assemble(source, f[name], SIZES[name]))
     plan.features['lut_sd_menu'] = dict(
         page_index=PAGE_INDEX, page_offset=extension['page_offset'], state_offset=extension['state_offset'],
-        activation_cell=extension['activation_cell'],
+        activation='framework host-block getter (state anchor word, valid after page close)',
         controls=list(identifiers), actions=list(ACTIONS), path='A:\\WL-LUT.CUBE',
         functions={name: hex(f[name] | 1) for name in SIZES},
         manager=hex(extension['manager'] | 1), manager_bytes=extension['manager_bytes'],

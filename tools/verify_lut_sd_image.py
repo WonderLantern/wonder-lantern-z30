@@ -176,7 +176,8 @@ def verify(stock, image, report):
     assert f.action(0) == 0
     active = word(f.u, f.state + 4)
     assert word(f.u, f.state) == lut_core.LUT_FLAG
-    assert word(f.u, int(f.feature['activation_cell'], 16)) == f.state
+    from z30_extensions.features.sound_layout import STATE_ANCHOR
+    assert word(f.u, STATE_ANCHOR + 16) == f.host  # the gate's getter anchor
     assert len(f.live) == 2 and not f.file_live
     assert f.labels[lut_ui.CURRENT_SLOT] == 'SD LUT ready'
     binary = payload(table_text())
@@ -212,7 +213,7 @@ def verify(stock, image, report):
     assert f.labels[lut_ui.CURRENT_SLOT] == 'Embedded LUT'
     rows.append(dict(case='restore_embedded_then_process', pixel_parity=True))
     assert f.action(2) == 0 and word(f.u, f.state) == 0 and len(f.live) == 1
-    assert word(f.u, int(f.feature['activation_cell'], 16)) == 0
+    assert word(f.u, STATE_ANCHOR + 16) == f.host  # anchor untouched by disable
     assert f.labels[lut_ui.CURRENT_SLOT] == 'Disabled'
     f.process(expected_stock=True)
     rows.append(dict(case='disable_release_and_stock_fallback', host_only=True))

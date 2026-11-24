@@ -16,6 +16,10 @@ class Context:
         self.stock = StockImage(stock)
         self.u = u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
         u.ctl_set_cpu_model(UC_CPU_ARM_CORTEX_A15)
+        # The stock kernel enables CP10/CP11 access (it runs NEON throughout);
+        # the emulator starts with them off, so mirror the runtime state.
+        u.reg_write(UC_ARM_REG_C1_C0_2, 0xF00000)
+        u.reg_write(UC_ARM_REG_FPEXC, 0x40000000)
         u.mem_map(BASE, (len(image) + 4095) & ~4095)
         u.mem_write(BASE, image)
         u.mem_map(RAM, 0x100000)

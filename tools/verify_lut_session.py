@@ -247,7 +247,9 @@ def processing_lock(f):
     u.mem_write(PARAMS, bytes(24)); put(u, PARAMS + 4, DESC_IN); put(u, PARAMS + 16, DESC_OUT)
     assert f.c.call(core, (PARAMS,)) == 1 and len(cache) == 4
     assert word(u, ARENA + session.LOCK) == 0
-    want_y, want_c = lut.apply_frame_int(payload(table_text()), yin, cin, width, height, stride, stride)
+    # The fresh output planes were zeroed; bytes outside the window stay zero.
+    want_y, want_c = lut.apply_frame_int(payload(table_text()), yin, cin, width, height, stride, stride,
+                                         base_y=bytes(len(yin)), base_c=bytes(len(cin)))
     assert bytes(u.mem_read(Y_OUT, len(yin))) == want_y and bytes(u.mem_read(C_OUT, len(cin))) == want_c
     rows.append(dict(case='processing_holds_session_lock', cache_calls=4, pixel_parity=True))
     cache.clear(); put(u, ARENA + session.LOCK, 1)

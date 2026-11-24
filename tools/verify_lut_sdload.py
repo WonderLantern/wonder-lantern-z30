@@ -263,7 +263,9 @@ def run(data):
     image_descriptor(u, DESC_OUT, stride, stride, width, height, Y_OUT, C_OUT)
     u.mem_write(PARAMS, bytes(24)); put(u, PARAMS + 4, DESC_IN); put(u, PARAMS + 16, DESC_OUT)
     assert f.c.call(core_address, (PARAMS,)) == 1
-    want_y, want_c = lut.apply_frame_int(payload(text), yin, cin, width, height, stride, stride)
+    # The fresh output planes were zeroed; bytes outside the window stay zero.
+    want_y, want_c = lut.apply_frame_int(payload(text), yin, cin, width, height, stride, stride,
+                                         base_y=bytes(len(yin)), base_c=bytes(len(cin)))
     assert bytes(u.mem_read(Y_OUT, len(yin))) == want_y
     assert bytes(u.mem_read(C_OUT, len(cin))) == want_c
     rows.append(dict(case='loaded_payload_to_core', pixel_parity=True))

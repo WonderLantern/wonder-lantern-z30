@@ -250,12 +250,16 @@ def trilinear_int(block_data, red, green, blue):
         t = ((coord - lo) << 16) // span
         pos = t * (size - 1) >> 16
         base = min(pos, size - 2)
-        frac = t * (size - 1) - (base << 16)
-        return base, frac
+        # Both weights must stay inside u16: at an exact node position one
+        # weight would be 0 or 65536, and a 65536 weight multiplied by another
+        # 65536 weight overflows the 32-bit product the ARM core computes.
+        hi_w = min(t * (size - 1) - (base << 16), 65535)
+        lo_w = min(65536 - hi_w, 65535)
+        return base, lo_w, hi_w
 
-    base_r, frac_r = axis(red, mins[0], maxs[0])
-    base_g, frac_g = axis(green, mins[1], maxs[1])
-    base_b, frac_b = axis(blue, mins[2], maxs[2])
+    base_r, wlo_r, whi_r = axis(red, mins[0], maxs[0])
+    base_g, wlo_g, whi_g = axis(green, mins[1], maxs[1])
+    base_b, wlo_b, whi_b = axis(blue, mins[2], maxs[2])
     row_y = size * 6
     row_z = size * row_y
     out = []
@@ -267,9 +271,9 @@ def trilinear_int(block_data, red, green, blue):
             dz = base_b + ((index >> 2) & 1)
             value = struct.unpack_from('<H', block_data,
                 table_offset + dx * 6 + dy * row_y + dz * row_z + channel * 2)[0]
-            weight = ((frac_r if index & 1 else 65536 - frac_r)
-                      * (frac_g if index & 2 else 65536 - frac_g) >> 16)
-            weight = (weight * (frac_b if index & 4 else 65536 - frac_b)) >> 16
+            weight = ((whi_r if index & 1 else wlo_r)
+                      * (whi_g if index & 2 else wlo_g) >> 16)
+            weight = (weight * (whi_b if index & 4 else wlo_b)) >> 16
             acc += value * weight >> 16
         out.append(clamp8(acc >> 8))
     return tuple(out)
@@ -280,21 +284,24 @@ def lut_effect_int(block_data, y, cb, cr):
     return rgb_to_ycbcr_int(*trilinear_int(block_data, *ycbcr_to_rgb_int(y, cb, cr)))
 
 
-def apply_frame_int(block_data, y_plane, c_plane, width, height, stride_y, stride_c):
+def apply_frame_int(block_data, y_plane, c_plane, width, height, stride_y, stride_c,
+                    x0=0, y0=0, base_y=None, base_c=None):
     """The exact frame contract the ARM core implements, as host reference.
 
     Processes chroma pairs: both pixels of a pair are converted independently
     and the output Cb/Cr pair is the rounded average of the two results. An
-    odd trailing pixel writes its own chroma to both bytes. Returns the new
-    (y_plane, c_plane) as bytearrays.
+    odd trailing pixel writes its own chroma to both bytes. The window starts
+    at (x0, y0); base_y/base_c override the untouched-output bytes (the core
+    leaves bytes outside the window at whatever the output planes held).
+    Returns the new (y_plane, c_plane) as bytearrays.
     """
-    y_out = bytearray(y_plane)
-    c_out = bytearray(c_plane)
-    for row in range(height):
+    y_out = bytearray(base_y if base_y is not None else y_plane)
+    c_out = bytearray(base_c if base_c is not None else c_plane)
+    for row in range(y0, y0 + height):
         y_row = row * stride_y
         c_row = row * stride_c
-        x = 0
-        while x + 1 < width:
+        x = x0
+        while x + 1 < x0 + width:
             cb, cr = c_plane[c_row + x], c_plane[c_row + x + 1]
             first = lut_effect_int(block_data, y_plane[y_row + x], cb, cr)
             second = lut_effect_int(block_data, y_plane[y_row + x + 1], cb, cr)
