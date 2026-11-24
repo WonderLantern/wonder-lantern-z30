@@ -304,7 +304,7 @@ def finish(plan, f, extension, identifiers):
                 raise ValueError('Physical key observer exceeds its slot')
         plan.put(f[name], raw)
     plan.features['jpg_capture_probe'] = dict(
-        version=9, page_index=PAGE_INDEX, default_enabled=False,
+        version=10, page_index=PAGE_INDEX, default_enabled=False,
         page_offset=extension['page_offset'], state_offset=extension['state_offset'],
         allocation_size=extension['allocation_size'], state_bytes=STATE_BYTES,
         functions={k: hex(f[k] | 1) for k in SIZES}, controls=list(identifiers),
@@ -321,6 +321,11 @@ def finish(plan, f, extension, identifiers):
         requires_existing_silent_photography=True, setting_writes=False,
         shutter_mode_switching=False, continuous_precapture=False,
         native_capture_request='0x1020A630, 20-byte request, word +0x10 = 1',
+        admission_wait=dict(polls=capture.GATE_POLLS, delay_ms=capture.GATE_DELAY_MS,
+                            getters=['attr 0x1B2E', '0x1020BBC4 != 0x12', '0x1020BC2E', '0x1006316E',
+                                     '0x10063166', '0x10065964', '0x1020BAEC'],
+                            logged_only=['0x101F5204(0x11B)', '0x1020BB8A'],
+                            timeout_behavior='Submit the single v9 request anyway and log its return'),
         native_worker=dict(task_offset=capture.TASK, config_offset=capture.CONFIG,
                            request_offset=capture.REQUEST, phase_offset=capture.PHASE,
                            ready_offset=capture.READY, ticket_offset=capture.TICKET,

@@ -11,7 +11,12 @@ TASK, CONFIG, REQUEST = 1744, 1796, 1824
 PHASE, READY, TICKET, RESULT = 1844, 1848, 1852, 1856
 TASK_INFO, QUERY_RESULT, ENTRY_HIT = 1860, 1924, 1928
 STATE_BYTES = 1932
-SIZES = dict(pre_task=512, pre_entry=192, pre_inspect=256, pre_wake=384, pre_worker=1024, pre_complete=320)
+SIZES = dict(pre_task=512, pre_entry=192, pre_inspect=256, pre_wake=384, pre_worker=1280,
+             pre_gates=384, pre_complete=320)
+# v10: poll the stock 0x1020A630 admission getters (all mutex-guarded reads,
+# no writes) while the half press is still held, like the Z7 II worker's
+# admission wait, then submit at most one request exactly as v9 did.
+GATE_POLLS, GATE_DELAY_MS = 15, 100
 
 
 def codes(f):
@@ -82,6 +87,23 @@ def codes(f):
         ldr r0,[r4,#8];cmp r0,#1;bne disabled;
         {n(0x101E389C)}ldr r0,[r0,#4];tst r0,#0x40000000;bne stale;
         tst r0,#0x80000000;beq stale;
+        movs r7,#0;
+    gate_loop:
+        mov r0,r4;movs r1,#0;cmp r7,#0;it eq;moveq r1,#1;{call('pre_gates')}
+        cmp r0,#1;beq gates_clear;
+        adds r7,#1;cmp r7,#{GATE_POLLS};bhs gates_timeout;
+        movs r0,#{GATE_DELAY_MS};{n(0x1021994A)}
+        ldr r0,[r4,#8];cmp r0,#1;bne disabled;
+        {n(0x101E389C)}ldr r0,[r0,#4];tst r0,#0x40000000;bne stale;
+        tst r0,#0x80000000;beq stale;
+        b gate_loop;
+    gates_timeout:movs r6,#14;b gates_logged;
+    gates_clear:movs r6,#15;
+    gates_logged:
+        cmp r7,#0;beq gates_first;
+        mov r0,r4;movs r1,#1;{call('pre_gates')}
+    gates_first:
+        mov r0,r4;movs r1,#5;mov r2,r6;mov r3,r7;{call('pre_log')}
         movw r0,#0x57b;{n(0x10188776)}cmp r0,#1;bne silent_required;
         {n(0x1020BB8A)}cmp r0,#0;bne native_active;
         movs r0,#0x46;{n(0x10061064)}cmp r0,#0;bne occupied;
@@ -105,6 +127,30 @@ def codes(f):
         b done;
     disabled:movs r0,#5;str r0,[r4,#{PHASE}];
     done:movs r0,#0;pop {{r4-r8,pc}};'''
+    # Snapshot the stock capture-entry admission inputs in entry order:
+    # attr 0x1B2E (!=0 -> 0x20), 0x1020BBC4 (==0x12 -> 0x20), 0x1020BC2E,
+    # 0x1006316E, 0x10063166, 0x10065964 (!=0 -> 0x1D), 0x1020BAEC (!=0 -> 0xD).
+    # 0x101F5204(0x11B)==1 makes the entry ignore the request and only
+    # register slot 0x46, so it is logged but never waited on.
+    # Args: state, log flag. Returns 1 only when every waited gate is clear.
+    gates = f'''push {{r4-r9,lr}};sub sp,#4;mov r4,r0;mov r9,r1;
+        {n(0x1020BBC4)}uxtb r5,r0;
+        {n(0x1020BC2E)}uxtb r0,r0;orr r5,r5,r0,lsl #8;
+        {n(0x1020BAEC)}uxtb r0,r0;orr r5,r5,r0,lsl #16;
+        {n(0x10065964)}uxtb r0,r0;orr r5,r5,r0,lsl #24;
+        movw r0,#0x1b2e;{n(0x10188776)}mov r6,r0;
+        {n(0x1006316E)}mov r7,r0;{n(0x10063166)}mov r8,r0;
+        cmp r9,#0;beq judge;
+        mov r0,r4;movs r1,#8;mov r2,r5;mov r3,r6;{call('pre_log')}
+        mov r0,r4;movs r1,#9;mov r2,r7;mov r3,r8;{call('pre_log')}
+        movw r0,#0x11b;{n(0x101F5204)}mov r9,r0;{n(0x1020BB8A)}mov r3,r0;
+        mov r0,r4;movs r1,#10;mov r2,r9;{call('pre_log')}
+    judge:movs r0,#0;
+        cmp r6,#0;bne gates_done;cmp r7,#0;bne gates_done;cmp r8,#0;bne gates_done;
+        and r1,r5,#0xff;cmp r1,#0x12;beq gates_done;
+        bics r1,r5,#0xff;bne gates_done;
+        movs r0,#1;
+    gates_done:add sp,#4;pop {{r4-r9,pc}};'''
     complete = f'''push {{r4-r6,lr}};mov r5,r0;mov r6,r1;
         {call('bitrate_get')}cmp r0,#0;beq done;mov r4,r0;
         {c('r0',0x04100046)}cmp r5,r0;bne record;
@@ -112,4 +158,5 @@ def codes(f):
     completed:movs r0,#4;dmb ish;str r0,[r4,#{PHASE}];
     record:mov r0,r4;movs r1,#6;mov r2,r5;mov r3,r6;{call('pre_log')}
     done:movs r0,#0;pop {{r4-r6,pc}};'''
-    return dict(pre_task=task, pre_entry=entry, pre_inspect=inspect, pre_wake=wake, pre_worker=worker, pre_complete=complete)
+    return dict(pre_task=task, pre_entry=entry, pre_inspect=inspect, pre_wake=wake, pre_worker=worker,
+                pre_gates=gates, pre_complete=complete)

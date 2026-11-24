@@ -52,7 +52,21 @@ def decode(data):
                 8:'Input released or full-pressed before capture',
                 9:'Capture callback already occupied', 10:'Native capture already active',
                 11:'Worker entered; arg1 is event mask',
-                12:'Worker phase before delay', 13:'Worker enabled after delay'}.get(row['arg0'], 'Unknown')
+                12:'Worker phase before delay', 13:'Worker enabled after delay',
+                14:'Admission wait timed out; arg1 polls, request still submitted once',
+                15:'Admission gates clear; arg1 polls waited'}.get(row['arg0'], 'Unknown')
+        if row['kind'] == 8:
+            packed = row['arg0']
+            row['admission_gates'] = dict(
+                bbc4=packed & 255, bbc4_busy=(packed & 255) == 0x12,
+                bc2e=packed >> 8 & 255, baec=packed >> 16 & 255, gate_65964=packed >> 24 & 255,
+                attr_1b2e=row['arg1'])
+        if row['kind'] == 9:
+            row['admission_gates'] = dict(word_6316e=row['arg0'], word_63166=row['arg1'])
+        if row['kind'] == 10:
+            row['admission_context'] = dict(
+                attr_11b=row['arg0'], deferred_entry_path=row['arg0'] == 1,
+                native_phase_bb8a=row['arg1'])
         if row['kind'] == 7:
             row['task_entry_arguments'] = dict(r0=hex(row['arg0']), r1=hex(row['arg1']))
         if row['kind'] == 6:
@@ -68,6 +82,10 @@ def decode(data):
         values = struct.unpack_from('<4I', data, 64+64*24+index*16)
         report['segments'].append(dict(zip(('kind','address','logical_length','padding'), values)))
     report['camera_capture_interpretation'] = (
+        'Kinds 8/9/10 (v10) snapshot stock 0x1020A630 admission getters before the '
+        'request: attr 0x1B2E/0x1020BBC4==0x12 predict 0x20, 0x1020BC2E/0x1006316E/'
+        '0x10063166/0x10065964 predict 0x1D, 0x1020BAEC predicts 0xD; attr 0x11B==1 '
+        'takes a deferred path that ignores the request. '
         'Kind 4 records physical SW0 current/previous button bits. Kind 3 is a '
         'release-controller notification ID, not a physical button event. '
         'Stock mode values do not identify electronic/mechanical operation.')

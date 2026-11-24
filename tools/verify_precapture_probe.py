@@ -64,6 +64,11 @@ class Fixture(WriterFixture):
         self.native_capture_phase = 0
         self.capture_sync_complete = False
         self.task_creations, self.event_posts, self.capture_requests, self.delays = [], [], [], []
+        # v10 admission getters: static values plus N busy rounds of 0x1006316E.
+        self.gates = {0x1b2e: 0, 0x1020BBC4: 0, 0x1020BC2E: 0, 0x1020BAEC: 0, 0x10065964: 0,
+                      0x1006316E: 0, 0x10063166: 0, 0x101F5204: 0}
+        self.busy_rounds = 0
+        self.on_delay = None
         self.context.map(0xC1F87A70, 0x20)
         self.context.map(0xC23A5504, 0x400)
         self.u.mem_write(0xC23A5504, bytes(0x400))
@@ -72,7 +77,9 @@ class Fixture(WriterFixture):
         self.fd = 10
         for address in (0x10211F4C, 0x103382A2, 0x102C8A6A, 0x1033832E, 0x101993DE,
                         0x10035F04, 0x10035FDC, 0x10035E6C, 0x10036440, 0x10036334,
-                        0x1021994A, 0x10188776, 0x1020BB8A, 0x1020A630, 0x10036254):
+                        0x1021994A, 0x10188776, 0x1020BB8A, 0x1020A630, 0x10036254,
+                        0x1020BBC4, 0x1020BC2E, 0x1020BAEC, 0x10065964, 0x1006316E,
+                        0x10063166, 0x101F5204):
             self.u.hook_add(UC_HOOK_CODE, self.service, begin=address, end=address)
 
     def ret(self, value):
@@ -100,10 +107,22 @@ class Fixture(WriterFixture):
             return self.ret(self.event_post_result & 0xffffffff)
         if address == 0x1021994A:
             self.delays.append(r0)
+            if self.on_delay:
+                self.on_delay(self, r0)
             return self.ret(0)
         if address == 0x10188776:
+            if r0 == 0x1b2e:
+                return self.ret(self.gates[0x1b2e])
             assert r0 == 0x57b
             return self.ret(self.silent_photo)
+        if address == 0x101F5204:
+            assert r0 == 0x11b
+            return self.ret(self.gates[address])
+        if address == 0x1006316E and self.busy_rounds:
+            self.busy_rounds -= 1
+            return self.ret(1)
+        if address in self.gates:
+            return self.ret(self.gates[address])
         if address == 0x1020BB8A:
             return self.ret(self.native_capture_phase)
         if address == 0x1020A630:
@@ -546,6 +565,48 @@ def verify_capture_worker(stock, image, report):
         assert k.state_word(capture.RESULT) == result
     cases.append(dict(name='capture_rejection_and_early_callback_do_not_hang_phase', variants=2, passed=True))
 
+    # v10 admission wait. Getters are fixtures; this proves the worker's
+    # bounded polling, logging and single-submission rules only.
+    def events(fixture):
+        snapshot = bytes(fixture.u.mem_read(fixture.state, 64))+bytes(fixture.u.mem_read(fixture.state+112, 1632))
+        return decode(snapshot)['events']
+    def armed_worker(busy_rounds, gates=None):
+        g = Fixture(stock, image, report)
+        g.call('pre_arm', 1)
+        g.context.call(g.functions['pre_wake'], (g.state, 0x80000000, 0))
+        g.word(0xC1F87A74, 0x80000000)
+        g.busy_rounds = busy_rounds
+        g.gates.update(gates or {})
+        return g
+    g = armed_worker(3)
+    g.context.call(g.functions['pre_worker'], (1,))
+    rows = events(g)
+    assert g.delays == [80]+[capture.GATE_DELAY_MS]*3 and len(g.capture_requests) == 1
+    assert [r['arg1'] for r in rows if r['kind'] == 5 and r['arg0'] == 15] == [3]
+    assert sum(r['kind'] == 9 for r in rows) == 2 and sum(r['kind'] == 10 for r in rows) == 2
+    assert [r['arg0'] for r in rows if r['kind'] == 9] == [1, 0]
+    assert g.state_word(capture.PHASE) == 3
+    g = armed_worker(10**6)
+    g.context.call(g.functions['pre_worker'], (1,))
+    rows = events(g)
+    assert g.delays == [80]+[capture.GATE_DELAY_MS]*(capture.GATE_POLLS-1)
+    assert len(g.capture_requests) == 1
+    assert [r['arg1'] for r in rows if r['kind'] == 5 and r['arg0'] == 14] == [capture.GATE_POLLS]
+    g = armed_worker(10**6)
+    g.on_delay = lambda fx, ms: fx.word(0xC1F87A74, 0) if ms == capture.GATE_DELAY_MS else None
+    g.context.call(g.functions['pre_worker'], (1,))
+    assert not g.capture_requests and g.state_word(capture.PHASE) == 5
+    assert any(r['kind'] == 5 and r['arg0'] == 8 for r in events(g))
+    g = armed_worker(0, {0x1020BBC4: 0x12, 0x1020BAEC: 1, 0x10065964: 2, 0x101F5204: 1})
+    g.on_delay = lambda fx, ms: fx.gates.update({0x1020BBC4: 3, 0x1020BAEC: 0, 0x10065964: 0}) if ms == capture.GATE_DELAY_MS else None
+    g.context.call(g.functions['pre_worker'], (1,))
+    rows = events(g)
+    packed = [r['arg0'] for r in rows if r['kind'] == 8]
+    assert packed == [0x12 | 1 << 16 | 2 << 24, 3], [hex(v) for v in packed]
+    assert [r['arg0'] for r in rows if r['kind'] == 10] == [1, 1]
+    assert len(g.capture_requests) == 1
+    cases.append(dict(name='v10_admission_wait_polls_getters_logs_and_submits_once', variants=4, passed=True))
+
     # One failed create attempt cannot spawn an event-wait loop or retry leak.
     for event_error, task_error, start_error in ((-5, 21, 0), (17, -5, -5), (17, 21, -5)):
         failed = Fixture(stock, image, report)
@@ -678,7 +739,8 @@ def main():
         candidate_sha256=sha256(image), camera_verified=False,
         substitutions=['General allocation', 'file system', 'selected downstream stock services',
                        'Kernel event/task create, start and post', 'Worker delay',
-                       'Capture entry 0x1020A630, phase and silent-setting read in worker tests'],
+                       'Capture entry 0x1020A630, phase and silent-setting read in worker tests',
+                       'v10 admission getters 0x1020BBC4/BC2E/BAEC, 0x10065964, 0x1006316E/66, 0x101F5204, attr 0x1B2E'],
         limitations=['No sensor, ISP, DMA, physical allocation, SD or thermal execution.',
                      'Physical SW0 hook/polarity have v3 user log evidence; the new worker does not yet.',
                      'One opt-in half-press request is implemented; native capture outcome requires camera testing.',
