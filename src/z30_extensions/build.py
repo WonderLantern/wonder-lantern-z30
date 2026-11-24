@@ -7,14 +7,16 @@ from .platform.z30_120 import BASE
 
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot',
            'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
-           'gyro-evr', '3d-tracking', 'af-frame-colour', 'nef-menu', 'nef-uncompressed', 'nef-compressed')
+           'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length', 'nef-menu', 'nef-uncompressed', 'nef-compressed')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
                  'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
-                 'gyro-evr', '3d-tracking', 'af-frame-colour', 'nef-menu', 'nef-uncompressed', 'nef-compressed')
+                 'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length', 'nef-menu', 'nef-uncompressed', 'nef-compressed')
+EXPERIMENTAL_FEATURES = ('focal-length',)  # opt-in builds, not part of full
 NEF_FIXED_FEATURES = ('nef-uncompressed', 'nef-compressed')
 NEF_COMPRESSION_FEATURES = ('nef-menu',) + NEF_FIXED_FEATURES
-FULL_FEATURES = tuple(name for name in FEATURE_ORDER if name not in NEF_FIXED_FEATURES)
+FULL_FEATURES = tuple(name for name in FEATURE_ORDER
+                      if name not in NEF_FIXED_FEATURES + EXPERIMENTAL_FEATURES)
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 
 
@@ -151,6 +153,9 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         add(plan)
     if 'af-frame-colour' in features:
         from .features.af_frame_colour import add
+        add(plan)
+    if 'focal-length' in features:
+        from .features.focal_length import add
         add(plan)
     if ptp_read:
         # Research only: read-only USB PTP 0x9FF1 ReadMemory for live readouts.
