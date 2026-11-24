@@ -36,7 +36,7 @@
 
 ## Noto CJK 字形
 
-中文菜单需要的、原厂字体缺少的字形（全部可打印 ASCII 和部分汉字）由 Noto Sans CJK SC/TC Regular 与 Noto Sans Mono CJK SC Regular（版本 2.004，© 2014-2021 Adobe，Reserved Font Name “Source”）的轮廓转换而来：缩放与平移到原厂字体坐标、三次曲线转二次曲线、套用原厂度量。转换结果为 `src/z30_extensions/platform/z30_120_extra_glyphs.json`，由 `tools/build_cjk_glyphs.py` 生成；构建时这些字形被加入原厂字体 0、2 的副本，写入输出固件。
+中文菜单需要的、原厂字体缺少的字形（全部可打印 ASCII 和部分汉字；SD 卡加载的常驻 EG 还包括 GB2312 一级字和 Big5 常用字，约 7700 个字形）由 Noto Sans CJK SC/TC Regular 与 Noto Sans Mono CJK SC Regular（版本 2.004，© 2014-2021 Adobe，Reserved Font Name “Source”）的轮廓转换而来：缩放与平移到原厂字体坐标、三次曲线转二次曲线、套用原厂度量。转换结果为 `src/z30_extensions/platform/z30_120_extra_glyphs.json`，由 `tools/build_cjk_glyphs.py` 生成；构建时这些字形被加入原厂字体 0、2 的副本，写入输出固件。
 
 这些字形属于 Noto 字体的修改版本，按 [SIL Open Font License 1.1](licenses/OFL-Noto-CJK.txt) 授权，不适用本项目的 MIT 或 Wonder Lantern Community License；不得以 “Source” 为名，也不得单独出售。仓库不附 Noto 字体文件本身，生成数据时需自行下载到 `build/fonts/noto-cjk/`。
 

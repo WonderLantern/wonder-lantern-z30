@@ -52,7 +52,9 @@ def resolve_presets(preset='full'):
 def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
           aspect_border_diagnostic=False, aspect_border_lease=False,
           aspect_mask=None, aspect_mask_trial=False, module_host=False, ptp_read=False,
-          evr_hook=False, imu_hook=False, face_hook=False):
+          evr_hook=False, imu_hook=False, face_hook=False, tail_base=None, card=False, resident=None):
+    """card=True returns (plan, report) without writing an image: card.py turns
+    the plan's edits and tail (assembled at tail_base) into an SD-card patch."""
     # module_host is a research option only: the SD module host is no longer a
     # patcher preset, but its tools still build it on top of the sound framework.
     selected, features = resolve_presets(preset)
@@ -90,18 +92,20 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         raise ValueError('Soft aspect mask requires aspect-profiles')
     if aspect_mask and aspect_mask_trial:
         raise ValueError('Soft aspect mask dynamic and trial modes are mutually exclusive')
-    if features == ['liveview-dual']:
+    if card and (module_host or ptp_read or evr_hook or imu_hook or face_hook):
+        raise ValueError('Research hooks are not available in card builds')
+    if features == ['liveview-dual'] and not card:
         output, report = build_dual(source)
         report.update(preset=selected[0] if len(selected) == 1 else selected,
                       selected_presets=selected, enabled_features=features)
         return output, report
-    plan = Plan(source)
+    plan = Plan(source, tail_base=tail_base, card=card, resident=resident)
     if 'gyro-evr' in features:
         # The SD host (research builds) drives the built-in copy from its Run row.
         from .features.gyro_evr import layout
         plan.evr_builtin_layout = layout()
     if 'liveview-dual' in features:
-        dual, report = build_dual(source)
+        dual, report = build_dual(source, plan.tail_base)
         plan.tail.extend(dual[len(source) - 2:-2])
         plan.edits.extend(Edit(int(e['offset'], 16), bytes.fromhex(e['expected_hex']),
                               bytes.fromhex(e['replacement_hex']), e['name']) for e in report['edits'])
@@ -175,6 +179,13 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if face_hook:
         from .features.face_hook import add
         add(plan)
+    if card:
+        for address, expected in VIDEO_STOCK_WINDOWS:
+            for edit in plan.edits:
+                if edit.offset < address - BASE + len(expected) and address - BASE < edit.offset + len(edit.expected):
+                    raise ValueError('Video shutter differs from stock')
+        return plan, dict(preset=selected[0] if len(selected) == 1 else selected,
+                          selected_presets=selected, enabled_features=features, features=plan.features)
     output, report = plan.finish()
     for address, expected in VIDEO_STOCK_WINDOWS:
         if output[address - BASE:address - BASE + len(expected)] != expected:

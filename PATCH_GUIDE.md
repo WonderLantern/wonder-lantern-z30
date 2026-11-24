@@ -82,6 +82,21 @@ python patch.py full --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 - **EG209020.BIN**：独立 EG 模块，可在 Z30 C 1.20 上安装；不是完整 Nikon 更新包。
 - **EG209020.json**：构建信息，无需复制到相机。
 
+## SD 卡加载（实验，命令行）
+
+只刷一次常驻 EG，功能放在卡上，出问题时拔卡即可恢复（[说明](docs/card-loader.md)）：
+
+```powershell
+python tools/build_card.py --source "Z_30_0120.bin" --output "output/card"
+```
+
+1. 刷 `output/card/EG209020.BIN`，先不插卡文件，确认固件版本页正常、相机与原厂一致。
+2. 把 `output/card/Z30/WL.PATCH` 复制到卡上的 `Z30` 文件夹（文件夹不存在就新建），重启。约 3 秒后功能出现。
+3. 卡上的 `Z30/WL.LOG` 应为 `WL.PATCH S=01 …`；其他代码的含义见说明文档。
+4. 以后只换卡文件：在同一个 `output/card` 目录运行同一命令并加 `--patch-only`（先移走旧的 `Z30/WL.PATCH`）。提示常驻固件已改变时，去掉 `--patch-only` 换一个新目录重新构建并重刷。
+
+`--preset` 选择功能，默认 `full`。图形界面暂不支持此方式。
+
 ## 常见问题
 
 - **Windows 提示“已保护你的电脑”**：程序没有代码签名。请确认文件来自本项目 Releases 并核对 SHA-256，再决定是否运行。

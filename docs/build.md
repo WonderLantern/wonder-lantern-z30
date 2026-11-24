@@ -13,6 +13,8 @@
 
 当前用户流程只需准备原始 Z30 C 1.20 固件包和本项目 patch 程序。默认 full 包含同屏、自定义电子快门声音、M 档 900 秒曝光、MTP 加速、视频自动方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印和陀螺仪电子防抖，不包含状态页面。
 
+2026-11-24 新增 SD 卡加载（实验）：`tools/build_card.py` 输出常驻 EG（原厂 + 带常用字的中文字体 + 加载器）和 `Z30/WL.PATCH`，功能在开机后从卡上读入 RAM。普通整包构建不受影响，产物与此前逐字节相同。见 [SD 卡加载说明](card-loader.md)。
+
 ## 发布 Windows 图形界面程序
 
 Keystone 为 GPLv2，其 FOSS 例外未列入 Wonder Lantern Community License，因此发布包不包含 Keystone，只附带预先汇编的机器码。维护者在项目根目录运行：
@@ -23,7 +25,7 @@ python tools/build_asm_cache.py
 python tools/build_gui_exe.py
 ```
 
-`build_asm_cache.py` 汇编全部 1023 种功能组合，再禁用 Keystone 重建并比对哈希，不一致时删除缓存。补丁代码改动后必须重新生成，否则受影响的组合在打包程序中会报错。结果是 `dist/WonderLanternZ30-windows-x64.zip`，已附带许可证文本。
+`build_asm_cache.py` 汇编全部 1023 种功能组合，再禁用 Keystone 重建并比对哈希，不一致时删除缓存。补丁代码改动后必须重新生成，否则受影响的组合在打包程序中会报错。结果是 `dist/WonderLanternZ30-windows-x64.zip`，已附带许可证文本。缓存不覆盖 SD 卡构建（尾部链接在其他基址），卡构建需要 Keystone，图形界面暂不提供。
 
 ## 运行
 

@@ -32,6 +32,14 @@ python -m unittest discover -s tests -v
 
 覆盖输入身份、CRC、补丁边界与重叠、原字节校验、追加对齐、容量、Thumb 指令生成和合成输入的解码掩码恢复。
 
+SD 卡加载（[说明](card-loader.md)）：
+- `tests/test_card.py`：重定位与卡文件格式，参考加载器结果与直接在该基址链接的结果逐字节相同，各种不一致都不写入；
+- `tests/test_card_loader.py`：在 Unicorn 中执行真正的 Thumb 加载器，`full` 加载结果与参考加载器逐字节相同，并覆盖无文件、CRC、常驻 id、截断、多余数据、内存不足和预期不符；
+- `tests/test_mmu_probe.py`：MMU 探测模块的指令流；
+- `tests/test_fonts.py`：用 `common=True` 扩展的字体里约 7700 个新字形逐个取回一致。
+
+2026-11-24 实机：`full` 卡文件加载正常（`WL.LOG` 为 `S=01`），拔卡恢复原厂，损坏文件被拒绝（`S=07`），固件升级不受影响。
+
 `video-rot` 单元测试使用合成 EG（仅替换测试中的身份常量），执行真实 Plan、预设构建和 CRC 路径，核对四份大端矩阵、两处钩子、追加区、共享矩阵不变、expected 不匹配拒绝及报告。构建测试需要 Keystone，未安装时明确跳过。预设/CLI 测试核对显式接入、重复选择、菜单第 7 项和默认范围不变。
 
 ## 自动视频方向离线检查

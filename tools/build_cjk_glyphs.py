@@ -3,8 +3,12 @@
   python tools/build_cjk_glyphs.py --firmware Z_30_0120.bin --write
   python tools/build_cjk_glyphs.py --firmware Z_30_0120.bin --check
 
-Adds every printable ASCII character and every character of the Chinese UI
-labels (ui_text.TRANSLATIONS) that stock fonts 0/2 lack. Han and other
+Adds every printable ASCII character, every character of the Chinese UI
+labels (ui_text.TRANSLATIONS) and a standard set of common characters that
+stock fonts 0/2 lack: GB2312 level 1 (3755) for the simplified font 2 and Big5
+level 1 (5401) for the traditional font 0. With the common sets in the EG, new
+labels rarely need new glyphs, so card patches (docs/card-loader.md) can add
+features without reflashing. Han and other
 full-width characters come from Noto Sans CJK TC/SC Regular, ASCII from the
 half-width Noto Sans Mono CJK SC Regular (all SIL OFL 1.1, in --noto-dir).
 Each font gets its own placement, least-squares fitted on the bounds of
@@ -32,6 +36,26 @@ LATIN = 'NotoSansMonoCJKsc-Regular.otf'
 OUTPUT = ROOT / 'src/z30_extensions/platform' / EXTRA_GLYPHS
 
 
+def gb2312_level1():
+    """The 3755 level-1 hanzi: rows 0xB0..0xD7, row 0xD7 ends at 0xF9."""
+    return {bytes((lead, trail)).decode('gb2312') for lead in range(0xB0, 0xD8)
+            for trail in range(0xA1, 0xFA if lead == 0xD7 else 0xFF)}
+
+
+def big5_level1():
+    """The 5401 frequently used hanzi of Big5: 0xA440..0xC67E."""
+    chars = set()
+    for lead in range(0xA4, 0xC7):
+        for trail in list(range(0x40, 0x7F)) + list(range(0xA1, 0xFF)):
+            if (lead, trail) > (0xC6, 0x7E):
+                break
+            chars.add(bytes((lead, trail)).decode('big5'))
+    return chars
+
+
+COMMON = {HANS_FONT: gb2312_level1, HANT_FONT: big5_level1}
+
+
 def stock_glyphs(image, font):
     records = glyph_addresses(image, font)
     return {chr(cp): decode_glyph(image.read(records[glyph + cp - first], 4096))[0]
@@ -49,7 +73,7 @@ def generate(firmware, noto):
                                         if '一' <= c <= '鿿' and g.flags == FULL_WIDTH})
         latin_place = fit_placement(latin, {c: g for c, g in stock.items()
                                             if c in ASCII and g.flags == HALF_WIDTH})
-        wanted = set(ASCII) | {c for pair in TRANSLATIONS.values() for c in pair[column]}
+        wanted = set(ASCII) | {c for pair in TRANSLATIONS.values() for c in pair[column]} | COMMON[font]()
         added = {}
         for char in sorted(wanted - set(stock)):
             if char.isascii():
@@ -77,7 +101,7 @@ def main():
     if args.write:
         OUTPUT.write_text(text, encoding='utf-8', newline='\n')
         for font, glyphs in data['fonts'].items():
-            print(f'font {font}: {len(glyphs)} glyphs: {"".join(glyphs)}')
+            print(f'font {font}: {len(glyphs)} glyphs added')
     elif OUTPUT.read_text(encoding='utf-8') != text:
         sys.exit(f'{OUTPUT.name} differs from the generated glyphs')
     else:

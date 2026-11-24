@@ -6,7 +6,7 @@
 
 ## 基本原则
 
-1. **升级路径必须可用。** 每个交给他人上机的构建，都必须仍能进入 **设定菜单 → 固件版本** 并正常升级。这是刷回原厂固件的唯一途径。凡是改动原厂共享数据（字体、样式、菜单表）的功能，都要先跑[交付前检查](#交付前检查)。
+1. **升级路径必须可用。** 每个要刷进相机的 EG（整包构建，或 SD 卡加载的常驻 EG）都必须仍能进入 **设定菜单 → 固件版本** 并正常升级，这是换掉它的唯一途径。凡是改动原厂共享数据（字体、样式、菜单表）的功能，都要先跑[交付前检查](#交付前检查)。只换 SD 卡文件（`Z30/WL.PATCH`）的测试不需要这项检查：拔卡或换文件就能恢复。
 2. **补丁只针对原厂字节。** 每处修改都带原字节；原字节不符就拒绝构建。不改动原厂数据本体：需要改的表先复制到尾部，再把引用重定向过去。
 3. **不分发原厂内容。** 仓库和发布包里不放原厂固件、解码后的模块、生成的 EG 或原厂字形位图。需要原厂数据时，在构建时从用户提供的固件读取。
 4. **证据分开记录。** 区分离线检查、QEMU 检查和实机反馈；文档只写有证据的结论，没验证的就写“未验证”。
@@ -19,7 +19,7 @@ python -m pip install -e '.[sound,verify]'
 
 - **Python 3.10+。** `sound` 安装 Keystone（汇编补丁代码），`verify` 安装 Unicorn（执行原厂与补丁指令的测试）。
 - **原厂固件。** 把未修改的 `Z_30_0120.bin` 放在仓库根目录（已被 `.gitignore` 忽略），依赖固件的测试和工具会自动使用它；没有它时这些测试会跳过。
-- **QEMU（可选）。** 把 [z30-qemu](https://github.com/WonderLantern/z30-qemu)（基于 WonderLantern/z7-qemu 的 Z30 模拟机）克隆到本仓库旁边（`../z30-qemu`），按它的 README 构建，并把解码后的原厂模块放到 `../z30-qemu/.local/firmware/eg2090_0120a0.bi`。QEMU 工具在 Linux 或 WSL 中用 `python3` 运行，传 `--qemu-root ../z30-qemu`。
+- **QEMU（可选）。** 把 [z30-qemu](https://github.com/WonderLantern/z30-qemu)（基于 WonderLantern/z7-qemu 的 Z30 模拟机）克隆到本仓库旁边（`../z30-qemu`），按它的 README 构建，并把解码后的原厂模块放到 `../z30-qemu/.local/firmware/eg2090_0120a0.bi`。QEMU 工具在 Linux 或 WSL 中用 `python3` 运行，传 `--qemu-root ../z30-qemu`。SD 卡加载的常驻 EG 约 37 MB，超出了模拟机原来 `0x2200000` 的 ROM 区；模拟机的 ROM 区要和真机 EG bank 一样大（`0x2940000`，`nikon-z30.c` 与 `nikon-z30-display.c`），否则写入镜像时报 `E14`。
 - **补字字体（只在增加中文标签时需要）。** `python -m pip install fonttools`，再把 [noto-cjk](https://github.com/notofonts/noto-cjk) 的 `Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf`、`Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf` 和 `Sans/Mono/NotoSansMonoCJKsc-Regular.otf` 下载到 `build/fonts/noto-cjk/`。
 
 ## 仓库结构
@@ -31,6 +31,9 @@ python -m pip install -e '.[sound,verify]'
 | `src/z30_extensions/build.py` | `PRESETS`、`FEATURE_ORDER`、预设展开与功能组合 |
 | `src/z30_extensions/container.py` | 校验并解码 `Z_30_0120.bin`，提取 EG 模块 |
 | `src/z30_extensions/plan.py`、`patch.py` | 补丁计划（尾部分配、原字节校验）与应用、CRC 重建、报告 |
+| `src/z30_extensions/card.py` | SD 卡加载：常驻 EG、多基址链接与重定位、`WL.PATCH` 格式、参考加载器 |
+| `src/z30_extensions/features/card_loader.py` | 常驻加载器（Thumb，IMU 任务触发） |
+| `src/z30_extensions/mmu_probe.py` | 研究用 ZMOD：读取 MMU 设置并测试代码区能否写入 |
 | `src/z30_extensions/assembly.py` | Keystone 汇编、预汇编缓存和常用指令片段 |
 | `src/z30_extensions/platform/z30_120.py` | 原厂模块身份、地址映射（`StockImage`） |
 | `src/z30_extensions/platform/fonts.py` | 原厂字体格式：字符表、字形索引、轮廓编解码、字体重建 |
@@ -65,6 +68,15 @@ def add(plan):
 - **原厂数据表：** 不要直接改。先复制到尾部，再把引用它的字面量改过去。改之前要找全所有引用，例子见 `features/cjk_fonts.py`：字体指针表和大小表是两张表，只复制一张会让原厂语言页卡死。
 - **汇编缓存：** `assemble()` 先查 `asm_cache.gz`，没命中才调用 Keystone。改动汇编源码后，Windows 发布包需要重新生成缓存（见[发布](#发布)）。
 
+### SD 卡构建的额外要求
+
+`card.build_card` 用 `Plan(card=True, tail_base=…)` 把尾部链接到 `0x20000000` 等三个基址，相互比对后推导重定位，再由加载器放进 RAM（[说明](docs/card-loader.md)）。功能代码要同时满足：
+
+- **地址只能线性依赖尾部基址。** 用 `plan.alloc` 返回的地址、`constant()`（MOVW/MOVT）和 32 位字面量都可以；对尾部地址做移位、截断等非线性运算时，构建会报“address dependence is neither ABS32 nor MOVT”。不要写死尾部地址，也不要假设尾部紧跟在原厂镜像之后（`liveview_dual` 和 `liveview_full_info` 为此接受 `tail_base`）。
+- **edits 只能落在可写区。** 相机上只有 EG 的 `0x10000000..0x106FFFFF` 是 DRAM 副本，另外 scatter 数据开机后在 RAM `0xC1800000..`；`0x10700000` 之后的表、菜单记录等都写不进去，`card.runtime_address` 会拒绝。遇到这种表，在 `getattr(plan, 'card', False)` 分支里用 `plan.copy_table` 复制一份改好的副本，再改可写区里引用它的那个指针。例子：`wifi_5ghz.py`、`bitrate_slowmo_uncap.py`、`shutter_sound.seed_record`。普通整包构建不走这个分支，产物保持不变。
+- **开机就读的数据要放常驻 EG。** 加载器在开机约 3 秒后才运行，例如 CJK 字体表就在常驻 EG 里（`cjk_fonts.add(..., common=True)`），卡构建通过 `plan.resident` 引用它。
+- `full` 的卡构建由 `tests/test_card.py` 和 `tests/test_card_loader.py` 覆盖；新功能进入 `full` 后自动受检。
+
 ## 新增功能或预设
 
 1. 在 `src/z30_extensions/features/` 写实现，并在 `build.py` 的 `build()` 里按顺序调用。
@@ -77,14 +89,15 @@ def add(plan):
 ## 菜单文字与中文字库
 
 - **标签与翻译：** 菜单标签通过 `ui_text.TextResources.alloc('English text')` 分配；中文翻译写在 `ui_text.TRANSLATIONS`，每条最多 24 个 UTF-16 码元。
-- **原厂字体：** 原厂中文字体（简体字体 2、繁体字体 0）只含菜单用字。构建时 `cjk_fonts` 会补上 `platform/z30_120_extra_glyphs.json` 里的字形：全部可打印 ASCII，加上标签需要的缺字。
+- **原厂字体：** 原厂中文字体（简体字体 2、繁体字体 0）只含菜单用字，各约 720 个汉字。`platform/z30_120_extra_glyphs.json` 里有全部可打印 ASCII、标签需要的缺字，以及常用字集：简体 GB2312 一级字，繁体 Big5 常用字，共约 7700 个字形。普通整包构建只补 ASCII 和标签用字（`cjk_fonts.label_chars`）；SD 卡加载的常驻 EG 用 `common=True` 全部补上，这样新标签通常不用重刷 EG。
+- **多个索引区间：** 字形索引区间内的偏移是 16 位，`extend_font` 会把新字形按 64 KiB 分成多个区间。
 - **缺字检查：** `check_glyphs()` 在构建时检查每个标签，用到字体里没有的字就报错。新增标签缺字时，运行：
 
   ```powershell
   python tools/build_cjk_glyphs.py --firmware Z_30_0120.bin --write
   ```
 
-  它会从 Noto 字体转换缺的字，并更新 JSON。这份 JSON 要和代码一起提交。
+  它会从 Noto 字体转换缺的字和常用字集，并更新 JSON（约 5.6 MB）。这份 JSON 要和代码一起提交。新字不在常用字集里时，SD 卡加载的常驻 EG 会随之改变，需要重刷。
 - **查询与预览：** `tools/font_coverage.py 某词` 查原厂字体缺哪些字；`tools/render_stock_glyphs.py --fill-from <Noto OTF> 文字 -o out.png` 预览原厂字和补字混排的效果。
 - **格式细节：** 字体格式和相关证据见 [UI 验证记录](docs/ui-qemu.md)。
 
@@ -116,16 +129,22 @@ python -m unittest discover -s tests
 - **地区码：** 模拟机默认是无效值 `0xFF`，语言页只显示 English。要用 `--region` 指定 0–12 才能覆盖真实的语言列表（地区 9 是中文简繁，地区 5、6、7、12 是含中文的长列表）。
 - **SD 卡：** 模拟机不挂载虚拟 SD 卡，升级本身只能在相机上验证。
 - **启动方式：** QEMU 是辅助启动，不能代替真实开机、录制、SD/USB 等实机测试。
+- **`--observe-fonts`：** 当前 `probe_language_page_qemu.py --observe-fonts` 在原厂固件上也会报 `Guest stopped unexpectedly: T02`，不能作为判据；检查语言页时用 `--region N --scroll 35`。
 
 ### 交付前检查
 
-把构建交给他人上机之前：
+把要刷进相机的 EG（整包构建或常驻 EG）交给他人上机之前：
 
 1. 全部单元测试通过。
 2. 构建输出到新的 `output/<名称>/` 目录（构建器不会自己建目录，也不覆盖已有文件），并记下 SHA-256，供对方核对。
 3. `verify_firmware_update_qemu.py` 在简体、繁体、英文三种语言下都打开原厂固件版本页。
 4. 改动涉及原厂共享数据（字体、样式、菜单）时，用多个地区码检查语言页，并跑受影响的菜单验证。
 5. 实机清单的第一项永远是：能进入固件版本页并正常升级。
+
+只交付新的 `WL.PATCH`（常驻 EG 不变）时：
+
+1. 全部单元测试通过，`tools/build_card.py --patch-only` 在已刷 EG 的输出目录里生成成功（常驻 id 一致）。
+2. 实机清单：放入卡文件后 `Z30/WL.LOG` 为 `S=01`，相关功能正常；拔卡恢复原厂。
 
 ## 实机记录
 
@@ -152,3 +171,4 @@ python tools/build_gui_exe.py
 
 - **生成缓存：** `build_asm_cache.py` 汇编全部功能组合，再在禁用 Keystone 的情况下重建并比对哈希。
 - **打包：** `build_gui_exe.py` 生成 `dist/WonderLanternZ30-windows-x64.zip`，附带全部许可证文本，包括 MIT、Wonder Lantern Community License、OFL、Python、Tcl/Tk 和 PyInstaller。
+- **SD 卡构建：** 预汇编缓存只覆盖整包构建，卡构建在其他基址链接，需要 Keystone；图形界面目前也不提供卡构建。

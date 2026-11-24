@@ -37,9 +37,13 @@ def gate_code(address, prologue, yes, no):
     return a.finish()
 
 
-def build(source):
+def build(source, tail_base=None):
+    """tail_base: assemble the tail for another address (card builds only;
+    the returned image is then not bootable and only its edits and tail count)."""
     stock = StockImage(source)
     source = stock.data
+    if tail_base is None:
+        tail_base = BASE + len(source) - 2
     if stock.words(0x1073F830 + 31 * 4, 1) != (HISTOGRAM,):
         raise ValueError('Unexpected histogram descriptor binding')
     if stock.words(HISTOGRAM + 4, 9) != (0x444,) * 9:
@@ -53,7 +57,7 @@ def build(source):
     for site, expected, prologue, yes, no in HOOKS:
         if site % 4 or stock.read(site, len(expected)) != expected:
             raise ValueError('Unexpected histogram instruction window')
-        entry = BASE + len(source) - 2 + len(append)
+        entry = tail_base + len(append)
         code = gate_code(entry, prologue, yes, no)
         jump = bytes.fromhex('dff800f0') + struct.pack('<I', entry | 1)
         jump += bytes.fromhex('00bf') * ((len(expected) - 8) // 2)
@@ -65,7 +69,7 @@ def build(source):
     edits.append(Edit(mask_address - BASE, struct.pack('<9I', *([0x444] * 9)),
                       struct.pack('<9I', *([0xCCC] * 9)), 'Histogram visibility masks'))
     from .liveview_full_info import add as add_full_info
-    full_info_hooks = add_full_info(stock, append, edits)
+    full_info_hooks = add_full_info(stock, append, edits, tail_base)
     output, report = apply_patch(source, edits, append, expected_sha256=STOCK_SHA256,
                                  base=BASE, capacity=CAPACITY)
     for address, expected in VIDEO_STOCK_WINDOWS:

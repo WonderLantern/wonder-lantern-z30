@@ -19,13 +19,15 @@ CYCLE_SITE = 0x10372536
 CYCLE_EXPECTED = bytes.fromhex('90f89601083d2c5c022c')
 
 
-def add(stock, tail, edits):
+def add(stock, tail, edits, tail_base=None):
     hooks = []
+    if tail_base is None:
+        tail_base = BASE + len(stock.data) - 2
 
     def hook(site, expected, source, name):
         if stock.read(site, len(expected)) != expected:
             raise ValueError(f'Unexpected full-info DISP window at {site:#x}')
-        entry = BASE + len(stock.data) - 2 + len(tail)
+        entry = tail_base + len(tail)
         code = assemble(source, entry, 256)
         tail.extend(code)
         tail.extend(bytes((-len(code)) % 4))

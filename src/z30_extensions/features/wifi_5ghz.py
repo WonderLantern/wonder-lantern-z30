@@ -7,6 +7,9 @@ This is a country-request override, not proof of effective radio channels.
 import struct
 
 TABLE_BASE = 0x114A37BC
+# The only reference to the table: a literal loaded at 0x101F5034 and 0x101F5040.
+# Card builds point it at an edited RAM copy; the table itself is not writable.
+TABLE_LITERAL = 0x101F51EC
 SLOT_COUNT = 34
 RECORD_SIZE = 12
 VALID_PROFILES = tuple(range(1, 11)) + tuple(range(14, 26))
@@ -23,10 +26,16 @@ def add(plan):
     # Check the reserved records and index fields we leave untouched as well.
     if plan.image.read(TABLE_BASE, len(EXPECTED_TABLE)) != EXPECTED_TABLE:
         raise ValueError('Unexpected stock Wi-Fi profile table')
-    for profile in VALID_PROFILES:
-        plan.edit(TABLE_BASE + RECORD_SIZE * profile, REQUEST,
-                  f'Wi-Fi profile {profile}: request US/-1 instead of AA/{profile}',
-                  struct.pack('<4sI', b'AA\0\0', profile))
+    patches = [(RECORD_SIZE * profile, REQUEST, struct.pack('<4sI', b'AA\0\0', profile))
+               for profile in VALID_PROFILES]
+    if getattr(plan, 'card', False):
+        copy = plan.copy_table(TABLE_BASE, len(EXPECTED_TABLE), patches)
+        plan.edit(TABLE_LITERAL, struct.pack('<I', copy), 'Wi-Fi profile table: edited RAM copy',
+                  struct.pack('<I', TABLE_BASE))
+    else:
+        for (offset, replacement, expected), profile in zip(patches, VALID_PROFILES):
+            plan.edit(TABLE_BASE + offset, replacement,
+                      f'Wi-Fi profile {profile}: request US/-1 instead of AA/{profile}', expected)
     plan.features['wifi_5ghz'] = {
         'profiles': list(VALID_PROFILES),
         'requested_country': 'US',

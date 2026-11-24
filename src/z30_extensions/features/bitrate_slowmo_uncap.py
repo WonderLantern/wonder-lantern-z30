@@ -37,6 +37,10 @@ STOCK_MBPS = {
 # Record index of each mode in the firmware table; 20-23 are the unused 720p rows.
 RECORDS = dict(zip(STOCK_MBPS, list(range(20)) + list(range(24, 30))))
 MODE_TABLE = 0x10713154
+MODE_RECORDS = 30
+# The only reference to the table: a literal loaded at 0x10355764 and 0x10355784.
+# Card builds point it at an edited RAM copy; the table itself is not writable.
+MODE_LITERAL = 0x10355798
 RECORD = 0x1C
 RATES = 0x14
 # The encoder keeps maximum kbit / 8 in 16 bits, so stay well below 536 Mbps.
@@ -85,15 +89,22 @@ def add(plan):
     if set(BITRATES_MBPS) - set(STOCK_MBPS):
         raise ValueError('Unknown movie mode in bitrate table')
     changed = {}
+    patches = []
     for mode, pair in BITRATES_MBPS.items():
         maximum, average = pair
         if not 0 < average <= maximum <= CEILING_MBPS:
             raise ValueError(f'Movie bitrate for {mode} must satisfy 0 < average <= maximum <= {CEILING_MBPS} Mbps')
         if tuple(pair) == STOCK_MBPS[mode]:
             continue
-        plan.edit(MODE_TABLE + RECORDS[mode] * RECORD + RATES, rates(pair),
-                  f'Movie bitrate {mode}', rates(STOCK_MBPS[mode]))
+        patches.append((RECORDS[mode] * RECORD + RATES, rates(pair), rates(STOCK_MBPS[mode]), mode))
         changed[mode] = {'maximum_mbps': maximum, 'average_mbps': average}
+    if getattr(plan, 'card', False):
+        copy = plan.copy_table(MODE_TABLE, MODE_RECORDS * RECORD, [p[:3] for p in patches])
+        plan.edit(MODE_LITERAL, struct.pack('<I', copy), 'Movie mode table: edited RAM copy',
+                  struct.pack('<I', MODE_TABLE))
+    else:
+        for offset, replacement, expected, mode in patches:
+            plan.edit(MODE_TABLE + offset, replacement, f'Movie bitrate {mode}', expected)
     for edit in SLOW_EDITS:
         plan.edit(*edit)
     plan.features['bitrate_slowmo_uncap'] = {'changed_bitrates': changed, 'slow_motion_length_limit_ms': SLOW_LIMIT_MS}

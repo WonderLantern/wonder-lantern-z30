@@ -269,19 +269,26 @@ def extend_font(blob, glyphs):
     if cursor != features:
         raise ValueError('Glyph index does not end at the feature table')
     first_new = last
-    records, offsets = bytearray(), []
+    # Offsets inside an index range are 16-bit, so the new glyphs get as many
+    # ranges as their records need, each covering at most 64 KiB of records.
+    records, groups = bytearray(), []
     for i, cp in enumerate(sorted(glyphs)):
-        offsets.append(len(records))
+        if not groups or len(records) - groups[-1][1] > 0xFFFF:
+            groups.append([first_new + i, len(records), []])
+        groups[-1][2].append(len(records) - groups[-1][1])
         records += encode_glyph(glyphs[cp])
         mapping[cp] = first_new + i
-    if first_new + len(glyphs) > 0xFFFF or len(records) > 0xFFFF:
-        raise ValueError('Too many added glyphs for one index range')
+    if first_new + len(glyphs) > 0xFFFF or ranges + len(groups) > 0xFFFF:
+        raise ValueError('Too many added glyphs')
     entries = [(0, 0, 0)] * (stock[0] == (0, 0, 0)) + _runs({cp: g for cp, g in mapping.items() if cp})
+    if len(entries) > 0xFFFF:
+        raise ValueError('Too many character map entries')
     cmap = struct.pack('<H', len(entries)) + b''.join(struct.pack('<3H', *e) for e in entries)
     grow_map = len(cmap) - (primary_end - primary)
     base = len(blob) - data          # appended after every stock record
-    new_range = struct.pack('<HIH', first_new, base, len(glyphs)) + struct.pack(f'<{len(glyphs)}H', *offsets)
-    grow_index = len(new_range) if glyphs else 0
+    new_range = b''.join(struct.pack('<HIH', first, base + start, len(offsets)) +
+                         struct.pack(f'<{len(offsets)}H', *offsets) for first, start, offsets in groups)
+    grow_index = len(new_range)
     header = bytearray(blob[:primary])
     struct.pack_into('<II', header, 0x2C, index + grow_map, data + grow_map + grow_index)
     struct.pack_into('<I', header, 0x3C, features + grow_map + grow_index)
@@ -289,7 +296,7 @@ def extend_font(blob, glyphs):
         struct.pack_into('<I', header, _HEADER + 7 + 5 * i, offset + grow_map)
     index_body = bytearray(blob[index:features])
     if glyphs:
-        struct.pack_into('<H', index_body, 0, ranges + 1)
+        struct.pack_into('<H', index_body, 0, ranges + len(groups))
         index_body += new_range
     return (bytes(header) + cmap + blob[primary_end:index] + bytes(index_body)
             + blob[features:] + bytes(records))

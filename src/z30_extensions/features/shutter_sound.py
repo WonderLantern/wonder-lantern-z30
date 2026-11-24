@@ -13,6 +13,20 @@ ROOT_ORDER = ('aspect', 'zebra', 'portrait', 'stamp', 'nef', 'bitrate', 'gyro', 
 
 
 
+# A menu object (scatter RAM) holds at +16 a pointer to its 5-word callback record;
+# the first word is the page init callback the menus replace.
+SEED_RECORD_BYTES = 20
+
+
+def seed_record(plan, menu_object, callback, name):
+    record = plan.image.words(menu_object + 16, 1)[0]
+    if getattr(plan, 'card', False):
+        # The records sit in EG flash the camera cannot write. Card builds give
+        # the object a RAM copy of its record instead (the object itself is RAM).
+        copy = plan.copy_table(record, SEED_RECORD_BYTES, [(0, struct.pack('<I', callback | 1), None)])
+        plan.edit(menu_object + 16, struct.pack('<I', copy), f'{name}: RAM record', struct.pack('<I', record))
+    else:
+        plan.edit(record, struct.pack('<I', callback | 1), name)
 
 def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, cmos_dump=False, cmos_trace=False, cmos_spi=False, cmos_window=False, lut_sd=False, lut_cube_text=None, lut_size=17):
     if lut_sd and (wireless or bitrate or precapture_probe):
@@ -279,7 +293,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
     dispatch_address = plan.alloc(im.read(setup_header[4], 38 * 4) + struct.pack('<I', entry_events))
     plan.edit(SETUP_META_SOURCE + 12, struct.pack('<2I', controls_address, dispatch_address), 'Sound settings entry tables')
     plan.edit(SETUP_META_SOURCE + 20, struct.pack('<I', (setup_header[5] & 0xFFFF0000) | 39), 'Settings row count with sound only')
-    plan.edit(im.words(SETUP_OBJECT + 16, 1)[0], struct.pack('<I', f['setup_init'] | 1), 'Seed sound entry before settings rows')
+    seed_record(plan, SETUP_OBJECT, f['setup_init'], 'Seed sound entry before settings rows')
     for menu in native:
         source = im.rom(im.words(menu['object'] + 40, 1)[0])
         header = im.words(source, 7)
@@ -304,7 +318,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, stamp=Fal
         dispatch = plan.alloc(im.read(header[4], count * 4) + struct.pack(f'<{len(row_events)}I', *row_events))
         plan.edit(source + 12, struct.pack('<2I', ascii_table, dispatch), f"Native {menu['name']} menu direct rows")
         plan.edit(source + 20, struct.pack('<I', (header[5] & 0xFFFF0000) | (count + len(row_events))), f"Native {menu['name']} menu row count")
-        plan.edit(im.words(menu['object'] + 16, 1)[0], struct.pack('<I', f[f"init_{menu['name']}"] | 1), f"Seed native {menu['name']} menu rows")
+        seed_record(plan, menu['object'], f[f"init_{menu['name']}"], f"Seed native {menu['name']} menu rows")
 
     # Stock leaf page 0x18f contains both a header and the native back bitmap.
     # Copy those records from the caller's stock, then use dynamic header text.

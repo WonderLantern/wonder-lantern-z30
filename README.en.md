@@ -10,6 +10,8 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 > - know how to update again from **Setup menu → Firmware version**.
 >
 > As long as the update page opens, you can return to stock firmware. Every test build the project hands out is checked for this first. The builder itself never connects to the camera or writes to an SD card.
+>
+> With the experimental [SD card loading](#sd-card-loading-experimental), the features are read from the card; if anything goes wrong, remove the card or replace the file. No reflash is needed.
 
 ## Features
 
@@ -106,6 +108,27 @@ Step-by-step instructions and common errors are in the [offline build guide](PAT
 
 Implementation details: [build notes](docs/build.md) (Chinese).
 
+### SD card loading (experimental)
+
+Instead of writing every feature into the EG, you can flash a **resident EG** once and keep the features on the SD card:
+
+| Part | Contents |
+| --- | --- |
+| Resident EG | Stock firmware, the Chinese fonts with common characters (GB2312 level 1, Big5 level 1) and a loader; without a card it behaves as stock |
+| `Z30/WL.PATCH` | Code and patches of the chosen features, read into RAM by the loader about 3 s after power-on |
+| `Z30/WL.LOG` | One result line whenever the card file was found; `S=01` means loaded |
+
+```powershell
+python tools/build_card.py --source "Z_30_0120.bin" --output "output/card"
+```
+
+- Flash `output/card/EG209020.BIN` and copy `output/card/Z30/WL.PATCH` to the `Z30` folder on the card. `--preset` selects features (default `full`).
+- To change features later, only replace the card file: rebuild with `--patch-only` in the same output folder. A card file only works with the resident EG it was built with; if the resident EG changes (a loader change, or a new label using characters outside the common sets), the tool stops and asks for a reflash.
+- Before writing anything the loader checks the CRC, the resident EG identity and every edit's original bytes; if any check fails it leaves camera memory untouched. Removing the card or replacing the file restores the camera.
+- The GUI does not support this mode yet; it needs the command line and Keystone.
+
+Confirmed on a Z30 C 1.20 on 2026-11-24: with the `full` card file every feature works; removing the card restores stock; a damaged card file is rejected (`S=07`) and the camera stays stock; firmware updates still work. Design, log codes and limits: [SD card loading](docs/card-loader.md) (Chinese).
+
 ## Using the features
 
 ### Menus and language
@@ -113,7 +136,7 @@ Implementation details: [build notes](docs/build.md) (Chinese).
 - **Menu entry:** new features live in **Setup menu → Extensions** (Simplified Chinese 自定义菜单, Traditional 自訂選單). A sound-only build names the entry `Shutter sound`.
 - **Direct rows:** Photo aspect, Photo zebra and Date stamp are also listed at the end of the photo shooting menu, and Video bitrate at the end of the video shooting menu; press up once from the first row to reach them. Direct rows show `--` on the right. These direct rows are verified in QEMU only.
 - **Language:** menus follow the stock **Language** setting and show Simplified Chinese, Traditional Chinese or English; other languages show English.
-- **Added glyphs:** the stock Chinese fonts only carry menu characters. Builds add every printable ASCII character and the characters the Chinese labels need, converted from Noto Sans CJK (SIL OFL 1.1). This does not provide arbitrary Chinese text input.
+- **Added glyphs:** the stock Chinese fonts only carry menu characters. Builds add every printable ASCII character and the characters the Chinese labels need; the resident EG for SD card loading also adds GB2312 level 1 and Big5 level 1. The glyphs are converted from Noto Sans CJK (SIL OFL 1.1). This does not provide arbitrary Chinese text input.
 
 ### Custom shutter sound
 
@@ -158,7 +181,7 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 
 | Area | Evidence |
 | --- | --- |
-| Build and unit tests | 145 unit tests pass; builds are byte-for-byte reproducible with zero CRC residue |
+| Build and unit tests | 248 unit tests pass; builds are byte-for-byte reproducible with zero CRC residue |
 | EG installation | Maintainer confirmed installation on Z30 C 1.20 |
 | Menus, language and added glyphs | QEMU native pages and Unicorn instruction checks; the added Chinese glyphs, the Language page (every region's list) and the firmware update page have QEMU checks and user camera confirmation |
 | Dual live view, shutter sound, M900, aspect profiles | Confirmed by users on camera |
@@ -169,6 +192,7 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 | Photo zebra | Live view, stock thresholds and file integrity verified on camera; the separate switch is checked in QEMU only |
 | MTP acceleration | Matches stock on 590 property-list replies, with faster queries |
 | Wi-Fi 5 GHz | A user confirmed 5 GHz connections; throughput and long-term stability untested |
+| SD card loading | The loader matches the reference implementation byte for byte in Unicorn; the resident EG's Language and firmware version pages are checked in QEMU; loading the `full` card file, recovery by removing the card, rejection of a damaged file and firmware updates are confirmed on camera |
 
 `camera_verified: false` in a build report means **the build script itself ran no camera test**; camera results are recorded in the feature documents.
 
@@ -181,6 +205,7 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 | [Build notes](docs/build.md) | Input checks, decoding, preset composition, patch flow |
 | [Verification](docs/verification.md) | Unit tests, stock instruction execution, camera evidence |
 | [UI verification log](docs/ui-qemu.md) | Menus, Chinese text, fonts and added glyphs, Language and firmware update pages |
+| [SD card loading](docs/card-loader.md) | Resident EG, card file format, loading steps, log codes and camera record; the earlier memory probe is in [MMU probe](docs/card-loader-probe.md) |
 | Feature documents | Linked from the feature table |
 | [Licenses and third-party notices](THIRD_PARTY_NOTICES.md) | Per-file licenses and asset sources |
 

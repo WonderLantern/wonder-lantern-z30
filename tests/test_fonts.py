@@ -90,10 +90,18 @@ class FontCoverageTests(unittest.TestCase):
 
     @unittest.skipUnless(FIRMWARE.exists(), 'Needs the stock Z_30_0120.bin in the repository root')
     def test_build_installs_extended_fonts(self):
+        self.check_extended_fonts(common=False)
+
+    @unittest.skipUnless(FIRMWARE.exists(), 'Needs the stock Z_30_0120.bin in the repository root')
+    def test_card_resident_installs_common_characters(self):
+        # Thousands of glyphs: several 64 KiB index ranges per font.
+        self.check_extended_fonts(common=True)
+
+    def check_extended_fonts(self, common):
         from z30_extensions.features import cjk_fonts
         from z30_extensions.plan import Plan
         plan, functions = Plan(stock_image().data), {}
-        table = cjk_fonts.add(plan, functions)
+        table = cjk_fonts.add(plan, functions, common=common)
         self.assertEqual(cjk_fonts.add(plan, functions), table)
         edit, = plan.edits
         report = plan.features['cjk_fonts']
@@ -111,11 +119,15 @@ class FontCoverageTests(unittest.TestCase):
         stock = struct.unpack('<25I', plan.image.read(FONT_TABLE, 100))
         stock_sizes = struct.unpack('<25I', plan.image.read(FONT_TABLE + 100, 100))
         for font in (HANT_FONT, HANS_FONT):
+            wanted = extra_glyphs(font) if common else {
+                c: r for c, r in extra_glyphs(font).items() if c in cjk_fonts.label_chars(font)}
+            if common:
+                self.assertGreater(len(wanted), 3000)
             self.assertGreaterEqual(pointers[font], tail)
             self.assertEqual(sizes[font], len(extend_font(font_blob(plan.image, font), {
-                ord(c): decode_glyph(bytes.fromhex(r))[0] for c, r in extra_glyphs(font).items()})))
+                ord(c): decode_glyph(bytes.fromhex(r))[0] for c, r in wanted.items()})))
             image = BlobImage(read(pointers[font], sizes[font]), font)
-            for char, record in extra_glyphs(font).items():
+            for char, record in wanted.items():
                 self.assertEqual(glyph_of(image, font, ord(char)), decode_glyph(bytes.fromhex(record))[0], char)
             self.assertEqual(glyph_of(image, font, ord('设' if font == HANS_FONT else '設')),
                              glyph_of(BlobImage(font_blob(plan.image, font), font), font,
