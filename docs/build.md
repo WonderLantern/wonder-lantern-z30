@@ -1,6 +1,6 @@
 # 从原始固件包构建功能扩展
 
-2026-11-11 新增 `gyro-evr`（陀螺仪电子防抖）并纳入 `full`；2026-11-13 上游加入 `portrait-ui`、2026-11-14 上游加入 `nef-menu`、同日新增 `3d-tracking`（[3D 跟踪](3d-tracking.md)）后共十四项功能（2026-11-14 再加 `af-frame-colour`，[对焦框颜色](af-frame-colour.md)，共十五项）；见[陀螺仪电子防抖](gyro-evr.md)。2026-11-12 起 `gyro-evr` 带有自定义菜单页（标准 / 增强 / 原厂裁切 / 关闭；2026-11-14 去掉标准 (RS)），单独选择时会自动带上 `shutter-sound` 菜单框架。
+2026-11-11 新增 `gyro-evr`（陀螺仪电子防抖）并纳入 `full`；2026-11-13 上游加入 `portrait-ui`、2026-11-14 上游加入 `nef-menu`、同日新增 `3d-tracking`（[3D 跟踪](3d-tracking.md)）后共十四项功能（2026-11-14 再加 `af-frame-colour`，[对焦框颜色](af-frame-colour.md)，共十五项；2026-11-24 `focal-length`（[焦距显示](focal-length.md)）纳入 `full`，共十六项）；见[陀螺仪电子防抖](gyro-evr.md)。2026-11-12 起 `gyro-evr` 带有自定义菜单页（标准 / 增强 / 原厂裁切 / 关闭；2026-11-14 去掉标准 (RS)），单独选择时会自动带上 `shutter-sound` 菜单框架。
 
 2026-11-03 `date-stamp`（JPEG 胶片风格日期水印）纳入 `full`，机内默认关闭；SD 模块宿主不再作为构建预设提供，`full` 不再包含它。见[日期水印说明](date-stamp.md)。
 
@@ -43,7 +43,7 @@ python patch.py --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 python patch.py liveview-dual m900 mtp-fast --source path/to/Z_30_0120.bin --output output/EG209020.BIN
 ```
 
-`full` 展开为全部十五项功能：同屏、M900、快门声音、MTP 加速、视频方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印、竖拍显示、陀螺仪电子防抖（`gyro-evr`）、3D 跟踪（`3d-tracking`）、对焦框颜色（`af-frame-colour`）和 NEF 压缩菜单（`nef-menu`）。`nef-uncompressed` 和 `nef-compressed` 不在 `full` 中，和 `full` 一起选时替换其中的 `nef-menu`，三者互斥。`modular` 现为同屏、M900 和快门声音；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra wifi-5ghz date-stamp portrait-ui gyro-evr 3d-tracking af-frame-colour nef-menu` 与 full 启用同一功能集合。SD 模块宿主的代码保留给研究工具，通过 `build(..., module_host=True)` 构建，不再出现在 patch 程序和图形界面中。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
+`full` 展开为全部十六项功能：同屏、M900、快门声音、MTP 加速、视频方向、高码率与慢动作扩展、多画幅、照片斑马纹、Wi-Fi 5 GHz、日期水印、竖拍显示、陀螺仪电子防抖（`gyro-evr`）、3D 跟踪（`3d-tracking`）、对焦框颜色（`af-frame-colour`）、焦距显示（`focal-length`）和 NEF 压缩菜单（`nef-menu`）。`nef-uncompressed` 和 `nef-compressed` 不在 `full` 中，和 `full` 一起选时替换其中的 `nef-menu`，三者互斥。`modular` 现为同屏、M900 和快门声音；`modular mtp-fast video-rot bitrate-slowmo-uncap aspect-profiles photo-zebra wifi-5ghz date-stamp portrait-ui gyro-evr 3d-tracking af-frame-colour focal-length nef-menu` 与 full 启用同一功能集合。SD 模块宿主的代码保留给研究工具，通过 `build(..., module_host=True)` 构建，不再出现在 patch 程序和图形界面中。重复功能只应用一次，构建顺序固定，同一功能集合的输出不会随输入顺序改变。报告记录 `selected_presets` 和展开后的 `enabled_features`。
 
 ### 视频码率与慢动作限制
 

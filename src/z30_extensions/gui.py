@@ -18,7 +18,7 @@ OUTPUT_STEM = 'EG209020'
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
-    'full': 'All fifteen features, including aspect profiles, the film-style date stamp, the portrait layout, the NEF compression menu, gyro e-VR, 3D tracking and the AF frame colours',
+    'full': 'All sixteen features, including aspect profiles, the film-style date stamp, the portrait layout, the NEF compression menu, gyro e-VR, 3D tracking, the AF frame colours and the focal length',
     'liveview-dual': 'Histogram and level together on a new full-info DISP page',
     'shutter-sound': 'Custom electronic shutter sound',
     'm900': '900-second exposure in M mode',
@@ -31,7 +31,7 @@ PRESET_LABELS_EN = {
     'portrait-ui': 'Portrait layout for photo live-view info when held upright, redrawn after each turn, off by default; included in full',
     'nef-uncompressed': 'Experimental: NEF fixed to uncompressed (confirmed on the camera as Packed 14-bit); not in full, replaces the nef-menu inside full',
     'nef-compressed': 'Experimental: NEF fixed to compressed (lossy), confirmed on the camera as Lossy type 2; not in full, replaces the nef-menu inside full',
-    'focal-length': 'Experimental: show the focal length for every CPU lens in photo live view (stock: power zoom only); always on; not in full',
+    'focal-length': 'Show the focal length for every CPU lens in photo live view (stock: power zoom only); always on; included in full',
     'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; included in full, all three choices confirmed on the camera',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
     'gyro-evr': 'Gyro e-VR: in-body gyro stabilization in movie mode when electronic VR is on; yaw, pitch and roll, cooperates with lens VR; Extensions menu Standard/Enhanced/Native crop/OFF; included in full',

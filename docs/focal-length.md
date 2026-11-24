@@ -16,7 +16,7 @@
 
 ## 构建
 
-可选 preset，不包含在默认 `full` 中：
+2026-11-24 起包含在默认 `full` 中，也可单独选择：
 
 ```powershell
 python patch.py focal-length --source Z_30_0120.bin --output output/EG209020-focal.BIN

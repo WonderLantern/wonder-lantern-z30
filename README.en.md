@@ -13,7 +13,7 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 
 ## Features
 
-`full` enables all fifteen features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate, date stamp, portrait UI, the NEF compression menu, gyro e-VR and 3D tracking automatically include the `shutter-sound` menu framework.
+`full` enables all sixteen features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate, date stamp, portrait UI, the NEF compression menu, gyro e-VR and 3D tracking automatically include the `shutter-sound` menu framework.
 
 | Preset | What it does | Notes |
 | --- | --- | --- |
@@ -32,6 +32,7 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 | `gyro-evr` | Gyro e-VR: in-body gyro stabilization while recording with electronic VR on; yaw, pitch and roll, cooperates with lens VR; Extensions menu: Standard / Enhanced / Native crop / OFF | [Doc](docs/gyro-evr.md) |
 | `3d-tracking` | 3D tracking: tracking started with OK or a half-press hands over to a detected person or animal (the fine subject box) as touch tracking does, also during a half-press; photo shooting menu Disable / Enable, OFF by default; **needs the AF-area mode Auto-area AF (people) or (animals)** | [Doc](docs/3d-tracking.md); research module confirmed on a camera, firmware build to be confirmed |
 | `af-frame-colour` | AF frame colours in the style of Nikon EXPEED 7 cameras (Z9, Z8, Z6III and others): the tracking and person / animal boxes are white, green when a half-press focuses and red when it does not, in AF-S and AF-C alike; the movie-mode person / animal box is white; plain auto-area AF-C frames turn green in focus; other frames unchanged; photo shooting menu Enable / Disable (Enable by default) | [Doc](docs/af-frame-colour.md); to be confirmed on a camera |
+| `focal-length` | Shows the focal length for every CPU lens in photo live view (stock: power-zoom lenses only); always on | [Doc](docs/focal-length.md), confirmed on a camera |
 
 ¹ `wifi-5ghz` only changes the wireless country request; it does not write the camera's sales region or NVRAM. Cameras that could use 2.4 GHz channels 12 and 13 may no longer connect on them (inferred, not tested). It does not promise a 5 GHz access point from the camera itself or faster transfers, and the channels and power in use must suit local rules.
 
@@ -76,7 +77,7 @@ python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
 ```
 
 - `.[sound]` installs the Keystone assembler. Every feature except `m900` or `wifi-5ghz` built on their own needs it.
-- Without presets, a multi-select menu lists `full`, the fifteen features above and the two optional presets below as entries 1–18; press Enter for `full`.
+- Without presets, a multi-select menu lists `full`, the sixteen features above and the two optional presets below as entries 1–19; press Enter for `full`.
 - Or name the presets directly, separated by spaces; repeated features apply once:
 
 ```powershell

@@ -31,7 +31,7 @@ class GuiHelperTests(unittest.TestCase):
     def test_selected_presets(self):
         self.assertEqual(gui.selected_presets({'full': True, 'm900': True}), ['full'])
         self.assertEqual(gui.selected_presets({'full': True, 'date-stamp': True}), ['full'])
-        self.assertEqual(gui.OPT_IN_PRESETS, ('focal-length', 'nef-uncompressed', 'nef-compressed'))
+        self.assertEqual(gui.OPT_IN_PRESETS, ('nef-uncompressed', 'nef-compressed'))
         self.assertEqual(gui.selected_presets({'full': True, 'portrait-ui': True}), ['full'])
         self.assertEqual(gui.selected_presets({'full': True, 'nef-menu': True}), ['full'])
         self.assertEqual(gui.selected_presets({'full': True, 'nef-compressed': True}), ['full', 'nef-compressed'])

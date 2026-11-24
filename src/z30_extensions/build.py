@@ -12,11 +12,9 @@ LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
                  'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
                  'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length', 'nef-menu', 'nef-uncompressed', 'nef-compressed')
-EXPERIMENTAL_FEATURES = ('focal-length',)  # opt-in builds, not part of full
 NEF_FIXED_FEATURES = ('nef-uncompressed', 'nef-compressed')
 NEF_COMPRESSION_FEATURES = ('nef-menu',) + NEF_FIXED_FEATURES
-FULL_FEATURES = tuple(name for name in FEATURE_ORDER
-                      if name not in NEF_FIXED_FEATURES + EXPERIMENTAL_FEATURES)
+FULL_FEATURES = tuple(name for name in FEATURE_ORDER if name not in NEF_FIXED_FEATURES)
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 
 
