@@ -30,7 +30,12 @@ def install(plan, functions, codes, sizes, profiles):
     shapes = {tuple(wh) for p in profiles for wh in p['jpeg_wh']}
     # NEF may describe the padded RAW plane rather than the visible JPEG.
     # The XPAN sample has 5600x2072 in its RAW IFD and 5568x2056 in JPEG SOF.
+    # Keep those v43 padded planes for photos already taken; since issue 38
+    # new NEFs carry the stock DX/16:9 plane instead. Stock NEFs sharing those
+    # shapes read their own preview sizes; DX previews exceed the 1920x1080
+    # bound and fall back to the stock path unchanged.
     shapes.update((p['jpeg_wh'][0][0]+32, p['jpeg_wh'][0][1]+16) for p in profiles)
+    shapes.update(tuple(p['raw_plane_wh']) for p in profiles)
     shapes = sorted(shapes)
     shape_table = plan.alloc(b''.join(struct.pack('<2H', *wh) for wh in shapes))
 

@@ -49,7 +49,28 @@ def preview_dimensions(width, height, box):
     return nearest4(max_h * width, height, max_w), max_h
 
 
-def build_trial(stock, profile):
+STOCK_RAW_PLANES = {
+    # Stock RAW plane (selector 0x1020BFC8 L / 0x1020C05C M) and its sensor
+    # origin (0x1020C072) for the native area each custom profile builds on.
+    'dx': dict(large=(5600, 3728), reduced=(4200, 2796), origin=(0, 0)),
+    '16:9': dict(large=(5600, 3144), reduced=(4200, 2358), origin=(0, 292)),
+}
+
+
+def raw_plane(profile):
+    p, q = PROFILES[profile]
+    return STOCK_RAW_PLANES['dx' if p * 2 < q * 3 else '16:9']
+
+
+def build_trial(stock, profile, stock_raw_plane=True):
+    """Build one independent area-2 geometry.
+
+    stock_raw_plane=True (issue 38): NEF RAW keeps the native DX or 16:9
+    plane, which raw converters know. The JPEG processing window keeps the
+    camera-verified custom position: the edge table compensates for the
+    stock vertical origin. stock_raw_plane=False reproduces v43 geometry
+    (custom RAW plane such as 5600x2072), kept for regression comparison.
+    """
     p, q = PROFILES[profile]
     sizes = dimensions(p, q)
     width, height = sizes[0]
@@ -73,22 +94,36 @@ def build_trial(stock, profile):
     source_crop = 0x115A4E20 if narrow else 0x115A4E38
     source_edges = 0x115A4E98 if narrow else 0x115A4EB0
     source_sizes = DX if narrow else ((5568, 3128), (4176, 2344), (2784, 1560))
-    pair(0x115A4D54, (x, y), 'internal area offset')
+    plane = raw_plane(profile)
+    if stock_raw_plane:
+        origin = plane['origin']
+        large, reduced = plane['large'], plane['reduced']
+    else:
+        origin = (x, y)
+        large = (width + 32, height + 16)
+        reduced = (medium_w + 24, medium_h + (12 if narrow else 14))
+    pair(0x115A4D54, origin, 'internal area offset')
     for i, wh in enumerate(sizes):
         pair(0x115A4DB4 + i * 4, wh, f'output size {i}')
     for table in (0x115A4D78, 0x115A4DF0):
-        pair(table, (width + 32, height + 16), 'internal large dimensions')
-        pair(table + 8, (medium_w + 24, medium_h + (12 if narrow else 14)),
-             'internal reduced dimensions')
+        pair(table, large, 'internal large dimensions')
+        pair(table + 8, reduced, 'internal reduced dimensions')
+    # Native configuration adds the origin y to the edge y (absolute sensor
+    # rows), while RAW-plane-relative consumers use the edge alone. Moving
+    # the origin by -dy and the edge by +dy keeps both at the v43 position.
+    # The x origin is not part of the processing window; RAW-plane-relative
+    # descriptors need +dx, applied by a separate selector table in the UI.
+    dx, dy = x - origin[0], y - origin[1]
+    descriptor_edges = []
     for i in range(6):
         original = struct.unpack('<2H', plan.image.read(source_crop + i * 4, 4))
         index = 0 if i < 3 else 1
         delta = tuple(a - b for a, b in zip(sizes[index], source_sizes[index]))
         pair(0x115A4E38 + i * 4, tuple(a + b for a, b in zip(original, delta)),
              f'crop variant {i}')
-        pair(0x115A4EB0 + i * 4,
-             struct.unpack('<2H', plan.image.read(source_edges + i * 4, 4)),
-             f'crop edge variant {i}')
+        edge_x, edge_y = struct.unpack('<2H', plan.image.read(source_edges + i * 4, 4))
+        pair(0x115A4EB0 + i * 4, (edge_x, edge_y + dy), f'crop edge variant {i}')
+        descriptor_edges.append((edge_x + dx, edge_y + dy))
     # Native configuration keeps a full-width parent and applies horizontal
     # trim separately. All three JPEG size selections use this sensor crop.
     for i in range(3):
@@ -101,6 +136,9 @@ def build_trial(stock, profile):
     candidate, report = plan.finish()
     report.update(profile=profile, ratio=[p, q], target_jpeg_wh=sizes,
                   target_large_in_dx_xywh=[x, y, width, height], geometry_edits=edits,
+                  raw_plane_wh=list(large), raw_origin_xy=list(origin),
+                  stock_raw_plane=stock_raw_plane,
+                  descriptor_edges=[list(v) for v in descriptor_edges],
                   status='emulator_only_not_camera_ready',
                   replaces='Existing area 2 in this independent trial; no menu expansion',
                   limitations=[

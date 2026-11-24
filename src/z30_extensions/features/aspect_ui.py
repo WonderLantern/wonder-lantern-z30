@@ -49,6 +49,7 @@ FILE_GEOMETRY_CALLERS = (
     0x1038FAEB, 0x1038FB03, 0x103A8C9F, 0x103A8D7B, 0x103AF625,
 )
 
+DESCRIPTOR_EDGES = 0x115A4EB0  # Area-2 slot of the shared edge table.
 PREVIEW_DIRECT_SPAN = (0x1157223C, 80)
 # Literal reads in the independent preview pixel-buffer producers. Strides
 # stay stock; the immutable copies only replace index-1 output dimensions.
@@ -89,6 +90,8 @@ def prepare(plan, f, resources, allocation_size, *, trace=False, border=False, b
         geometries.append(tuple(report['target_large_in_dx_xywh']))
         profiles.append(dict(name=profile,ratio=report['ratio'],jpeg_wh=report['target_jpeg_wh'],
                              large_xywh=report['target_large_in_dx_xywh'],
+                             raw_plane_wh=report['raw_plane_wh'],raw_origin_xy=report['raw_origin_xy'],
+                             descriptor_edges=report['descriptor_edges'],
                              preview_wh=[preview_dimensions(*report['target_jpeg_wh'][0], box)
                                          for box in ((640,360),(1920,1080))]))
     pointer_table = plan.alloc(struct.pack('<12I', *(v for row in copies for v in row)))
@@ -255,13 +258,28 @@ def prepare(plan, f, resources, allocation_size, *, trace=False, border=False, b
     selector('aspect_offset',0x1020C072,128,f'''push {{r4,lr}};mov r4,lr;
         {c('r1',0x115a4d4c)}add r0,r1,r0,lsl #2;mov r1,r4;{call('aspect_file_guard')}pop {{r4,pc}};''')
     for name,address,offset,fallback in (('aspect_crop',0x1020C07C,0x3c,0xc),
-                                        ('aspect_edges',0x1020C0D2,0x50,0x10),
-                                        ('aspect_desc_edges',0x1020C128,0x64,0x10)):
+                                        ('aspect_edges',0x1020C0D2,0x50,0x10)):
         selector(name,address,224,f'''push {{r4-r6,lr}};mov r6,lr;cmp r0,#0;bne fixed;
             mov r4,r1;mov r0,r2;mov r1,r3;{call('aspect_index')}mov r5,r0;
             {c('r0',0xc18c7de8+offset)}ldr r0,[r0,r4,lsl #2];add r0,r0,r5,lsl #2;
             mov r1,r6;{call('aspect_file_guard')}pop {{r4-r6,pc}};
             fixed:{c('r0',0x115a4c80+fallback)}pop {{r4-r6,pc}};''')
+    # Area 2 shares one native table for processing edges (absolute x) and
+    # RAW-plane-relative descriptor edges. With the stock RAW plane (issue
+    # 38), narrow profiles need the descriptor x shifted by their crop origin,
+    # so a translated area-2 descriptor pointer reads a separate table.
+    descriptor_tables = plan.alloc(b''.join(struct.pack('<2H', *wh) for p in profiles
+                                            for wh in p['descriptor_edges']))
+    selector('aspect_desc_edges',0x1020C128,288,f'''push {{r4-r7,lr}};mov r6,lr;cmp r0,#0;bne fixed;
+        mov r4,r1;mov r0,r2;mov r1,r3;{call('aspect_index')}mov r5,r0;
+        {c('r0',0xc18c7de8+0x64)}ldr r0,[r0,r4,lsl #2];add r0,r0,r5,lsl #2;mov r7,r0;
+        mov r1,r6;{call('aspect_file_guard')}cmp r0,r7;beq done;mov r5,r0;
+        {c('r1',DESCRIPTOR_EDGES)}subs r4,r7,r1;cmp r4,#24;bhs keep;
+        {call('aspect_get')}cmp r0,#0;beq keep;ldr r0,[r0];subs r0,#1;cmp r0,#5;bhi keep;
+        add r0,r0,r0,lsl #1;{c('r1',descriptor_tables)}add r1,r1,r0,lsl #3;add r0,r1,r4;b done;
+        keep:mov r0,r5;
+        done:pop {{r4-r7,pc}};
+        fixed:{c('r0',0x115a4c80+0x10)}pop {{r4-r7,pc}};''')
     # Horizontal trim comes from a direct PC-relative table reference.
     codes['aspect_trim'] = f'''push {{r0,r1,r3,lr}};{c('r0',0x11571e18)}
         {call('aspect_translate')}mov r2,r0;pop {{r0,r1,r3,lr}};
@@ -370,6 +388,8 @@ def prepare(plan, f, resources, allocation_size, *, trace=False, border=False, b
         trace_info=install(plan,f,codes,sizes)
     from .aspect_raw_playback import install as install_raw_playback
     raw_playback = install_raw_playback(plan, f, codes, sizes, profiles)
+    from .aspect_xmp_crop import install as install_xmp_crop
+    xmp_crop = install_xmp_crop(plan, f, codes, sizes, profiles)
     from .aspect_mask import STATE_SIZE as MASK_STATE_SIZE
     mask_extra = MASK_STATE_SIZE if mask else 0
     if mask:mask_offset = state_offset+16
@@ -379,7 +399,7 @@ def prepare(plan, f, resources, allocation_size, *, trace=False, border=False, b
                 trace=trace_info, border=border, border_cache_offset=border_cache_offset if border else None,
                 border_diagnostic=border_diagnostic,
                 border_lease=border_lease, mask=mask, mask_trial=mask_trial, mask_state=mask_state,
-                raw_playback=raw_playback,
+                raw_playback=raw_playback, xmp_crop=xmp_crop,
                 codes=codes,geometry_table=geometry_table,selectors=selectors,
                 function_names=list(codes),shadows=copies,sizes=sizes,profiles=profiles)
 
@@ -397,7 +417,11 @@ def finish(plan, f, extension, identifiers):
         config_magic=hex(MAGIC),config_version=2,
         preview_geometry_version=2,
         playback_isolation_version=1,
+        stock_raw_plane_version=1,
+        raw_plane_policy='NEF RAW keeps the native DX (narrow) or 16:9 (wide) plane; '
+                         'JPEG processing window and previews keep the selected profile',
         raw_preview_playback=extension['raw_playback'],
+        xmp_crop=extension['xmp_crop'],
         file_geometry_callers=[hex(v) for v in FILE_GEOMETRY_CALLERS],
         narrow_source_window_version=0,
         native_area_sync_version=1,

@@ -118,6 +118,34 @@ def verify(stock, image, report, sample=None):
                                 assert (width,height)==previews[kind], (wh,file_type,flags,index,width,height)
                     cases.append(dict(file_wh=wh,file_type=file_type,flags=flags,legacy=legacy,
                                       changed=outputs[0]!=outputs[1],queries=len(current.queries)))
+    # Issue 38: new custom NEFs share the stock 16:9 / DX RAW planes. A stock
+    # NEF of the same plane (stock main JPEG and previews) must keep the exact
+    # native descriptor; a new custom NEF must receive its own previews.
+    stock_planes=[]
+    for wh,main,previews,custom in (
+            ((5600,3144),(5568,3128),{4:(640,360),5:(1920,1080)},False),
+            ((5600,3728),(5568,3712),{4:(640,424),5:(1620,1080)},False),
+            ((5600,3144),(5568,2056),{4:(640,236),5:(1920,708)},True),
+            ((5600,3728),(4952,3712),{4:(640,480),5:(1440,1080)},True)):
+        assert list(wh) in shapes, wh
+        for file_type in (1,2):
+            for flags in (0,1<<4,1<<11):
+                outputs=[]
+                for fixture in (original,current):
+                    fixture.prepare(list(wh),file_type,flags)
+                    fixture.u.mem_write(META+12,struct.pack('<2H',*main))
+                    fixture.preview=previews
+                    fixture.call(0x103472DE,(OBJ,))
+                    outputs.append(bytes(fixture.u.mem_read(DESC,0x90)))
+                if not custom:
+                    assert outputs[0]==outputs[1], ('stock plane NEF changed',wh,file_type,flags)
+                else:
+                    for index in range(6):
+                        kind,enabled,width,height=struct.unpack_from('<B3x3I',outputs[1],index*24)
+                        if enabled==1 and kind in (4,5):
+                            assert (width,height)==previews[kind], (wh,main,file_type,flags,kind)
+                stock_planes.append(dict(file_wh=list(wh),main_wh=list(main),custom=custom,
+                                         file_type=file_type,flags=flags))
     full_metadata=[]
     for file_type in (1,2):
         for flags in (0,1<<4,1<<11):
@@ -157,6 +185,7 @@ def verify(stock, image, report, sample=None):
     assert any(row['changed'] for row in cases), 'Must reproduce stock-size mismatch'
     return dict(image_sha256=hashlib.sha256(image).hexdigest(),native_producer_cases=cases,
                 metadata_cases=metadata_cases,full_metadata_cases=full_metadata,rejected_queries=rejected,
+                stock_plane_nef_cases=stock_planes,
                 sample_stream_dimensions_verified=bool(sample),file_service_is_fixture=True,
                 jpeg_decoder_executed=False,physical_playback_verified=False)
 
