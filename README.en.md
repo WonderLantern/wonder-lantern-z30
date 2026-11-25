@@ -2,16 +2,31 @@
 
 [简体中文](README.md) · **English**
 
-Wonder Lantern Z30 is the WonderLantern organization's experimental firmware extension project for the **Nikon Z30 C 1.20**, exploring Magic Lantern-style on-camera extensions. The builder applies byte-verified patches to stock firmware that you supply, and writes a modified **EG module** plus a JSON build report. It is a Z30-specific prototype, not a cross-model framework, and it is not supported or endorsed by Nikon.
+Wonder Lantern Z30 is the WonderLantern organization's firmware extension project for the **Nikon Z30 C 1.20**, exploring Magic Lantern-style on-camera extensions. It is specific to the Z30, not a cross-model framework, and it is not supported or endorsed by Nikon.
+
+**New features load from a patch file on the memory card.** You flash the **loader firmware** into the camera once; after that, adding, removing or updating features only means replacing `Z30/WL.PATCH` on the card, with no further flashing. The loader itself needs flashing again only when it gets a low-level update, and the packaging tool tells you when.
 
 > [!WARNING]
-> Modified firmware carries risk. Before flashing:
+> Modified firmware carries risk. Before flashing the loader:
 > - keep the unmodified `Z_30_0120.bin`;
 > - know how to update again from **Setup menu → Firmware version**.
 >
-> As long as the update page opens, you can return to stock firmware. Every test build the project hands out is checked for this first. The builder itself never connects to the camera or writes to an SD card.
->
-> With the experimental [SD card loading](#sd-card-loading-experimental), the features are read from the card; if anything goes wrong, remove the card or replace the file. No reflash is needed.
+> As long as the update page opens, you can return to stock firmware; every loader firmware the project hands out is checked for this first. If a card file misbehaves, remove the card or replace the file and restart; no reflash is needed. The packaging tool itself never connects to the camera or writes to an SD card.
+
+## How it works
+
+| Part | Where | Contents |
+| --- | --- | --- |
+| Loader firmware `EG209020.BIN` | Flashed into the camera, **once** | Stock firmware, Chinese fonts with the common character sets (GB2312 level 1, Big5 level 1) and a loader. Without a card it behaves as stock |
+| Feature card file `Z30/WL.PATCH` | Memory card | Code and patches of the chosen features. The loader reads it into memory about 3 s after power-on and the features appear |
+| Load log `Z30/WL.LOG` | Memory card (written by the loader) | One line of result; `S=01` means loaded |
+
+- **Changing features only changes the card file:** pick the features again in the packaging tool, copy the new `WL.PATCH` to the card and restart.
+- **When the loader needs reflashing:** card files are built for the loader on the camera. Only when a new card file needs something that loader lacks (such as a new card file format), or characters its fonts do not have, does the packaging tool refuse and ask for a loader update. Adding features or updating versions normally does not.
+- **Safety checks:** before writing anything the loader checks the card file's CRC, the loader identity and every original byte; if anything differs it leaves the camera's memory untouched and the camera behaves as stock.
+- **Load feedback:** once loaded, the photo live view shows "Wonder Lantern ready · 16 features" for about 2 s, and the Status page of the extension menu shows whether the card file loaded, its version and the feature count.
+
+Design, log codes and camera records: [SD card loading](docs/card-loader.md) (Chinese).
 
 ## Features
 
@@ -51,7 +66,7 @@ The two presets below fix NEF to one compression type at build time, without a m
 
 ### Stock firmware
 
-Bring your own firmware: the repository ships neither stock firmware nor a modified update package. The builder accepts exactly this file:
+You supply the firmware yourself; the repository contains neither stock firmware nor modified update packages. The packaging tool accepts only this stock file:
 
 | Item | Value |
 | --- | --- |
@@ -61,89 +76,71 @@ Bring your own firmware: the repository ships neither stock firmware nor a modif
 
 ### Graphical app (Windows, recommended)
 
-1. Download `WonderLanternZ30-windows-x64.zip` from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract all files** before running.
-2. Put `Z_30_0120.bin` in the extracted folder, or choose it in the app.
-3. Open `WonderLanternZ30.exe` and wait for the firmware check to pass. The interface switches between Chinese and English, and dark and light.
-4. The app does two things: **build the loader EG firmware** (`EG209020.BIN`, flashed once) and **build the feature card file** (`Z30/WL.PATCH`, from the ticked features, copied to the memory card). Output goes to the `output` folder next to the app; existing files are never overwritten.
+1. Download `WonderLanternZ30-windows-x64.zip` from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract the whole archive** before running it.
+2. Put `Z_30_0120.bin` into the extracted folder, or choose it in the program.
+3. Open `WonderLanternZ30.exe` and wait for the firmware check to pass. The interface switches between Chinese and English, dark and light.
+4. **First time: build the loader firmware.** Click "Build loader EG" and flash `EG209020.BIN` from `output/card` into the camera (Setup menu → Firmware version). Without a card file, check that the camera behaves as stock and the firmware version page works.
+5. **Build the feature card file.** The loader folder field already points at that folder; pick the features, click "Build card file", copy the resulting `Z30` folder to the root of the memory card and restart the camera.
+6. **Later feature changes and updates:** build a new card file with the new program and the same loader folder (move the old `Z30/WL.PATCH` away first) and replace the file on the card; no reflash. Repeat step 4 only when the program asks for a loader update.
 
-The app is not code-signed, so Windows SmartScreen may warn; compare the SHA-256 listed on the Release page first. On other systems, run `python patch_gui.py` or use the command line.
+The program is not code-signed, so Windows SmartScreen may warn about it; check the SHA-256 listed on the Release page first. It needs the Microsoft Edge WebView2 runtime that comes with Windows 10/11. On other systems run `python patch_gui.py`, or use the command line.
 
 ### Command line
 
-Needs Python **3.10+** and the full source tree. From the project root (PowerShell):
+You need Python **3.10+** and the complete source tree. Run these commands in the project root (PowerShell):
 
 ```powershell
 python -m pip install '.[sound]'
-New-Item -ItemType Directory -Force output | Out-Null
-python patch.py --source "Z_30_0120.bin" --output "output/EG209020.BIN"
+python patch.py full --card --source "Z_30_0120.bin" --output "output/card"
 ```
 
-- `.[sound]` installs the Keystone assembler. Every feature except `m900` or `wifi-5ghz` built on their own needs it.
-- Without presets, a multi-select menu lists `full`, the sixteen features above and the two optional presets below as entries 1–19; press Enter for `full`.
-- Or name the presets directly, separated by spaces; repeated features apply once:
+- This writes `output/card/EG209020.BIN` (the loader firmware, flashed once) and `output/card/Z30/WL.PATCH` (copied to the card).
+- To change features later, add `--patch-only` in the same folder: only a new card file is built, for the loader already flashed (move the old `Z30/WL.PATCH` away first):
 
 ```powershell
-python patch.py liveview-dual m900 mtp-fast --source "Z_30_0120.bin" --output "output/EG209020-custom.BIN"
+python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0120.bin" --output "output/card"
 ```
 
-- **macOS:** if installation is followed by `fail to load the dynamic library`, run this in the Python environment you build with:
+- `.[sound]` installs the Keystone assembler.
+- Without presets the builder shows a multi-select menu: entries 1–19 are `full`, the sixteen features above and the two optional presets; press Enter for `full`. Separate several presets with spaces; repeated features are applied once.
+- `tools/build_card.py` does the same with a few extra options, such as `--menu-tab` (the extension menu as an eighth tab on the left of the menu) and `--no-banner` (no live-view ready banner).
+- **macOS:** if you see `fail to load the dynamic library` after installation, run this in the Python environment used for building:
 
 ```bash
 brew install keystone
 ln -s "$(brew --prefix keystone)/lib/libkeystone.dylib" "$(python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')/keystone/libkeystone.dylib"
 ```
 
-Step-by-step instructions and common errors are in the [offline build guide](PATCH_GUIDE.md) (Chinese).
+For step-by-step instructions and common errors, see the [offline build guide](PATCH_GUIDE.md) (Chinese).
 
 ### Output
 
 | File | Purpose |
 | --- | --- |
-| `EG209020.BIN` | The modified stand-alone EG module, not a repackaged `Z_30_0120.bin` |
-| `.json` with the same name | Input/output digests, selected features, and every edit's offset, original bytes and replacement bytes |
+| `EG209020.BIN` | The loader firmware, a standalone EG module (not a repacked `Z_30_0120.bin`), flashed into the camera once |
+| `EG209020.json` | The loader's build report: digests, loader identity and capabilities; `--patch-only` card builds read it, so keep it next to the BIN |
+| `Z30/WL.PATCH` | The feature card file, copied to the `Z30` folder at the root of the memory card |
 
-- The builder first checks the stock package's size and SHA-256, decodes it internally and checks every CRC, then verifies original bytes, bounds and non-overlap for each edit before rebuilding the CRC.
+- The packaging tool checks the stock package size and SHA-256, decodes it internally and checks every CRC level, then verifies original bytes, bounds and non-overlap for each change.
 - It never modifies its input and refuses to overwrite existing output.
-- `Built` means the local build finished. It does not mean every camera behavior is verified.
+- A finished build only means the local build succeeded; it does not mean every camera behavior has been verified.
 
 Implementation details: [build notes](docs/build.md) (Chinese).
 
-### SD card loading (experimental)
+### Without a card: flashing everything (developers)
 
-Instead of writing every feature into the EG, you can flash a **resident EG** once and keep the features on the SD card:
-
-| Part | Contents |
-| --- | --- |
-| Resident EG | Stock firmware, the Chinese fonts with common characters (GB2312 level 1, Big5 level 1) and a loader; without a card it behaves as stock |
-| `Z30/WL.PATCH` | Code and patches of the chosen features, read into RAM by the loader about 3 s after power-on |
-| `Z30/WL.LOG` | One result line whenever the card file was found; `S=01` means loaded |
-
-```powershell
-python tools/build_card.py --source "Z_30_0120.bin" --output "output/card"
-```
-
-- Flash `output/card/EG209020.BIN` and copy `output/card/Z30/WL.PATCH` to the `Z30` folder on the card. `--preset` selects features (default `full`).
-- To change features later, only replace the card file: rebuild with `--patch-only` in the output folder that holds the flashed resident EG. The card file is built for the resident EG on the camera; the tool asks for a reflash only when a new feature needs something its loader cannot do, or characters its fonts lack.
-- Before writing anything the loader checks the CRC, the resident EG identity and every edit's original bytes; if any check fails it leaves camera memory untouched. Removing the card or replacing the file restores the camera.
-- The GUI supports it too: build the loader EG firmware first, then the feature card file. On the command line, `patch.py --card` does the same (`--patch-only` for the card file alone).
-
-Confirmed on a Z30 C 1.20 on 2026-11-24: with the `full` card file every feature works; removing the card restores stock; a damaged card file is rejected (`S=07`) and the camera stays stock; firmware updates still work. The second loader version (sectioned card file format, main RAM edits, load-time functions) loads correctly on camera since 2026-11-24, and the ready banner uses its load-time functions on camera; no feature uses main RAM edits yet.
-
-- **Ready banner:** after the card file loads, the photo live view shows "Wonder Lantern ready · 16 features" (the number of features in the card file) for about 2 s; it never appears in photos or videos. `--no-banner` removes it ([notes](docs/ready-banner.md), Chinese).
-- **Firmware version page:** the resident EG shows the project name and copyright as two lines on Setup → Firmware version, with or without a card.
-- **Eighth tab:** `build_card.py --menu-tab` puts the extension menu in an eighth tab (lantern icon) on the left of the menu, and the Setup menu loses its Extensions row. Off by default; tried on camera on 2026-11-25 ([notes](docs/menu-framework.md#菜单左侧第-8-个标签构建选项-menu_tab2026-11-24), Chinese).
-
-Design, log codes and limits: [SD card loading](docs/card-loader.md) (Chinese).
+Without `--card` the command line writes the features straight into one complete EG (`python patch.py full --source "Z_30_0120.bin" --output "output/EG209020.BIN"`). Every feature change then needs a reflash and removing the card cannot recover from a problem, so this is kept for development and comparison tests only; the graphical app does not offer it.
 
 ## Using the features
 
 ### Menus and language
 
-- **Menu entry:** new features live in **Setup menu → Extensions** (Simplified Chinese 自定义菜单, Traditional 自訂選單). A sound-only build names the entry `Shutter sound`.
+- **Menu entry:** new features live in **Setup menu → Extensions** (Simplified Chinese 自定义菜单, Traditional 自訂選單). A sound-only build names the entry `Shutter sound`. Built with `--menu-tab`, the menu is an eighth tab (lantern icon) on the left of the menu instead.
 - **Root page:** the first row is Status (whether the card file loaded, version, feature count, whether settings were saved); below it the features are grouped by purpose, each feature page inside its category page ([notes](docs/menu-framework.md#根页分类2026-11-25), Chinese).
 - **Direct rows:** Photo aspect, Photo zebra and Date stamp are also listed at the end of the photo shooting menu, and Video bitrate at the end of the video shooting menu; press up once from the first row to reach them. Direct rows show `--` on the right. These direct rows are verified in QEMU only.
 - **Language:** menus follow the stock **Language** setting and show Simplified Chinese, Traditional Chinese or English; other languages show English.
-- **Added glyphs:** the stock Chinese fonts only carry menu characters. Builds add every printable ASCII character and the characters the Chinese labels need; the resident EG for SD card loading also adds GB2312 level 1 and Big5 level 1. The glyphs are converted from Noto Sans CJK (SIL OFL 1.1). This does not provide arbitrary Chinese text input.
+- **Added glyphs:** the stock Chinese fonts only carry menu characters. The loader firmware adds every printable ASCII character, the characters the Chinese labels need, GB2312 level 1 and Big5 level 1 to the stock Chinese fonts. The glyphs are converted from Noto Sans CJK (SIL OFL 1.1). This does not provide arbitrary Chinese text input.
+- **Firmware version page:** the loader firmware shows the project name and copyright as two lines on Setup → Firmware version, with or without a card.
 
 ### Custom shutter sound
 
@@ -189,7 +186,7 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 | Area | Evidence |
 | --- | --- |
 | Build and unit tests | 295 unit tests pass (19 more need optional tools such as arm-none-eabi-gcc and are skipped without them); builds are byte-for-byte reproducible with zero CRC residue |
-| EG installation | Maintainer confirmed installation on Z30 C 1.20 |
+| Loader installation | Maintainer confirmed installation on Z30 C 1.20; the firmware update page still works afterwards |
 | Menus, language and added glyphs | QEMU native pages and Unicorn instruction checks; the added Chinese glyphs, the Language page (every region's list) and the firmware update page have QEMU checks and user camera confirmation |
 | Dual live view, shutter sound, M900, aspect profiles | Confirmed by users on camera |
 | Date stamp | Five formats, four colors, glow and both portrait orientations confirmed on camera |
@@ -222,7 +219,7 @@ Topic documents are mostly in Chinese; this English README covers the same conte
 
 ## License
 
-- **Project identity:** this project belongs to the **WonderLantern** organization and is an independent experiment, not supported or endorsed by Nikon.
+- **Project identity:** this project belongs to the **WonderLantern** organization and is an independent project, not supported or endorsed by Nikon.
 - **Code:** original code and documents are under the [MIT License](LICENSE). The files listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are under the [Wonder Lantern Community License](licenses/Wonder-Lantern.txt), which allows use, modification and free redistribution but forbids paid distribution.
 - **Added glyphs:** the glyphs converted from Noto fonts are under the [SIL OFL 1.1](licenses/OFL-Noto-CJK.txt).
 - **Per-file terms:** each file's SPDX tag and the list above decide.
