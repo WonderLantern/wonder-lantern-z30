@@ -48,7 +48,7 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的固件
 | `photo-zebra` | 把原厂斑马纹扩展到照片取景，独立开关 | [文档](docs/photo-zebra.md) |
 | `wifi-5ghz` | 全部有效无线配置请求 US/-1 国家码，解锁 5 GHz 连接 | 见注¹ |
 | `date-stamp` | JPEG 右下角的胶片风格日期水印，五种格式、四种颜色、可选光晕，随竖拍转向 | [文档](docs/date-stamp.md) |
-| `film-grain` | 机内 JPEG 加胶片颗粒，FUJI400 / HP5 两种风格、强度 1–6，移植自 Wonder Lantern Z5；机内菜单默认关闭 | [文档](docs/film-grain.md)，已有实机确认 |
+| `film-grain` | 机内 JPEG 加胶片颗粒，FUJI400 / HP5 两种风格、强度 1–6，移植自 Wonder Lantern Z5；可选“NEF 写入”，把对应的 Lightroom 颗粒写进 NEF 自带的 XMP；机内菜单默认关闭 | [文档](docs/film-grain.md)，已有实机确认（NEF 写入在 Lightroom Classic 和 Adobe Camera Raw 中确认） |
 | `portrait-ui` | 竖拿时照片取景信息和 i 菜单改为竖版，转动后自动补全，默认关闭；触摸跟着竖版位置，i 菜单设置页按 2/3 竖版显示；快门、光圈、ISO 滑条页竖版；直方图页竖拿时显示竖版直方图 | [文档](docs/portrait-ui.md) |
 | `nef-menu` | 在扩展菜单里选择 NEF 压缩类型（无失真压缩／压缩／未压缩），保存到 `WL-NEF.CFG` | [文档](docs/nef-compression.md)，12/14 位下三个选项已有实机确认 |
 | `gyro-evr` | 陀螺仪电子防抖：录像时打开电子减震即生效，修正偏航、俯仰、滚转，与镜头 VR 协同；自定义菜单选标准 / 增强 / 原厂裁切 / 关闭 | [文档](docs/gyro-evr.md) |

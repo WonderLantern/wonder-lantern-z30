@@ -10,6 +10,12 @@ makes (SCTLR, TTBCR, ATS1CPW/PAR), which Unicorn has no MMU for. The PAR model
 is identity mapped with chosen attributes; real camera page tables, the real
 encoder and the capture task are not involved, so this does not prove which
 frames the camera sends through the gate, nor its timing.
+
+Write to NEF: runs the stock crd XMP writer 0x101B862E (synthetic context, as
+tools/verify_aspect_xmp_crop.py) and checks the Lightroom grain elements against
+the stock text: present exactly when style and the row are on, inside the crd:
+block, never overflowing; with aspect-profiles in the build, before its crs: crop.
+Lightroom import is not executed.
 """
 import argparse
 import json
@@ -406,26 +412,35 @@ def check_menu(stock, image, report):
     from z30_extensions.features.photo.film_grain_ui import MAGIC
     report = dict(report, features=dict(report['features'], shutter_sound=report['features']['menu_framework']))
     control = report['features']['film_grain_control']
-    offset, strength = control['state_offset'], control['strength_offset']
+    offset, strength, nef = control['state_offset'], control['strength_offset'], control['nef_offset']
     functions = {key: int(value, 16) for key, value in control['functions'].items()}
     path = 'A:\\' + control['settings_file']
     cases = []
-    for style, code in ((1, 0), (2, 5), (0, 3), (1, 4)):
+    record = lambda enabled, selected: struct.pack('<4I', MAGIC, enabled, selected,
+                                                   ~(MAGIC ^ enabled ^ selected) & 0xFFFFFFFF)
+    for style, code, write in ((1, 0, 0), (2, 5, 1), (0, 3, 1), (1, 4, 1), (2, 2, 0)):
         files = {}
         first = Fixture(stock, image, report, files, properties={})
         first.set(offset, style)
         first.set(strength, code)
+        first.set(nef, write)
         assert first.call(functions['grain_save']) == 1 and path in files
+        assert files[path] == record(code | write << 8, style), files[path].hex()
         second = Fixture(stock, image, report, files, properties={})
-        assert (second.word(offset), second.word(strength)) == (style, code) and not second.opened
-        cases.append(dict(fresh_boot_restores=dict(style=style, strength_code=code)))
-    valid = struct.pack('<4I', MAGIC, 1, 2, ~(MAGIC ^ 1 ^ 2) & 0xFFFFFFFF)
-    for payload in (b'', valid[:8], valid + b'X', valid[:-1] + b'\0',
-                    struct.pack('<4I', MAGIC, 6, 1, ~(MAGIC ^ 6 ^ 1) & 0xFFFFFFFF),
-                    struct.pack('<4I', MAGIC, 0, 3, ~(MAGIC ^ 3) & 0xFFFFFFFF)):
+        assert (second.word(offset), second.word(strength), second.word(nef)) == (style, code, write)
+        assert not second.opened
+        cases.append(dict(fresh_boot_restores=dict(style=style, strength_code=code, write_to_nef=write)))
+    # A record saved before the row existed (no bit 8) restores with Write to NEF off.
+    fixture = Fixture(stock, image, report, {path: record(4, 2)}, properties={})
+    assert (fixture.word(offset), fixture.word(strength), fixture.word(nef)) == (2, 4, 0)
+    cases.append(dict(record_without_nef_bit_restores_off=True))
+    valid = record(1, 2)
+    for payload in (b'', valid[:8], valid + b'X', valid[:-1] + b'\0', record(6, 1), record(0, 3),
+                    record(0x106, 1), record(0x200, 1), record(0x301, 1)):
         fixture = Fixture(stock, image, report, {path: payload}, properties={})
-        assert fixture.word(offset) == 0 and fixture.word(strength) == 0 and not fixture.opened
-    cases.append(dict(invalid_records_stay_off=6))
+        assert fixture.word(offset) == 0 and fixture.word(strength) == 0 and fixture.word(nef) == 0
+        assert not fixture.opened
+    cases.append(dict(invalid_records_stay_off=9))
     fixture = Fixture(stock, image, report, {}, properties={})
     navigation = []
 
@@ -438,7 +453,7 @@ def check_menu(stock, image, report):
     page = fixture.state + control['page_offset']
     for row, field, expected in ((0, offset, 1), (0, offset, 2), (0, offset, 0), (1, strength, 1),
                                  (1, strength, 2), (1, strength, 3), (1, strength, 4), (1, strength, 5),
-                                 (1, strength, 0)):
+                                 (1, strength, 0), (2, nef, 1), (2, nef, 0), (2, nef, 1)):
         navigation.clear()
         fixture.u.mem_write(page + 22, struct.pack('<2H', row, 0))
         fixture.call(functions['grain_action'], (page,))
@@ -446,17 +461,105 @@ def check_menu(stock, image, report):
         fixture.call(functions['grain_restore'])
         assert fixture.word(field) == expected
     cases.append(dict(rows_step_in_place_and_save=True))
-    before = (fixture.word(offset), fixture.word(strength))
+    before = (fixture.word(offset), fixture.word(strength), fixture.word(nef))
     navigation.clear()
-    fixture.u.mem_write(page + 22, struct.pack('<2H', 2, 0))
+    fixture.u.mem_write(page + 22, struct.pack('<2H', 3, 0))
     fixture.call(functions['grain_action'], (page,))
-    assert (fixture.word(offset), fixture.word(strength)) == before and not navigation
+    assert (fixture.word(offset), fixture.word(strength), fixture.word(nef)) == before and not navigation
     cases.append(dict(rows_past_the_last_do_nothing=True))
     fixture.short_write = True
     fixture.u.mem_write(page + 22, struct.pack('<2H', 0, 0))
     fixture.call(functions['grain_action'], (page,))
     assert fixture.word(offset) == 1 and fixture.word(52) == 8
     cases.append(dict(save_failure_keeps_choice_and_reports=True))
+    return cases
+
+
+def check_crd(stock, image, report):
+    """Write to NEF through the stock crd writer: elements, placement, room and every off case."""
+    import xml.dom.minidom
+    from native_runtime import Context
+    from verify_aspect_xmp_crop import run
+    from verify_sound_settings import Fixture
+    from z30_extensions.features.photo.film_grain import CRD_ROOM, lightroom_grain
+    from z30_extensions.host import film_grain as host
+    report = dict(report, features=dict(report['features'], shutter_sound=report['features']['menu_framework']))
+    control = report['features']['film_grain_control']
+    crd = report['features']['film_grain']['nef_crd']
+    aspect = report['features'].get('aspect_profiles')
+    offset, strength, nef = control['state_offset'], control['strength_offset'], control['nef_offset']
+    written, skipped, left = (crd['record'][k] for k in ('written', 'skipped', 'bytes_left'))
+    closer = '</rdf:Description>'
+    base, base_len, _, overflow = run(Context(stock, stock))
+    assert overflow == 0 and base.endswith(closer)
+    properties = {0x501: 2, 0x188c: 0}
+    fixture = Fixture(stock, image, report, {}, properties=properties)
+    if aspect:
+        aspect_state = fixture.call(int(aspect['functions']['aspect_get'], 16))
+        fixture.u.mem_write(aspect_state, struct.pack('<I', 0))
+    host_strength = list(host.STRENGTH_ORDER)
+    cases = []
+
+    def setting(style, code, write):
+        fixture.set(offset, style); fixture.set(strength, code); fixture.set(nef, write)
+
+    def grain(style, code):
+        amount, size, frequency = lightroom_grain(style, host_strength[code])
+        return (f'<crd:GrainAmount>{amount}</crd:GrainAmount><crd:GrainSize>{size}</crd:GrainSize>'
+                f'<crd:GrainFrequency>{frequency}</crd:GrainFrequency>')
+
+    def parse(text):
+        xml.dom.minidom.parseString(
+            '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+            + text + '</rdf:RDF></x:xmpmeta>')
+    for style, code, write, why in ((0, 0, 1, 'style OFF'), (1, 0, 0, 'row OFF'), (2, 3, 0, 'row OFF'),
+                                    (3, 0, 1, 'unknown style'), (1, 6, 1, 'strength code out of range'),
+                                    (1, 0, 2, 'row value 2 counts as ON'),):
+        setting(style, code, write)
+        text = run(fixture)[0]
+        if write == 2:
+            assert text == base[:-len(closer)] + grain(style, code) + closer, why
+        else:
+            assert text == base, why
+        cases.append(dict(style=style, strength_code=code, row=write, grain=text != base, case=why))
+    before = fixture.word(written)
+    for style in (host.STYLE_FUJI400, host.STYLE_HP5):
+        for code in range(host.STRENGTHS):
+            setting(style, code, 1)
+            text, length, remaining, overflow = run(fixture)
+            assert overflow == 0 and length == len(text)
+            assert text == base[:-len(closer)] + grain(style, code) + closer, (style, code, text[-160:])
+            parse(text)
+            assert fixture.word(left) == 0x7FF - (base_len - len(closer))
+            cases.append(dict(style=host.STYLES[style], strength=host_strength[code],
+                              lightroom=lightroom_grain(style, host_strength[code]), grain=True))
+    assert fixture.word(written) == before + 2 * host.STRENGTHS
+    # Room: the elements go in only with CRD_ROOM bytes left before the closer; never overflow.
+    setting(1, 3, 1)
+    elements = grain(1, 3)
+    for spare in (len(closer) + 1, CRD_ROOM - 1, CRD_ROOM):
+        skipped_before = fixture.word(skipped)
+        text, _, _, overflow = run(fixture, capacity=base_len - len(closer) + spare)
+        assert overflow == 0, spare
+        fits = spare >= CRD_ROOM
+        assert text == (base[:-len(closer)] + elements + closer if fits else base), spare
+        assert fixture.word(skipped) == skipped_before + (not fits)
+        cases.append(dict(bytes_left_before_closer=spare, grain=fits))
+    if aspect:
+        crop = aspect['xmp_crop']
+        selection = 1
+        fixture.u.mem_write(aspect_state, struct.pack('<I', selection))
+        text, _, _, overflow = run(fixture)
+        assert overflow == 0
+        head = base[:-len(closer)] + elements + closer
+        assert text.startswith(head) and len(text) == len(head) + crop['text_bytes'], text[-400:]
+        assert '<crs:HasCrop>True</crs:HasCrop>' in text[len(head):]
+        parse(text)
+        cases.append(dict(with_aspect_crop=True, order='crd grain, closer, crs crop'))
+        setting(0, 0, 0)
+        text = run(fixture)[0]
+        assert text.startswith(base) and len(text) == len(base) + crop['text_bytes']
+        cases.append(dict(with_aspect_crop=True, grain=False))
     return cases
 
 
@@ -477,14 +580,16 @@ def main():
     combined = check_with_stamp(frame)
     full = check_full_frame(frame) if args.full_frame else []
     menu = check_menu(stock, image, report)
+    crd = check_crd(stock, image, report)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(dict(
         image_sha256=report['sha256'], presets=args.preset, payload_sha256=report['features']['film_grain']['payload_sha256'],
-        cp15_sites=frame.cp15_sites, pixels=pixels, passthrough=passthrough, combined=combined, full_frame=full, menu=menu,
+        cp15_sites=frame.cp15_sites, pixels=pixels, passthrough=passthrough, combined=combined, full_frame=full, menu=menu, nef_crd=crd,
         scope=__doc__, physical_verified=False), indent=2) + '\n')
     rate = next((c['instructions_per_pixel'] for c in pixels if 'instructions_per_pixel' in c), None)
     print(f'PASS film grain: {len(pixels)} pixel, {len(passthrough)} gate, {len(combined)} combined, '
-          f'{len(full)} full-frame, {len(menu)} menu cases ({args.preset}); payload {rate} instructions per pixel')
+          f'{len(full)} full-frame, {len(menu)} menu, {len(crd)} NEF crd cases ({args.preset}); '
+          f'payload {rate} instructions per pixel')
 
 
 if __name__ == '__main__':

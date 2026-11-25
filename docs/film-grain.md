@@ -2,6 +2,8 @@
 
 日期：2026-11-25。固件：Z30 C1.20。**2026-11-25 用户上机测试，反馈都正常**（卡文件 `output/film-grain-v1/Z30/WL.PATCH`，`full film-grain` 加第 8 个标签，常驻 id `0x67f308e7`）。之后 `film-grain` 纳入 `full`，页面去掉了调试用的“上次耗时”一行，正式卡文件为 `output/film-grain-v2/Z30/WL.PATCH`（`full` 加第 8 个标签，同一常驻 EG）。机内菜单默认关闭。
 
+2026-11-26 加入“NEF 写入”（把对应的 Lightroom 颗粒写进 NEF 的 XMP，移植自 Z5 A48/A49），离线验证通过；**2026-11-26 用户上机测试通过**（Adobe Camera Raw 和 Lightroom Classic，见“NEF 写入的实机结果”）。卡文件 `output/film-grain-nef-v1/Z30/WL.PATCH`，同一常驻 EG。
+
 功能移植自 [Wonder Lantern Z5 的 FILM](https://github.com/WonderLantern/wonder-lantern-z5/blob/main/docs/FILM_GRAIN.md)（A52，MIT，作者在 Z5 上实机通过）。颗粒场、强度曲线和逐字运算与 Z5 相同，同一档位在两台相机上的颗粒统计一致。
 
 ## 用法
@@ -12,9 +14,14 @@
 | --- | --- |
 | 风格 | 每按一次切换：关闭 → FUJI400 → HP5。FUJI400 参照富士 400 彩负扫描；HP5 偏黑白，颗粒更紧，可配合相机的“单色”优化校准 |
 | 强度 | 每按一次切换：3 → 4 → 5 → 6 → 1 → 2。第 3 档是基准 |
+| NEF 写入 | 关闭 / 开启，默认关闭。开启时相机把对应的 Lightroom 颗粒写进每张 NEF 自带的 XMP，不产生额外文件；风格为“关闭”时不写 |
+
+**Lightroom 里怎么生效**：Lightroom Classic「首选项 → 预设 → 原始图像默认设置 → 全局」选「相机设置」。导入“NEF 写入：开启”时拍的 NEF，「修改照片 → 效果 → 颗粒」会自动带上数值，可以再调或设为 0。其他设置为默认值时不会采用这些值。
+
+**Adobe Camera Raw** 同理：「首选项 → 原始默认设置」选「相机设置」。已经打开过的照片要在 ACR 里「重置为默认值」才会改用相机设置。ACR 和 Lightroom Classic 都已实机确认。
 
 - 设置存在卡根目录的 `WL-FILM.CFG`。开机后扩展菜单第一次初始化时恢复设置，在此之前颗粒是关的。这和日期水印的规则相同：开机后先进一次扩展菜单，再拍。
-- 只改 JPEG 的亮度，不改色度。NEF 的传感器数据不改。
+- 只改 JPEG 的亮度，不改色度。NEF 的传感器数据不改；“NEF 写入”只在 NEF 的 XMP 里加三项 Lightroom 设置。
 - 颗粒写进了 JPEG 像素，事后去不掉。正式拍摄前先试拍。
 
 | 画质 | 加颗粒的图 |
@@ -32,7 +39,7 @@
 | 主机参考（颗粒场、查表、像素合同） | `src/z30_extensions/host/film_grain.py` |
 | C 模块（核对、页表、行循环、内核） | `modules/film_grain/film_grain.c`，`build.sh` |
 | 生成的 payload（构建不需要 C 编译器） | `src/z30_extensions/features/photo/film_grain_payload.py`，由 `tools/build_film_grain.py` 生成 |
-| 挂点和闸门 | `src/z30_extensions/features/photo/film_grain.py` |
+| 挂点和闸门（含 NEF 写入） | `src/z30_extensions/features/photo/film_grain.py` |
 | 菜单页 | `src/z30_extensions/features/photo/film_grain_ui.py` |
 | Unicorn 验证 | `tools/verify_film_grain.py` |
 
@@ -87,9 +94,42 @@
 - **步长**：每 4 个相邻像素共用一个步长，用 `USAD8` 求和后查表得到。表按风格、档位、主图或预览各一张。
 - **种子**：每张图一个，`(毫秒时钟 0xC18EB098) ^ 亮度地址 ^ 调用次数 × 0x9E3779B1`。每个 256×256 区域取自己的行偏移和列偏移，看不出平铺的重复。
 
+### NEF 写入（Lightroom 颗粒）
+
+移植自 Z5 的 A48/A49。每张 NEF 开头都有一段 XMP，其中 `<rdf:Description xmlns:crd="http://ns.adobe.com/camera-raw-defaults/1.0/">` 区块是原厂写的 Adobe 原始默认设置（锐化、降噪、配置文件等），Lightroom 的原始默认设置为“相机设置”时会采用。Zf 的颗粒也写在这里。
+
+Z30 C1.20 生成这一段的函数和 Z5 几乎一样：
+
+| 项目 | Z5 C1.50 | Z30 C1.20 |
+| --- | --- | --- |
+| 生成函数 | `0x101BCDF4` | `0x101B862E` |
+| 写入器 `{光标, 剩余字节, 溢出}` | `ctx+0x83C` | `ctx+0x86C`，初值 `{ctx[0xE8], 0x7FF, 0}`；r7 = 写入器，r4 = ctx |
+| 收尾 8 字节 | `0x101BCFA6` | `0x101B86B4`：`adr r1,"</rdf:Description>"; mov r0,r7; bl 0x101B86CC` |
+| 元素函数 `(写入器, 名称, 格式, 值)` | `0x101BCFD2` | `0x101B86DE`，输出 `<crd:名称>值</crd:名称>` |
+
+收尾的 8 字节换成跳转。挂钩通过菜单框架读当前设置；风格为 FUJI400 或 HP5、“NEF 写入”开启时，用原厂元素函数在收尾之前追加三项，然后照原样补回收尾：
+
+```xml
+<crd:GrainAmount>32</crd:GrainAmount><crd:GrainSize>40</crd:GrainSize><crd:GrainFrequency>65</crd:GrainFrequency>
+```
+
+- 只在写入器没溢出、剩余至少 160 字节时追加（三项共 113 字节）。原厂溢出时会丢掉整个区块，所以宁可不写。Unicorn 跑原厂生成函数时，合成上下文的区块是 1445 字节，余量约 620 字节；实际长度随优化校准不同。
+- 这段在按下快门时生成，比 JPEG 加颗粒早。挂钩在这时读菜单，所以每张 NEF 用的都是自己那一张的设置（Z5 的 A48 在这里错位过一张）。
+- **和画幅共用挂点**：多画幅（`aspect-profiles`）在同一位置写 Adobe 裁切（`xmp_crop.py`，已实机通过）。两个功能同时构建时，由画幅的钩子先调用颗粒钩子，再补回收尾，最后追加 `crs:` 裁切区块。不选画幅时，颗粒自己装这个挂点。
+- 数值用 Z5 在 Lightroom 里的校准（数量 / 大小 / 粗糙度），数量与机内颗粒强度近似成正比：
+
+| 档位 | 1 | 2 | 3 | 4 | 5 | 6 | 大小 | 粗糙度 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FUJI400 | 16 | 24 | 32 | 40 | 48 | 56 | 40 | 65 |
+| HP5（Z5 按比例推算，未单独校准） | 19 | 28 | 37 | 47 | 56 | 65 | 33 | 65 |
+
+  机内颗粒在高光约为中间调的 1/3，Lightroom 颗粒各亮度一样，只能近似。校准用的是 Z5 的 6016×4016 画面，Z30 的 5568×3712 略小，没有重新校准。
+
+**设置保存**：`WL-FILM.CFG` 格式不变（`WLF1`，16 字节）。“NEF 写入”存在强度字的第 8 位。没有这一位的旧文件恢复为“关闭”；旧版卡文件读到带这一位的新文件时，整条记录无效，颗粒恢复为关闭。
+
 ## 诊断
 
-正式版菜单不显示调试信息。C 模块仍把最近一张主图的结果写在菜单状态里，排查时可以读内存（偏移相对页面状态 `film_grain_control.state_offset`，见构建报告）：`+12` 结果码（1 成功，其余见上表），`+16` 耗时毫秒，`+20` 开机后加过颗粒的张数，`+24` 第一页的 PAR，`+32` 宽高，`+36` 调用点，`+40` 一行 ASCII 摘要（例如 `912 ms n #3`，`n` 不经缓存、`c` 经缓存）。
+正式版菜单不显示调试信息。C 模块仍把最近一张主图的结果写在菜单状态里，排查时可以读内存（偏移相对页面状态 `film_grain_control.state_offset`，见构建报告）：`+12` 结果码（1 成功，其余见上表），`+16` 耗时毫秒，`+20` 开机后加过颗粒的张数，`+24` 第一页的 PAR，`+32` 宽高，`+36` 调用点，`+40` 一行 ASCII 摘要（例如 `912 ms n #3`，`n` 不经缓存、`c` 经缓存）。NEF 写入：`+64` 开关，`+68` 写入的区块数，`+72` 因空间不够跳过的区块数，`+76` 最近一个区块收尾前的剩余字节。
 
 ## 已验证（离线）
 
@@ -114,6 +154,14 @@ python tools/verify_film_grain.py --source Z_30_0120.bin --preset full film-grai
   - 设置保存后重新开机能恢复；6 种坏记录都保持关闭；
   - 风格行、强度行原地切换并保存；
   - 保存失败时保留选择并提示。
+- **NEF 写入**（Unicorn，执行原厂生成函数 `0x101B862E`，合成上下文，与 `verify_aspect_xmp_crop.py` 相同；`film-grain` 单独 21 项，`full` 23 项）：
+  - 两种风格 × 6 档：文本等于原厂文本在收尾前插入对应的三项，XML 格式正确，不溢出；
+  - 风格关闭、“NEF 写入”关闭、未知风格、强度码越界：与原厂文本逐字相同；
+  - 收尾前剩余 19、159 字节时不写并计入“跳过”，160 字节时写入；
+  - `full`（和画幅一起）：顺序为 crd 区块内的颗粒、收尾、`crs:` 裁切；颗粒关闭时只有裁切。`verify_aspect_xmp_crop.py` 的 37 项照旧通过。
+- **设置文件**：新记录在强度字第 8 位存开关，重开机能恢复；没有这一位的旧记录恢复为关闭；第 8 位以外的高位、强度越界都按无效记录处理。第三行原地切换并保存。
+- **回归**：不选颗粒的 `aspect-profiles`、`date-stamp`、`photo-zebra`、`modular`、`nef-menu` 整包与改动前逐字节相同。
+- **QEMU**（加入 NEF 写入后，整包 `full`，`verify_menu_categories_qemu.py`）：简体、繁体、英文都通过，胶片颗粒页三行（风格 / 强度 / NEF 写入）显示正常并能返回。全部 311 项单元测试通过（跳过 1 项）。
 - **QEMU**（整包 `full film-grain`）：简体、繁体、英文的分类页和胶片颗粒页都能打开和返回；语言页和固件版本页正常（见下文字库）。
 - **回归**：不选 `film-grain` 时，`full`、`date-stamp`、`photo-zebra`、`full battery-percent` 的整包与改动前逐字节相同。
 - **卡文件**：`output/film-grain-v1/Z30/WL.PATCH`（`full film-grain`，带第 8 个标签），按相机上的常驻 EG（`0x67f308e7`）构建，不用重刷。纳入 `full` 后，`full` 与 `full film-grain` 展开为同一组功能。
@@ -156,3 +204,36 @@ python tools/verify_film_grain.py --source Z_30_0120.bin --preset full film-grai
 | 照片没有颗粒，其他正常 | 平面映射或模式与 Z5 不同（结果码 4、5），或没走这 5 个调用点；需要读状态里的结果码（见“诊断”） |
 | 照片有颗粒但出现横向条纹、错位块 | 缓存维护有问题，立即关闭并保留原片 |
 | 拍摄卡死或 JPEG 损坏 | 拔卡重启恢复，记下画质和尺寸 |
+
+## NEF 写入的实机结果
+
+2026-11-26 用户用 `output/film-grain-nef-v1/Z30/WL.PATCH` 测试：
+
+- 两张 NEF：FUJI400 第 3 档，一张“NEF 写入”开启（DSC_0505），一张关闭（DSC_0506）。读出 XMP：
+  - 0505 的 crd 区块在原厂收尾前多了 `GrainAmount 32 / GrainSize 40 / GrainFrequency 65`，区块 1892 字节，没有溢出，其他原厂项都在；
+  - 0506 没有这三项；
+  - 两张的对比度、饱和度不同，各自对应拍摄时的设置。
+- Adobe Camera Raw：原始默认设置原来不是「相机设置」，所有滑块都不是相机值（锐化 0）。改成「相机设置」后，颗粒、锐化、高光、阴影等都和 crd 的数值完全对应。
+- 之后按上机步骤测了其余各项，用户反馈全部对应、全部生效：
+  - 连拍中途改档位，每张 NEF 都是自己那一张的设置；
+  - 和非原厂画幅一起开，裁切和颗粒都生效；
+  - HP5 的数值和上表一致；
+  - Lightroom Classic 原始默认设置为「相机设置」时，导入即带颗粒。
+
+## NEF 写入的上机步骤
+
+卡文件 `output/film-grain-nef-v1/Z30/WL.PATCH`（`full` 加第 8 个标签，常驻 id `0x67f308e7`，与相机上的常驻 EG 相同，不用重刷）。
+
+1. 换上卡文件，开机，先进一次扩展菜单。胶片颗粒页应有三行，第三行“NEF 写入”默认关闭，原来的风格和强度应该还在。
+2. 风格 FUJI400、强度 3、NEF 写入开启，拍一张 RAW+JPEG；把 NEF 写入关掉再拍一张；风格改 HP5、强度 6、NEF 写入开启，拍一张只 RAW。
+3. 连拍几张，中途改档位，看每张 NEF 的数值是否和拍摄时的设置一一对应。
+4. 画幅选一个非原厂画幅，NEF 写入开启，拍一张 RAW，确认 Lightroom 里裁切和颗粒都在。
+5. Lightroom Classic 的原始图像默认设置选「相机设置」，导入，看「效果 → 颗粒」：第 1 张应为 32/40/65，第 2 张为 0，第 3 张为 65/33/65。
+6. 也可以不用 Lightroom 检查：用 `exiftool -xmp:all` 或文本编辑器在 NEF 开头找 `crd:GrainAmount`。
+
+| 现象 | 判断 |
+| --- | --- |
+| NEF 里有 `crd:GrainAmount`，Lightroom 不显示颗粒 | Lightroom 没采用 Z30 的 crd 值，或原始默认设置不是“相机设置” |
+| NEF 里没有 `crd:GrainAmount` | 区块剩余空间不够（看诊断 `+72`），或这类拍摄不经过 `0x101B862E` |
+| NEF 里整个 crd 区块消失 | 区块溢出，立即关闭 NEF 写入并保留原片 |
+| 数值是上一张的设置 | crd 不在拍摄时生成，需要改读设置的时机 |

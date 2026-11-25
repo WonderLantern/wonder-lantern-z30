@@ -58,7 +58,9 @@ def install(plan, functions, codes, sizes, profiles):
     sizes['aspect_xmp_crop'] = 192
     functions['aspect_xmp_crop'] = plan.alloc(bytes(192))
     # r7 = stock crd text buffer, r4/r6 live in the stock continuation.
-    codes['aspect_xmp_crop'] = f'''mov r0,r7;{c('r1',CLOSE_TEXT)}{n(APPEND)}
+    # With film-grain, its crd elements go in first, before the stock closer (keeps r4-r11).
+    grain = n(functions['grain_crd']) if 'grain_crd' in functions else ''
+    codes['aspect_xmp_crop'] = f'''{grain}mov r0,r7;{c('r1',CLOSE_TEXT)}{n(APPEND)}
         push {{r4-r7}};
         {n(functions['aspect_get'])}cmp r0,#0;beq out;ldr r5,[r0];subs r5,#1;cmp r5,#5;bhi out;
         {c('r0',AREA_KEY)}{n(0x10465984)}cmp r0,#2;bne out;

@@ -63,7 +63,19 @@ class PayloadTest(unittest.TestCase):
         layout = dict(re.findall(r'ST_(\w+) = (\d+)', source))
         self.assertEqual(int(layout['STRENGTH']) * 4, film_grain_ui.STRENGTH_FIELD)
         self.assertEqual(int(layout['TEXT']) * 4, film_grain_ui.TEXT_FIELD)
-        self.assertEqual(int(layout['WORDS']) * 4, film_grain_ui.STATE_BYTES)
+        # The payload owns the first ST_WORDS; Write to NEF and its record follow.
+        self.assertEqual(int(layout['WORDS']) * 4, film_grain_ui.NEF_FIELD)
+        self.assertEqual(film_grain_ui.CRD_LEFT + 4, film_grain_ui.STATE_BYTES)
+
+    def test_lightroom_grain_matches_the_z5_calibration(self):
+        from z30_extensions.features.photo.film_grain import lightroom_grain
+        # Z5 FILM_GRAIN.md section 5: FUJI400 16..56 / 40 / 65, HP5 19..65 / 33 / 65.
+        self.assertEqual([lightroom_grain(host.STYLE_FUJI400, n)[0] for n in range(1, 7)], [16, 24, 32, 40, 48, 56])
+        self.assertEqual([lightroom_grain(host.STYLE_HP5, n)[0] for n in range(1, 7)], [19, 28, 37, 47, 56, 65])
+        self.assertEqual(lightroom_grain(host.STYLE_FUJI400, 6)[1:], (40, 65))
+        self.assertEqual(lightroom_grain(host.STYLE_HP5, 1)[1:], (33, 65))
+        with self.assertRaises(ValueError):
+            lightroom_grain(host.STYLE_OFF, 3)
 
 
 @unittest.skipUnless(SOURCE.is_file(), 'stock firmware not present')
@@ -81,13 +93,17 @@ class BuildTest(unittest.TestCase):
     def test_alone_installs_its_gate(self):
         from z30_extensions.assembly import jump
         from z30_extensions.build import build
-        from z30_extensions.features.photo import date_stamp, film_grain_ui
+        from z30_extensions.features.photo import date_stamp, film_grain, film_grain_ui
         image, report = build(self.stock, 'film-grain')
         grain = report['features']['film_grain']
         self.assertEqual(grain['gate'], hex(date_stamp.ENCODE_GATEWAY))
         entry = int(grain['gate_entry'], 16) & ~1
         start = date_stamp.ENCODE_GATEWAY - 0x10020000
         self.assertEqual(image[start:start + 10], jump(date_stamp.ENCODE_GATEWAY, entry, 10))
+        crd = grain['nef_crd']
+        self.assertEqual(crd['site'], hex(film_grain.CRD_SITE))
+        start = film_grain.CRD_SITE - 0x10020000
+        self.assertEqual(image[start:start + 8], jump(film_grain.CRD_SITE, int(crd['gate'], 16) & ~1, 8))
         framework = report['features']['menu_framework']
         self.assertIn(str(film_grain_ui.PAGE_INDEX), framework['page_offsets'])
         self.assertIn('grain', [row['key'] for row in framework['menu_categories']])
@@ -103,6 +119,10 @@ class BuildTest(unittest.TestCase):
         _, report = build(self.stock, ['full', 'film-grain'])
         photo = report['features']['menu_framework']['category_pages']['photo']['members']
         self.assertEqual(photo, ['aspect', 'zebra', 'stamp', 'grain', 'nef'])
+        # The crd block end is the aspect crop's site; the aspect gate calls the grain hook first.
+        crd = report['features']['film_grain']['nef_crd']
+        self.assertTrue(crd['gate'].startswith('shared with aspect-profiles'))
+        self.assertEqual(crd['hook'], report['features']['menu_framework']['functions']['grain_crd'])
 
     def test_flash_fonts_gain_the_title_only_with_the_page(self):
         from z30_extensions.build import build

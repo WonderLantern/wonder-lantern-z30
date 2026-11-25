@@ -283,6 +283,11 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
         video = register('bitrate', bu, getattr(bu, 'ROWS', 4 if wireless or lut_sd else 3), restore=('bitrate_restore',),
                          **(dict(cube_text=lut_cube_text, size=lut_size) if lut_sd else {}))
         video['default'] = video.get('default', 2)
+    if grain and aspect:
+        # Both write into the NEF crd XMP block at its closing 0x101B86B4: the aspect gate
+        # calls the grain elements first (inside crd:), film_grain.add_crd fills this hook.
+        from ..photo.film_grain import CRD_HOOK_BYTES
+        f['grain_crd'] = plan.alloc(bytes(CRD_HOOK_BYTES))
     if aspect:
         from ..aspect import ui as au
         register('aspect', au, 7, restore=('aspect_restore', 'aspect_sync'), trace=aspect_trace,

@@ -15,8 +15,13 @@ from ...assembly import constant, invoke
 def settings_code(f, path, *, state_get='get', close='settings_close',
                   magic=CONFIG_MAGIC, enabled_offset=ENABLED, selected_offset=SELECTED,
                   fd_offset=SETTINGS_FD, enabled_max=1, selected_max=4,
-                  load_sound=True, restore_enabled=False):
-    """Emit a checked SD record; optional layout supports independent video state."""
+                  load_sound=True, restore_enabled=False, flag_offset=None):
+    """Emit a checked SD record; optional layout supports independent video state.
+
+    flag_offset: a 0/1 state word kept in bit 8 of the record's enabled word.
+    Records without the bit (written before it existed) restore it as 0; a
+    module without flag_offset rejects a record that has it set.
+    """
     CONFIG_MAGIC, ENABLED, SELECTED, SETTINGS_FD = magic, enabled_offset, selected_offset, fd_offset
     c = constant
     call = lambda name: invoke(f[state_get if name == 'get' else close if name == 'settings_close' else name])
@@ -28,6 +33,16 @@ def settings_code(f, path, *, state_get='get', close='settings_close',
     restore = (f'''str r6,[r4,#{SELECTED}];cmp r5,#0;beq done;
         mov r0,r6;{call('load')}cmp r0,#1;bne done;str r5,[r4,#{ENABLED}];b done;'''
         if load_sound else (f'str r5,[r4,#{ENABLED}];' if restore_enabled else '') + f'str r6,[r4,#{SELECTED}];b done;')
+    if flag_offset is None:
+        save_enabled = f'ldr r1,[r4,#{ENABLED}];'
+        check_enabled = f'cmp r5,#{enabled_max};bhi done;'
+    else:
+        if load_sound or enabled_max > 255:
+            raise ValueError('A flag bit needs an enabled value below 256 without sound loading')
+        save_enabled = (f'ldr r1,[r4,#{ENABLED}];ldr r2,[r4,#{flag_offset}];cmp r2,#0;beq flag_clear;'
+                        'orr r1,r1,#256;flag_clear:')
+        check_enabled = f'bic r1,r5,#256;cmp r1,#{enabled_max};bhi done;'
+        restore = (f'ubfx r1,r5,#8,#1;str r1,[r4,#{flag_offset}];and r5,r5,#255;' + restore)
     initialize = f"""
         mov r0,sp;movs r1,#48;{n(0x10199c40)}
         mvn r0,#0;str r0,[sp,#8];mov r0,sp;{c('r1',path)}{n(0x1033829e)}
@@ -49,7 +64,7 @@ def settings_code(f, path, *, state_get='get', close='settings_close',
             ldr r1,[sp,#8];str r1,[r4,#{SETTINGS_FD}];
             {c('r1',SUCCESS)}cmp r0,r1;bne failed;
             ldr r0,[sp,#8];str r0,[r4,#{SETTINGS_FD}];
-            {c('r0',CONFIG_MAGIC)}str r0,[sp,#48];ldr r1,[r4,#{ENABLED}];str r1,[sp,#52];
+            {c('r0',CONFIG_MAGIC)}str r0,[sp,#48];{save_enabled}str r1,[sp,#52];
             eor r0,r0,r1;ldr r1,[r4,#{SELECTED}];str r1,[sp,#56];eor r0,r0,r1;mvn r0,r0;str r0,[sp,#60];
             movs r0,#0;str r0,[sp,#40];ldr r0,[sp,#8];add r1,sp,#48;movs r2,#16;add r3,sp,#40;
             {n(0x102c8a6a)}mov r5,r0;ldr r6,[sp,#40];mov r0,sp;{n(0x1033832e)}
@@ -74,7 +89,7 @@ def settings_code(f, path, *, state_get='get', close='settings_close',
             mvn r0,#0;str r0,[r4,#{SETTINGS_FD}];
             cmp r5,r1;bne done;ldr r0,[sp,#40];cmp r0,#16;bne done;
             ldr r0,[sp,#48];{c('r1',CONFIG_MAGIC)}cmp r0,r1;bne done;
-            ldr r5,[sp,#52];cmp r5,#{enabled_max};bhi done;ldr r6,[sp,#56];cmp r6,#{selected_max};bhi done;
+            ldr r5,[sp,#52];{check_enabled}ldr r6,[sp,#56];cmp r6,#{selected_max};bhi done;
             eor r0,r0,r5;eor r0,r0,r6;mvn r0,r0;ldr r1,[sp,#60];cmp r0,r1;bne done;
             {restore}
             cleanup:mov r0,r4;{call('settings_close')}

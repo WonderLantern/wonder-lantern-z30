@@ -23,7 +23,7 @@ PRESET_LABELS = {
     'nef-compressed': '实验性：NEF 固定为压缩（有损）（实机已确认变为 Lossy type 2）；不包含在 full 中，与 full 同选时替换其中的 nef-menu',
     'nef-menu': '实验性：扩展菜单中选择 NEF 压缩（无失真压缩/压缩/未压缩），保存到 WL-NEF.CFG；包含在 full 中，三个选项实机已确认',
     'focal-length': '照片取景对所有 CPU 镜头显示焦距（原厂只对电动变焦镜头显示）；常开；包含在 full 中',
-    'film-grain': 'JPEG 胶片颗粒（FUJI400 / HP5，强度 1–6，移植自 Wonder Lantern Z5），机内菜单默认关闭；包含在 full 中',
+    'film-grain': 'JPEG 胶片颗粒（FUJI400 / HP5，强度 1–6，可选把 Lightroom 颗粒写进 NEF，移植自 Wonder Lantern Z5），机内菜单默认关闭；包含在 full 中',
     'battery-percent': '实验性：照片取景的电池图标显示精确电量百分比（20% 及以下变红）；常开，不含在 full 中',
     'date-stamp': '在 JPEG 上打胶片风格日期水印，可选五种格式、四种颜色和柔光晕，竖拍自动转向，默认关闭；包含在 full 中',
     'gyro-evr': '陀螺仪电子防抖：录像模式下开启电子减震即生效，修正偏航、俯仰、滚转，与镜头 VR 协同；自定义菜单可选标准/增强/原厂裁切/关闭；包含在 full 中',

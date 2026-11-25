@@ -51,6 +51,7 @@ TRANSLATIONS = {
     'Glow': ('光晕', '光暈'),
     'Style': ('风格', '風格'),
     'Strength': ('强度', '強度'),
+    'Write to NEF': ('NEF 写入', 'NEF 寫入'),
     'OFF (stock)': ('关闭', '關閉'),
     'Video bitrate': ('视频码率', '影片位元率'),
     'Gyro e-VR': ('Gyro 电子减震', 'Gyro 電子減震'),

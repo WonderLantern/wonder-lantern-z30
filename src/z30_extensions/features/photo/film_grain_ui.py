@@ -1,16 +1,22 @@
 # SPDX-License-Identifier: LicenseRef-Wonder-Lantern-Community
 # Copyright (c) 2026 Wonder Lantern Z30 contributors
 # See licenses/Wonder-Lantern.txt and THIRD_PARTY_NOTICES.md.
-"""Film grain page: grain style and strength, remembered on the SD card.
+"""Film grain page: grain style, strength and NEF write, remembered on the SD card.
 
-Rows: Style (OFF / FUJI400 / HP5) and Strength (1..6) step to the next value in place.
+Rows: Style (OFF / FUJI400 / HP5), Strength (1..6) and Write to NEF (OFF / ON)
+step to the next value in place. Write to NEF adds the matching Lightroom grain
+to each NEF's own XMP crd: block (film_grain.add_crd); it does nothing while the
+style is OFF.
 
 State after the page object (44 bytes), in words: the payload's ST_* layout
 (modules/film_grain/film_grain.c): +0 style, +4 settings fd, +8 strength code
 (0 = strength 3, then 4, 5, 6, 1, 2). The payload also keeps its last result
 there (+12 result, +16 ms, +20 count, +24 PAR, +28 calls, +32 size, +36 site,
 +40..63 ASCII text); the page does not show it (2026-11-25: no diagnostics in the
-release menu), a memory read does. WL-FILM.CFG keeps style and strength code.
+release menu), a memory read does. After the payload's 64 bytes: +64 Write to NEF
+(0 / 1), +68 NEF blocks written, +72 skipped for lack of room, +76 bytes left in
+the last block before the grain elements. WL-FILM.CFG keeps style, strength code
+and, in bit 8 of the strength word, Write to NEF (files from before it restore OFF).
 """
 import struct
 from ...assembly import constant as c, invoke as n, assemble
@@ -19,15 +25,17 @@ from ..menu.slots import page_slots
 from ...host.film_grain import STRENGTH_ORDER, STRENGTHS, STYLES
 
 PAGE_INDEX = 975   # 970-973 category pages, 974 status page
-ROWS = 2
-STYLE_ROW, STRENGTH_ROW = range(ROWS)
+ROWS = 3
+STYLE_ROW, STRENGTH_ROW, NEF_ROW = range(ROWS)
 TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = page_slots('grain', ROWS)
 MAGIC = 0x31464C57  # WLF1
 STRENGTH_FIELD = 8
 TEXT_FIELD = 40
-STATE_BYTES = 64
-SIZES = dict(grain_get=96, grain_labels=384, grain_open=160,
-             grain_action=384, grain_save=640, grain_restore=640, grain_close=128)
+NEF_FIELD = 64
+CRD_WRITTEN, CRD_SKIPPED, CRD_LEFT = 68, 72, 76
+STATE_BYTES = 80
+SIZES = dict(grain_get=96, grain_labels=448, grain_open=160,
+             grain_action=448, grain_save=640, grain_restore=640, grain_close=128)
 # 胶/颗/粒 are not stock glyphs: card builds draw them from the resident common
 # characters; a flash build with this page adds them to its fonts (menu_framework
 # sets plan.feature_labels), builds without it keep their fonts unchanged.
@@ -39,8 +47,9 @@ def prepare(plan, f, resources, allocation_size):
         f[name] = plan.alloc(bytes(size))
     page_offset, state_offset = allocation_size, allocation_size + 44
     title = resources.alloc('Film grain', TITLE)
-    strings = {k: resources.alloc(v) for k, v in dict(style='Style', strength='Strength').items()}
-    labels = plan.alloc(struct.pack(f'<{ROWS}I', strings['style'], strings['strength']))
+    strings = {k: resources.alloc(v) for k, v in dict(style='Style', strength='Strength', nef='Write to NEF').items()}
+    labels = plan.alloc(struct.pack(f'<{ROWS}I', strings['style'], strings['strength'], strings['nef']))
+    switch = plan.alloc(struct.pack('<2I', resources.alloc('OFF'), resources.alloc('ON')))
     styles = plan.alloc(struct.pack(f'<{len(STYLES)}I', *(resources.alloc(s) for s in STYLES)))
     strengths = plan.alloc(struct.pack(f'<{STRENGTHS}I', *(resources.alloc(str(s)) for s in STRENGTH_ORDER)))
     path = plan.alloc(b'A:\\WL-FILM.CFG\0')
@@ -48,23 +57,26 @@ def prepare(plan, f, resources, allocation_size):
     from ..sound.settings import settings_code
     persistence = settings_code(f, path, state_get='grain_get', close='grain_close',
         magic=MAGIC, enabled_offset=STRENGTH_FIELD, selected_offset=0, fd_offset=4,
-        enabled_max=STRENGTHS - 1, selected_max=len(STYLES) - 1, load_sound=False, restore_enabled=True)
+        enabled_max=STRENGTHS - 1, selected_max=len(STYLES) - 1, load_sound=False, restore_enabled=True,
+        flag_offset=NEF_FIELD)
     codes = {new: persistence[old] for old, new in (
         ('save_settings', 'grain_save'), ('restore_settings', 'grain_restore'),
         ('settings_close', 'grain_close'))}
     codes['grain_get'] = f'''push {{r4,lr}};{call('get')}cmp r0,#0;beq done;
         {c('r1',state_offset)}add r0,r0,r1;done:pop {{r4,pc}};'''
-    # r4 style, r6 strength code.
+    # r4 style, r6 strength code, r7 Write to NEF.
     codes['grain_labels'] = f'''push {{r4-r7,lr}};
         {c('r0',title)}movs r1,#{TITLE_SLOT};movs r2,#0;{call('text')}
         {c('r0',title)}movs r1,#{ROOT_SLOT};movs r2,#0;{call('text')}
-        {call('grain_get')}movs r4,#0;movs r6,#0;cmp r0,#0;beq ready;
+        {call('grain_get')}movs r4,#0;movs r6,#0;movs r7,#0;cmp r0,#0;beq ready;
         ldr r4,[r0];cmp r4,#{len(STYLES) - 1};it hi;movhi r4,#0;
         ldr r6,[r0,#{STRENGTH_FIELD}];cmp r6,#{STRENGTHS - 1};it hi;movhi r6,#0;
+        ldr r7,[r0,#{NEF_FIELD}];cmp r7,#1;it hi;movhi r7,#0;
         ready:movs r5,#0;
         loop:{c('r0',labels)}ldr r0,[r0,r5,lsl #2];add r1,r5,#{LABEL_SLOT};movs r2,#0;{call('text')}
         cmp r5,#{STYLE_ROW};bne strength_value;{c('r0',styles)}ldr r0,[r0,r4,lsl #2];b put;
-        strength_value:{c('r0',strengths)}ldr r0,[r0,r6,lsl #2];
+        strength_value:cmp r5,#{STRENGTH_ROW};bne nef_value;{c('r0',strengths)}ldr r0,[r0,r6,lsl #2];b put;
+        nef_value:{c('r0',switch)}ldr r0,[r0,r7,lsl #2];
         put:add r1,r5,#{MARK_SLOT};movs r2,#0;{call('text')}
         adds r5,#1;cmp r5,#{ROWS};bne loop;
         {c('r0',styles)}ldr r0,[r0,r4,lsl #2];movs r1,#{CURRENT_SLOT};movs r2,#0;{call('text')}
@@ -77,12 +89,14 @@ def prepare(plan, f, resources, allocation_size):
     # Every row stays on the page: the list shows a new value only once its widgets
     # are rebuilt, so the page is reopened with focus back on the row (as the date stamp).
     codes['grain_action'] = f'''push {{r4-r6,lr}};mov r4,r0;
-        ldrh r5,[r4,#22];ldrh r0,[r4,#24];add r5,r5,r0;cmp r5,#{STRENGTH_ROW};bhi done;
+        ldrh r5,[r4,#22];ldrh r0,[r4,#24];add r5,r5,r0;cmp r5,#{NEF_ROW};bhi done;
         {call('grain_get')}cmp r0,#0;beq done;
         cmp r5,#{STYLE_ROW};bne strength;
         ldr r1,[r0];adds r1,#1;cmp r1,#{len(STYLES) - 1};it hi;movhi r1,#0;str r1,[r0];b store;
-        strength:ldr r1,[r0,#{STRENGTH_FIELD}];adds r1,#1;cmp r1,#{STRENGTHS - 1};it hi;movhi r1,#0;
-        str r1,[r0,#{STRENGTH_FIELD}];
+        strength:cmp r5,#{STRENGTH_ROW};bne nef;
+        ldr r1,[r0,#{STRENGTH_FIELD}];adds r1,#1;cmp r1,#{STRENGTHS - 1};it hi;movhi r1,#0;
+        str r1,[r0,#{STRENGTH_FIELD}];b store;
+        nef:ldr r1,[r0,#{NEF_FIELD}];cmp r1,#0;ite eq;moveq r1,#1;movne r1,#0;str r1,[r0,#{NEF_FIELD}];
         store:dmb ish;{call('grain_save')}cmp r0,#1;beq redraw;
         mov r0,r4;{call('show_error')}b done;
         redraw:{call('grain_labels')}movs r0,#2;{c('r1',PAGE_INDEX)}{n(0x1045f732)}
@@ -101,8 +115,9 @@ def finish(plan, f, extension, identifiers):
     plan.features['film_grain_control'] = dict(
         default=0, page_index=PAGE_INDEX, page_offset=extension['page_offset'],
         state_offset=extension['state_offset'], strength_offset=extension['state_offset'] + STRENGTH_FIELD,
-        text_offset=extension['state_offset'] + TEXT_FIELD, settings_file='WL-FILM.CFG',
+        text_offset=extension['state_offset'] + TEXT_FIELD, nef_offset=extension['state_offset'] + NEF_FIELD,
+        crd_record_offset=extension['state_offset'] + CRD_WRITTEN, settings_file='WL-FILM.CFG',
         styles=list(STYLES), strength_order=list(STRENGTH_ORDER),
-        rows=['Style', 'Strength'],
+        rows=['Style', 'Strength', 'Write to NEF'],
         restore_policy='First extension-menu initialisation after power-on; OFF before that',
         functions={k: hex(f[k] | 1) for k in SIZES}, physical_verified=False)

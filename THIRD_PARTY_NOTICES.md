@@ -70,7 +70,7 @@
 
 ## Wonder Lantern Z5 胶片颗粒
 
-胶片颗粒（`film-grain`）移植自 [wonder-lantern-z5](https://github.com/WonderLantern/wonder-lantern-z5) 的 FILM 功能（A52）：颗粒场的生成方法和滤波系数、亮度强度曲线、每 4 像素的运算和分块相位都沿用该项目。原项目按 [MIT License](licenses/Z5-Extensions-MIT.txt) 授权（Copyright (c) 2026 Z5 Extensions contributors），许可文本随附。Z30 上的挂点、调用方判断、页表检查、缓存维护、菜单和设置文件为本项目实现。
+胶片颗粒（`film-grain`）移植自 [wonder-lantern-z5](https://github.com/WonderLantern/wonder-lantern-z5) 的 FILM 功能（A52）：颗粒场的生成方法和滤波系数、亮度强度曲线、每 4 像素的运算和分块相位都沿用该项目；“NEF 写入”沿用其 A48/A49 的做法（在 NEF XMP 的 crd: 区块收尾前追加 Lightroom 颗粒）和 Lightroom 数值校准。原项目按 [MIT License](licenses/Z5-Extensions-MIT.txt) 授权（Copyright (c) 2026 Z5 Extensions contributors），许可文本随附。Z30 上的挂点、调用方判断、页表检查、缓存维护、菜单和设置文件为本项目实现。
 
 ## Nikon 固件
 
