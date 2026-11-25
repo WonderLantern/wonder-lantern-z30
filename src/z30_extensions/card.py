@@ -482,12 +482,16 @@ def kit_outputs(folder, patch_only=False, loader_only=False):
 
 
 def write_kit(source_path, presets, folder, patch_only=False, menu_tab=False, build_tag=None,
-              ready_banner=True, banner_debug=False, loader_only=False):
+              ready_banner=True, banner_debug=False, loader_only=False, rebuild_resident=False):
     """Write FOLDER/EG209020.BIN + .json (resident loader EG) and FOLDER/Z30/WL.PATCH.
 
     With patch_only only WL.PATCH is written, built for the resident EG already in
     FOLDER (the one flashed on the camera); with loader_only only the resident EG
-    and its report (presets is ignored). Never overwrites a file."""
+    and its report (presets is ignored). With patch_only and rebuild_resident, a
+    FOLDER without the resident EG gets a card file for the resident EG this
+    program builds (in memory, never written): the resident EG is built
+    deterministically from the stock firmware, so that is the one flashed from
+    this program. Never overwrites a file."""
     from .container import CONTAINER_SHA256, extract_eg
     folder = Path(folder)
     eg, meta, patch_path = folder / RESIDENT_NAME, folder / REPORT_NAME, folder / PATCH_PATH
@@ -497,11 +501,18 @@ def write_kit(source_path, presets, folder, patch_only=False, menu_tab=False, bu
     if existing:
         raise ValueError(f'Refusing to overwrite: {", ".join(existing)}')
     stock = extract_eg(Path(source_path).read_bytes())
+    resident_from = 'built'
     if patch_only:
-        if not (eg.exists() and meta.exists()):
+        present = [path.exists() for path in (eg, meta)]
+        if all(present):
+            resident, resident_from = load_resident(eg, meta), 'folder'
+        elif rebuild_resident and not any(present):
+            resident, resident_from = build_resident(stock), 'program'
+        elif rebuild_resident:
+            raise ValueError(f'{folder} has only one of {RESIDENT_NAME} and {REPORT_NAME}')
+        else:
             raise ValueError(f'Updating only the card file needs the flashed {RESIDENT_NAME} '
                              f'and {REPORT_NAME} in {folder}')
-        resident = load_resident(eg, meta)
     else:
         resident = build_resident(stock)
     blob = card_report = None
@@ -529,7 +540,7 @@ def write_kit(source_path, presets, folder, patch_only=False, menu_tab=False, bu
         with patch_path.open('xb') as f:
             f.write(blob)
         written.append(patch_path)
-    return dict(resident=resident, resident_sha256=hashlib.sha256(resident.image).hexdigest(),
+    return dict(resident=resident, resident_from=resident_from, resident_sha256=hashlib.sha256(resident.image).hexdigest(),
                 patch_bytes=None if blob is None else len(blob),
                 card=card_report and card_report['card'],
                 enabled=card_report.get('enabled_features', []) if card_report else [], written=written)

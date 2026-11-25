@@ -20,7 +20,7 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
-    font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif; }
+    font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui, "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", "Noto Sans SC", sans-serif; }
   body { user-select: none; }
   button, input { font: inherit; color: inherit; }
   .wrap { max-width: 1000px; margin: 0 auto; padding: 18px 36px 36px; }
@@ -52,10 +52,12 @@
   .pill.wait::before { background: var(--info); animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .25; } }
   .files { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 0; }
-  .file { font: 12px/1.4 "Cascadia Mono", Consolas, monospace; color: var(--muted); background: var(--bg);
+  .file { font: 12px/1.4 "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace; color: var(--muted); background: var(--bg);
     border: 1px dashed var(--line-2); border-radius: 6px; padding: 3px 8px; }
   .file em { font-style: normal; color: var(--text); }
   .actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+  .note { margin-top: 10px; color: var(--muted); font-size: 12.5px; }
+  .note.bad { color: var(--bad); }
 
   .everything { display: flex; align-items: center; gap: 14px; background: var(--bg); border: 1px solid var(--line);
     border-radius: 10px; padding: 12px 14px; margin: 16px 0 8px; cursor: pointer; }
@@ -68,7 +70,7 @@
   .feat.locked { cursor: default; }
   .feat .t { flex: 1; min-width: 0; }
   .feat b { display: block; font-weight: 600; font-size: 13.5px; }
-  .feat code { font: 11.5px "Cascadia Mono", Consolas, monospace; color: var(--faint); }
+  .feat code { font: 11.5px "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace; color: var(--faint); }
   .sw { flex: none; width: 34px; height: 20px; border-radius: 20px; background: var(--line-2); position: relative;
     transition: background .15s; margin-top: 1px; }
   .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%;
@@ -89,7 +91,7 @@
   .result h3 { margin: 0; font-size: 14px; flex: 1; }
   .result.ok h3 { color: var(--ok); } .result.bad h3 { color: var(--bad); }
   .result .top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-  .result .kv { font: 12px/1.7 "Cascadia Mono", Consolas, monospace; color: var(--muted); word-break: break-all; }
+  .result .kv { font: 12px/1.7 "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace; color: var(--muted); word-break: break-all; }
   .result ol { margin: 10px 0 0; padding-left: 20px; }
   .result li { margin: 3px 0; }
 
@@ -127,6 +129,7 @@
       <button class="btn" data-pick="loaderOut" data-t="browse"></button>
     </div>
     <div class="files"><span class="file">→ <em>EG209020.BIN</em></span><span class="file">→ <em>EG209020.json</em></span></div>
+    <div class="note" data-t="loader_once"></div>
     <div class="actions"><button class="go" id="goLoader"></button></div>
     <div class="result" id="resultLoader"></div>
   </section>
@@ -134,11 +137,12 @@
   <section class="card">
     <div class="head"><span class="n">02</span><h2 data-t="patch"></h2></div>
     <div class="row">
-      <label data-t="loader_folder"></label>
+      <label data-t="out_folder"></label>
       <input id="patchOut" spellcheck="false">
       <button class="btn" data-pick="patchOut" data-t="browse"></button>
     </div>
     <div class="files"><span class="file">→ <em>Z30/WL.PATCH</em></span></div>
+    <div class="note" id="patchFor"></div>
     <div class="everything" id="everything"><div class="t" id="fullTitle"></div><div class="sw"></div></div>
     <div class="grid" id="grid"></div>
     <div class="summary" id="summary"></div>
@@ -154,7 +158,12 @@ const TEXT = {
     switch: 'English', theme_auto: '主题：跟随系统', theme_light: '主题：浅色', theme_dark: '主题：深色',
     source: '原厂固件', browse: '浏览…',
     loader: '打包加载器 EG 固件', patch: '打包功能卡文件',
-    out_folder: '输出文件夹', loader_folder: '加载器文件夹',
+    out_folder: '输出文件夹',
+    loader_once: '加载器只需刷一次。以后换功能只打包卡文件，不用再打包或刷加载器。',
+    for_folder: '按这个文件夹里的加载器 EG 构建（刷的是这份就对）。',
+    for_program: '按本程序打包出的加载器 EG 构建，不需要加载器文件夹；相机里刷的是更早版本的加载器时，请选那次的输出文件夹。',
+    for_partial: '这个文件夹里只有 EG209020.BIN 和 EG209020.json 之一，请补齐或换一个文件夹。',
+    built_for_folder: '已按文件夹里的加载器 EG 构建', built_for_program: '已按本程序的加载器 EG 构建',
     source_empty: '请选择原版 Z_30_0120.bin（Z30 C 1.20）', source_wait: '正在校验…',
     source_ok: '已校验：原版 Z30 C 1.20 固件', source_missing: '找不到该文件',
     source_bad: '文件不匹配：需要未经修改的原版 Z30 C 1.20 固件',
@@ -163,7 +172,7 @@ const TEXT = {
     need_source: '请先选择通过校验的原版固件。', need_preset: '请至少选择一项功能。',
     need_folder: '请指定文件夹。',
     kit_exists: '文件已存在，程序不会覆盖：{d}',
-    need_resident: '这个文件夹里没有加载器 EG（EG209020.BIN 和 EG209020.json）。请选择打包加载器时的输出文件夹。',
+    half_resident: '这个文件夹里只有 EG209020.BIN 和 EG209020.json 之一，请补齐或换一个文件夹。',
     busy: '已有打包在进行。', failed: '打包失败：{d}',
     done: '打包完成', fail_title: '没有生成文件', open: '打开文件夹',
     resident_id: '加载器 ID', bytes: '字节',
@@ -175,7 +184,12 @@ const TEXT = {
     switch: '中文', theme_auto: 'Theme: system', theme_light: 'Theme: light', theme_dark: 'Theme: dark',
     source: 'Stock firmware', browse: 'Browse…',
     loader: 'Build the loader EG firmware', patch: 'Build the feature card file',
-    out_folder: 'Output folder', loader_folder: 'Loader folder',
+    out_folder: 'Output folder',
+    loader_once: 'The loader is flashed once. To change features later, build only the card file; no new loader, no reflash.',
+    for_folder: 'Built for the loader EG in this folder (the one to flash).',
+    for_program: 'Built for the loader EG this program builds; no loader folder needed. If the camera has a loader from an older version, choose that build\'s output folder.',
+    for_partial: 'This folder has only one of EG209020.BIN and EG209020.json; add the other or choose another folder.',
+    built_for_folder: 'Built for the loader EG in the folder', built_for_program: 'Built for this program\'s loader EG',
     source_empty: 'Select the original Z_30_0120.bin (Z30 C 1.20)', source_wait: 'Checking…',
     source_ok: 'Verified: original Z30 C 1.20 firmware', source_missing: 'File not found',
     source_bad: 'Does not match: an unmodified Z30 C 1.20 firmware is required',
@@ -184,7 +198,7 @@ const TEXT = {
     need_source: 'Select a verified original firmware first.', need_preset: 'Select at least one feature.',
     need_folder: 'Choose a folder.',
     kit_exists: 'Already exists and will not be overwritten: {d}',
-    need_resident: 'This folder has no loader EG (EG209020.BIN and EG209020.json). Choose the folder the loader was built in.',
+    half_resident: 'This folder has only one of EG209020.BIN and EG209020.json; add the other or choose another folder.',
     busy: 'A build is already running.', failed: 'Build failed: {d}',
     done: 'Done', fail_title: 'Nothing was written', open: 'Open folder',
     resident_id: 'Loader id', bytes: 'bytes',
@@ -223,8 +237,21 @@ function render() {
     b.textContent = t(running === job ? 'building' : 'go_' + job);
     b.classList.toggle('busy', running === job); b.disabled = running !== null;
   }
-  showSource(); summarize();
+  showSource(); showPatchFor(); summarize();
   for (const job in results) if (results[job]) showResult(job, results[job]);
+}
+
+let folderKey = 'for_program', folderCheck = 0;
+function showPatchFor() {
+  const el = $('patchFor');
+  el.className = 'note' + (folderKey === 'for_partial' ? ' bad' : '');
+  el.textContent = t(folderKey);
+}
+async function checkPatchFolder() {
+  const ticket = ++folderCheck;
+  const r = await api.folder_state($('patchOut').value);
+  if (ticket !== folderCheck) return;
+  folderKey = {both: 'for_folder', partial: 'for_partial'}[r] || 'for_program'; showPatchFor();
 }
 
 async function summarize() {
@@ -258,6 +285,7 @@ function showResult(job, r) {
   const rows = r.files.map(esc).join('<br>')
     + (job === 'loader' ? `<br>SHA-256 ${esc(r.sha256)}` : '')
     + `<br>${t('resident_id')} ${r.resident_id}`
+    + (job === 'patch' && r.resident_from ? ` · ${t('built_for_' + r.resident_from)}` : '')
     + (r.patch_bytes ? ` · WL.PATCH ${r.patch_bytes.toLocaleString()} ${t('bytes')}` : '');
   el.className = 'result ok';
   el.innerHTML = `<div class="top"><h3>${t('done')}</h3><button class="btn" data-open="${esc(r.folder)}">${t('open')}</button></div>
@@ -279,7 +307,11 @@ async function build(job) {
     $('patchOut').value = r.folder;
     $('loaderOut').value = await api.next_kit(r.folder);
     results.patch = null; $('resultPatch').className = 'result';
+  } else if (r.ok && r.resident_from === 'program') {
+    // Not tied to any loader folder: the next card file goes to a fresh folder.
+    $('patchOut').value = await api.next_kit(r.folder);
   }
+  await checkPatchFolder();
   render(); showResult(job, r);
 }
 
@@ -294,8 +326,9 @@ function wire() {
   $('pickSource').onclick = async () => { const p = await api.choose_source(); if (p) { $('source').value = p; checkSource(); } };
   document.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => {
     const field = $(b.dataset.pick), p = await api.choose_folder(field.value);
-    if (p) field.value = p;
+    if (p) { field.value = p; if (field.id === 'patchOut') checkPatchFolder(); }
   });
+  $('patchOut').oninput = checkPatchFolder;
   $('goLoader').onclick = () => build('loader');
   $('goPatch').onclick = () => build('patch');
   $('everything').onclick = () => { states.full = !states.full; render(); };
@@ -322,7 +355,7 @@ async function start(bridge) {
   lang = info.language;
   $('source').value = info.source;
   $('loaderOut').value = info.outputs.loader; $('patchOut').value = info.outputs.patch;
-  wire(); render(); checkSource();
+  wire(); render(); checkSource(); checkPatchFolder();
 }
 
 let started = false;
@@ -344,8 +377,10 @@ setTimeout(() => {
     build: async job => job === 'loader'
       ? {ok: true, folder: dir + 'card', files: [dir + 'card/EG209020.BIN', dir + 'card/EG209020.json'],
          sha256: 'be618dea203bffa5…', resident_id: '0x67f308e7'}
-      : {ok: true, folder: dir + 'card', files: [dir + 'card/Z30/WL.PATCH'], resident_id: '0x67f308e7', patch_bytes: 409864},
+      : {ok: true, folder: dir + 'card', files: [dir + 'card/Z30/WL.PATCH'], resident_id: '0x67f308e7', patch_bytes: 409864,
+         resident_from: 'program'},
     next_kit: async () => dir + 'card-2', open_folder: async () => {}, choose_source: async () => null,
+    folder_state: async () => 'none',
     choose_folder: async () => null,
   });
 }, 1500);

@@ -1,6 +1,11 @@
-# Builds the Windows packaging tool (WonderLanternZ30-windows-x64.zip: the GUI
-# that packs the loader EG and the WL.PATCH card file, with Keystone inside),
-# checks the packaged program and attaches it to the GitHub release of the tag.
+# Builds the packaging tool (the GUI that packs the loader EG and the WL.PATCH
+# card file, with Keystone inside) for Windows, Linux and macOS, checks each
+# packaged program and attaches them to the GitHub release of the tag:
+#
+#   WonderLanternZ30-windows-x64.zip
+#   WonderLanternZ30-linux-x64.tar.gz
+#   WonderLanternZ30-macos-x64.zip     (x86_64; Apple silicon runs it through Rosetta 2)
+#
 # The release version (the tag) is stamped into the program and shown on the
 # status page of every card file it builds.
 #
@@ -17,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to upload to (leave empty to only build an Actions artifact)'
+        description: 'Release tag to upload to (leave empty to only build Actions artifacts)'
         required: false
         default: ''
 
@@ -34,7 +39,19 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            tests: true
+          # The oldest supported Ubuntu, so the program runs on older glibc too.
+          - os: ubuntu-22.04
+            tests: false
+          # keystone-engine 0.9.2 has macOS wheels for x86_64 only.
+          - os: macos-15-intel
+            tests: false
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     defaults:
       run:
@@ -47,6 +64,16 @@ jobs:
           python-version: '3.14'
           cache: pip
 
+      # Qt's X11 platform plugin links these; installed here they are bundled into
+      # the Linux program, so users need only a desktop with NSS (libnss3).
+      - name: Install Qt system libraries
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xkb1 libxkbfile1 libnss3
+
       - name: Install dependencies
         run: python -m pip install '.[gui-exe,verify]'
 
@@ -56,6 +83,7 @@ jobs:
         with:
           path: Z_30_0120.bin
           key: z30-firmware-${{ env.FIRMWARE_SHA256 }}
+          enableCrossOsArchive: true
 
       - name: Download stock firmware
         if: steps.firmware-cache.outputs.cache-hit != 'true'
@@ -84,7 +112,9 @@ jobs:
           }
           "Firmware OK: $hash"
 
+      # The unit tests are the same on every system; they run once, on Windows.
       - name: Run tests
+        if: matrix.tests
         run: python -m unittest discover -s tests -v
 
       # The tag on tag pushes and on manual runs that name one; otherwise the commit.
@@ -100,16 +130,17 @@ jobs:
       - name: Build packaging tool
         run: python tools/build_gui_exe.py --version '${{ steps.version.outputs.value }}'
 
-      # The packaged program builds the loader EG and a full card file without a
-      # window; its loader EG must equal the one built from source.
+      # The packaged program builds the loader EG, a full card file for it and a
+      # full card file without a loader folder (it must be the same bytes), with
+      # no window; its loader EG must equal the one built from source.
       - name: Check packaged program
         id: sums
         run: |
+          $build = Get-Content dist/build.json -Raw | ConvertFrom-Json
           $check = Join-Path $env:RUNNER_TEMP 'selftest'
-          $exe = 'dist/WonderLanternZ30/WonderLanternZ30.exe'
           $firmware = (Resolve-Path Z_30_0120.bin).Path
-          # A windowed exe: Start-Process -Wait is what waits for it to exit.
-          $run = Start-Process -FilePath $exe -ArgumentList '--selftest', $firmware, $check -PassThru -Wait
+          # The Windows exe is windowed: Start-Process -Wait is what waits for it to exit.
+          $run = Start-Process -FilePath $build.program -ArgumentList '--selftest', $firmware, $check -PassThru -Wait
           $report = Get-Content (Join-Path $check 'selftest.json') -Raw
           $report
           if ($run.ExitCode) { throw "Packaged program selftest failed ($($run.ExitCode))" }
@@ -125,15 +156,18 @@ jobs:
           $sourceHash = (Get-FileHash (Join-Path $source 'EG209020.BIN') -Algorithm SHA256).Hash.ToLower()
           if ($sourceHash -ne $loaderHash) { throw "Loader EG differs: packaged $loaderHash, source $sourceHash" }
 
-          $zip = 'dist/WonderLanternZ30-windows-x64.zip'
-          $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          "zip=$zipHash" >> $env:GITHUB_OUTPUT
+          $archive = Get-Item $build.archive
+          $archiveHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          "archive=$($archive.Name)" >> $env:GITHUB_OUTPUT
           "loader=$loaderHash" >> $env:GITHUB_OUTPUT
+          New-Item -ItemType Directory -Force sums | Out-Null
+          "$archiveHash  $($archive.Name)" | Set-Content "sums/$($archive.Name).sha256"
+          "$loaderHash" | Set-Content "sums/loader-$($build.system).sha256"
           @"
-          ## ${{ steps.version.outputs.value }}
+          ## ${{ steps.version.outputs.value }} ($($build.system)-$($build.arch))
           | File | SHA-256 |
           | --- | --- |
-          | WonderLanternZ30-windows-x64.zip | ``$zipHash`` |
+          | $($archive.Name) | ``$archiveHash`` |
           | Loader EG209020.BIN | ``$loaderHash`` |
           | full Z30/WL.PATCH (selftest, dated today) | ``$patchHash`` |
           "@ >> $env:GITHUB_STEP_SUMMARY
@@ -141,25 +175,60 @@ jobs:
       - name: Upload Actions artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WonderLanternZ30-windows-x64-${{ steps.version.outputs.value }}
-          path: dist/WonderLanternZ30-windows-x64.zip
+          name: ${{ steps.sums.outputs.archive }}-${{ steps.version.outputs.value }}
+          path: |
+            dist/${{ steps.sums.outputs.archive }}
+            sums/
           if-no-files-found: error
 
+  release:
+    needs: build
+    if: github.ref_type == 'tag' || inputs.tag != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
       - name: Attach to release
-        if: github.ref_type == 'tag' || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.value }}
-          ZIP_SHA: ${{ steps.sums.outputs.zip }}
-          LOADER_SHA: ${{ steps.sums.outputs.loader }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
         run: |
+          $archives = @(Get-ChildItem artifacts/dist -File)
+          if ($archives.Count -ne 3) { throw "Expected 3 programs, got: $($archives.Name -join ', ')" }
+          $loaders = @(Get-ChildItem artifacts/sums -Filter 'loader-*.sha256' | ForEach-Object { (Get-Content $_).Trim() } | Sort-Object -Unique)
+          if ($loaders.Count -ne 1) { throw "Loader EG differs between systems: $loaders" }
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE) {
             # New releases start as drafts so the notes can be written before publishing.
-            $notes = "``WonderLanternZ30-windows-x64.zip`` SHA-256:`n`n``$env:ZIP_SHA```n`n" +
-                     "Loader ``EG209020.BIN`` SHA-256 (the same from the program and from source):`n`n``$env:LOADER_SHA``"
-            gh release create $env:TAG --draft --verify-tag --title "Wonder Lantern Z30 $env:TAG" --notes $notes
+            $sums = @{}
+            Get-ChildItem artifacts/sums -Filter 'WonderLanternZ30-*.sha256' | ForEach-Object {
+              $hash, $name = (Get-Content $_).Trim() -split '\s+', 2
+              $sums[$name] = $hash
+            }
+            $rows = @(
+              @('Windows 10/11', 'WonderLanternZ30-windows-x64.zip'),
+              @('Linux x86-64', 'WonderLanternZ30-linux-x64.tar.gz'),
+              @('macOS 11+ (Intel; Apple silicon via Rosetta 2)', 'WonderLanternZ30-macos-x64.zip')
+            ) | ForEach-Object { "| $($_[0]) | ``$($_[1])`` | ``$($sums[$_[1]])`` |" }
+            $tick = '`'
+            $docs = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/blob/$env:TAG/docs"
+            @(
+              '## 下载 / Downloads', '',
+              '| 系统 / System | 文件 / File | SHA-256 |', '| --- | --- | --- |', $rows, '',
+              "加载器 / Loader ${tick}EG209020.BIN${tick} SHA-256（三个程序和源码构建相同 / the same from all three programs and from source）:", '',
+              "$tick$($loaders[0])$tick", '',
+              "图文教程 / Tutorial: [中文]($docs/gui-tutorial.md) · [English]($docs/gui-tutorial.en.md)"
+            ) | Set-Content notes.md
+            gh release create $env:TAG --draft --verify-tag --title "Wonder Lantern Z30 $env:TAG" --notes-file notes.md
             if ($LASTEXITCODE) { throw 'gh release create failed' }
           }
-          gh release upload $env:TAG dist/WonderLanternZ30-windows-x64.zip --clobber
+          gh release upload $env:TAG @($archives.FullName) --clobber
           if ($LASTEXITCODE) { throw 'gh release upload failed' }

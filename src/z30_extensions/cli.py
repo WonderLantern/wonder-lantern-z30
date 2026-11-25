@@ -89,7 +89,8 @@ def main(argv=None):
                         help='Build the card kit instead: OUTPUT/EG209020.BIN (resident loader EG, flashed once) '
                              'and OUTPUT/Z30/WL.PATCH (the features, copied to the SD card)')
     parser.add_argument('--patch-only', action='store_true',
-                        help='With --card: only OUTPUT/Z30/WL.PATCH, for the resident EG already in OUTPUT')
+                        help='With --card: only OUTPUT/Z30/WL.PATCH, for the resident EG in OUTPUT; '
+                             'without one there, for the resident EG this program builds (not written)')
     args = parser.parse_args(argv)
     if args.patch_only and not args.card:
         parser.error('--patch-only needs --card')
@@ -115,7 +116,8 @@ def main(argv=None):
         selected, features = resolve_presets(selected)
         print('Enabled features: ' + ', '.join(features))
         if args.card:
-            kit = card.write_kit(args.source, selected, args.output, patch_only=args.patch_only)
+            kit = card.write_kit(args.source, selected, args.output, patch_only=args.patch_only,
+                                 rebuild_resident=args.patch_only)
         else:
             report, metadata = build_to_files(args.source, selected, args.output, args.extracted_eg)
     except (ValueError, OSError) as error:
@@ -124,6 +126,8 @@ def main(argv=None):
         for path in kit['written']:
             print(f'Built {path}')
         print(f'Resident id {kit["resident"].identity:#010x}; WL.PATCH {kit["patch_bytes"]} bytes')
+        if kit['resident_from'] == 'program':
+            print('Built for the resident EG this program builds (no EG209020.BIN in the output folder).')
         if not args.patch_only:
             print(f'Flash {args.output / card.RESIDENT_NAME} once, then copy the Z30 folder to the SD card.')
         return 0

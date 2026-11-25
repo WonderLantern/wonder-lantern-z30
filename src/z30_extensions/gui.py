@@ -113,26 +113,73 @@ def gui_states(states):
     return {name: on for name, on in states.items() if name not in OPT_IN_PRESETS}
 
 
+def _writable(folder):
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / '.write-test'
+        probe.write_bytes(b'')
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
 def app_folder():
-    """Folder beside the exe when frozen, otherwise the working directory."""
-    return Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path.cwd()
+    """Where the program looks for the firmware and writes output/.
+
+    From source: the working directory. Packaged: the folder beside the program
+    (on macOS beside WonderLanternZ30.app, not inside it). When that folder cannot
+    be written (a macOS app run from a quarantined download, a read-only
+    install), ~/WonderLanternZ30 instead."""
+    if not getattr(sys, 'frozen', False):
+        return Path.cwd()
+    folder = Path(sys.executable).resolve().parent
+    if sys.platform == 'darwin':
+        bundle = next((p for p in folder.parents if p.suffix == '.app'), None)
+        if bundle:
+            folder = bundle.parent
+    return folder if _writable(folder / 'output') else Path.home() / 'WonderLanternZ30'
+
+
+def _system_language():
+    """The desktop's UI language when locale has none: 'zh'/'en' on Windows, else a code like zh-Hans."""
+    if sys.platform == 'win32':
+        import ctypes
+        return 'zh' if ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF == 0x04 else 'en'
+    if sys.platform == 'darwin':
+        # An app started from Finder gets no LANG; the language list is in the user defaults.
+        try:
+            out = subprocess.run(['defaults', 'read', '-g', 'AppleLanguages'],
+                                 capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            return ''
+        return out.replace('(', '').replace('"', '').strip().split(',')[0].strip()
+    return os.environ.get('LANGUAGE', '').split(':')[0]
 
 
 def ui_language():
     name = locale.getlocale()[0] or ''
-    if not name and sys.platform == 'win32':
-        import ctypes
-        return 'zh' if ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF == 0x04 else 'en'
+    if not name or name in ('C', 'POSIX'):
+        name = _system_language() or ''
     return 'zh' if name.lower().startswith(('zh', 'chinese')) else 'en'
 
 
+def has_resident(folder):
+    """'both', 'none' or 'partial': whether FOLDER holds a loader EG and its report."""
+    present = [(Path(folder) / n).is_file() for n in (card.RESIDENT_NAME, card.REPORT_NAME)]
+    return 'both' if all(present) else 'partial' if any(present) else 'none'
+
+
 def output_problem(mode, output):
-    """None when the folder OUTPUT can take this build, else (message key, detail)."""
+    """None when the folder OUTPUT can take this build, else (message key, detail).
+
+    A card file needs no loader EG in OUTPUT: without one it is built for the
+    loader EG this program builds (the same bytes every time)."""
     existing = [str(p) for p in card.kit_outputs(output, mode == 'patch', mode == 'loader') if p.exists()]
     if existing:
         return 'kit_exists', ', '.join(existing)
-    if mode == 'patch' and not all((output / n).is_file() for n in (card.RESIDENT_NAME, card.REPORT_NAME)):
-        return 'need_resident', ''
+    if mode == 'patch' and has_resident(output) == 'partial':
+        return 'half_resident', ''
     return None
 
 
@@ -140,8 +187,9 @@ def run_build(mode, source, presets, output):
     """Build and describe the result for the page; raises ValueError/OSError on failure."""
     # GUI kits always put the extension menu in the eighth menu tab (with its status page).
     kit = card.write_kit(source, presets, output, patch_only=mode == 'patch', loader_only=mode == 'loader',
-                         menu_tab=True)
+                         menu_tab=True, rebuild_resident=mode == 'patch')
     return dict(kind=mode, folder=str(output), files=[str(p) for p in kit['written']],
+                resident_from=kit['resident_from'],
                 sha256=kit['resident_sha256'], resident_id=f'{kit["resident"].identity:#010x}',
                 patch=str(output / card.PATCH_PATH), patch_bytes=kit['patch_bytes'])
 
@@ -163,7 +211,15 @@ class Api:
             labels={'zh': PRESET_LABELS, 'en': PRESET_LABELS_EN},
             source=str(source) if source.is_file() else '',
             outputs={'loader': str(next_free_kit(self._base / 'output')),
-                     'patch': str(latest_kit(self._base / 'output') or self._base / 'output' / KIT_STEM)})
+                     'patch': str(self.patch_folder())})
+
+    def patch_folder(self):
+        """The newest loader folder that has no card file yet, else a fresh folder."""
+        output = self._base / 'output'
+        kit = latest_kit(output)
+        if kit and not (kit / card.PATCH_PATH).exists():
+            return kit
+        return next_free_kit(output)
 
     def check_source(self, path):
         try:
@@ -197,6 +253,10 @@ class Api:
     def next_kit(self, folder):
         return str(next_free_kit(Path(folder).parent))
 
+    def folder_state(self, folder):
+        """What a card file built into FOLDER is made for: 'both' (its loader EG), 'none', 'partial'."""
+        return has_resident(folder.strip()) if folder.strip() else 'none'
+
     def build(self, mode, source, states, output):
         """MODE 'loader' writes the loader EG to OUTPUT; 'patch' writes OUTPUT/Z30/WL.PATCH for it."""
         if mode not in MODES or not output.strip():
@@ -227,11 +287,16 @@ class Api:
 
 
 def selftest(source, folder):
-    """Maintainer check of a packaged program: loader EG then a full card file, no window."""
+    """Maintainer check of a packaged program, no window: loader EG then a full card
+    file for it, then a full card file in a folder without a loader EG, which must
+    be the same bytes (the loader EG rebuilt in memory is the one written)."""
     import json
     folder = Path(folder)
     try:
         result = [run_build(mode, Path(source), ['full'], folder) for mode in MODES]
+        result.append(run_build('patch', Path(source), ['full'], folder / 'patch-only'))
+        if Path(result[1]['patch']).read_bytes() != Path(result[2]['patch']).read_bytes():
+            raise ValueError('The card file built without a loader folder differs')
     except Exception as error:  # noqa: BLE001 - reported to the file, the exe has no console
         result = {'error': repr(error)}
     folder.mkdir(parents=True, exist_ok=True)
@@ -249,5 +314,7 @@ def main(argv=None):
     title = 'Z30 固件构建' if ui_language() == 'zh' else 'Z30 Firmware Builder'
     api._window = webview.create_window(title, html=page, js_api=api,
                                        width=1080, height=820, min_size=(860, 640))
-    webview.start()
+    # The packaged Linux program carries Qt WebEngine (PySide6) and no GTK bindings.
+    frozen_linux = getattr(sys, 'frozen', False) and sys.platform.startswith('linux')
+    webview.start(gui='qt' if frozen_linux else None)
     return 0

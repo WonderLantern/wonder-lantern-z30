@@ -43,13 +43,19 @@ class GuiHelperTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             kit = Path(folder) / 'card'
             self.assertIsNone(gui.output_problem('loader', kit))
-            self.assertEqual(gui.output_problem('patch', kit)[0], 'need_resident')
+            # A card file needs no loader folder: it is built for this program's loader EG.
+            self.assertIsNone(gui.output_problem('patch', kit))
+            self.assertEqual(gui.has_resident(kit), 'none')
             (kit / 'Z30').mkdir(parents=True)
             (kit / 'Z30' / 'WL.PATCH').write_bytes(b'')
             self.assertIsNone(gui.output_problem('loader', kit))
             (kit / 'EG209020.BIN').write_bytes(b'')
             self.assertEqual(gui.output_problem('loader', kit)[0], 'kit_exists')
+            (kit / 'Z30' / 'WL.PATCH').rename(kit / 'old.PATCH')
+            self.assertEqual(gui.output_problem('patch', kit)[0], 'half_resident')
+            (kit / 'old.PATCH').rename(kit / 'Z30' / 'WL.PATCH')
             (kit / 'EG209020.json').write_text('')
+            self.assertEqual(gui.has_resident(kit), 'both')
             self.assertEqual(gui.output_problem('patch', kit)[0], 'kit_exists')
             (kit / 'Z30' / 'WL.PATCH').unlink()
             self.assertIsNone(gui.output_problem('patch', kit))
@@ -63,11 +69,27 @@ class GuiHelperTests(unittest.TestCase):
         self.assertEqual(set(gui.PRESET_LABELS_EN), set(gui.PRESETS))
 
     def test_run_build_always_uses_the_menu_tab(self):
-        kit = dict(written=[], resident_sha256='x', resident=SimpleNamespace(identity=1), patch_bytes=1)
+        kit = dict(written=[], resident_sha256='x', resident=SimpleNamespace(identity=1), patch_bytes=1,
+                   resident_from='built')
         for mode in gui.MODES:
             with patch('z30_extensions.card.write_kit', return_value=kit) as write_kit:
                 gui.run_build(mode, Path('eg.bin'), ['focal-length'], Path('out'))
             self.assertIs(write_kit.call_args.kwargs['menu_tab'], True)
+            self.assertIs(write_kit.call_args.kwargs['rebuild_resident'], mode == 'patch')
+
+    def test_patch_folder_skips_used_kits(self):
+        with tempfile.TemporaryDirectory() as folder:
+            api = gui.Api()
+            api._base = Path(folder)
+            self.assertEqual(api.patch_folder().name, 'card')
+            kit = Path(folder) / 'output' / 'card'
+            kit.mkdir(parents=True)
+            (kit / 'EG209020.BIN').write_bytes(b'')
+            (kit / 'EG209020.json').write_text('')
+            self.assertEqual(api.patch_folder(), kit)
+            (kit / 'Z30').mkdir()
+            (kit / 'Z30' / 'WL.PATCH').write_bytes(b'')
+            self.assertEqual(api.patch_folder().name, 'card-2')
 
     def test_build_to_files_refuses_existing_output(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -78,18 +78,18 @@ You supply the firmware yourself; the repository contains neither stock firmware
 | File | `Z_30_0120.bin`, 34,496,798 bytes |
 | SHA-256 | `1a5449ef505f1f347ed4e066a6a3f588ea542240680e83f4ebcae3b16da3434a` |
 
-### Graphical app (Windows, recommended)
+### Graphical app (Windows / Linux / macOS, recommended)
 
 Screenshots of every step and common problems are in the **[GUI packaging tutorial](docs/gui-tutorial.en.md)**.
 
-1. Download `WonderLanternZ30-windows-x64.zip` from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract the whole archive** before running it.
+1. Download `WonderLanternZ30-windows-x64.zip`, `WonderLanternZ30-linux-x64.tar.gz` or `WonderLanternZ30-macos-x64.zip` (Intel and Apple silicon, the latter through Rosetta 2) from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract the whole archive** before running it.
 2. Put `Z_30_0120.bin` into the extracted folder, or choose it in the program.
-3. Open `WonderLanternZ30.exe` and wait for the firmware check to pass. The interface switches between Chinese and English, dark and light.
+3. Open `WonderLanternZ30` (`WonderLanternZ30.exe` on Windows, `WonderLanternZ30.app` on macOS) and wait for the firmware check to pass. The interface switches between Chinese and English, dark and light.
 4. **First time: build the loader firmware.** Click "Build loader EG" and flash `EG209020.BIN` from `output/card` into the camera (Setup menu → Firmware version). Without a card file, check that the camera behaves as stock and the firmware version page works.
-5. **Build the feature card file.** The loader folder field already points at that folder; pick the features, click "Build card file", copy the resulting `Z30` folder to the root of the memory card and restart the camera.
-6. **Later feature changes and updates:** build a new card file with the new program and the same loader folder (move the old `Z30/WL.PATCH` away first) and replace the file on the card; no reflash. Repeat step 4 only when the program asks for a loader update.
+5. **Build the feature card file.** Pick the features, click "Build card file", copy the resulting `Z30` folder to the root of the memory card and restart the camera.
+6. **Later feature changes:** just build the card file; no loader build, no reflash. An output folder without a loader EG gets a card file for the loader this program builds (a given program version always builds the same loader). If the camera has a loader from an **older** program version, choose that build's output folder (move the old `Z30/WL.PATCH` away first). Repeat step 4 only when the program asks for a loader update.
 
-The program is not code-signed, so Windows SmartScreen may warn about it; check the SHA-256 listed on the Release page first. It needs the Microsoft Edge WebView2 runtime that comes with Windows 10/11. On other systems run `python patch_gui.py`, or use the command line.
+The program is not code-signed; check the SHA-256 listed on the Release page first. Windows SmartScreen may warn, and the program needs the Microsoft Edge WebView2 runtime that comes with Windows 10/11; on macOS right-click → Open the first time; the Linux build carries Qt WebEngine and needs only the system's `libnss3`. Section 1 of the tutorial has the details. From source, run `python patch_gui.py`, or use the command line.
 
 ### Command line
 
@@ -101,10 +101,10 @@ python patch.py full --card --source "Z_30_0120.bin" --output "output/card"
 ```
 
 - This writes `output/card/EG209020.BIN` (the loader firmware, flashed once) and `output/card/Z30/WL.PATCH` (copied to the card).
-- To change features later, add `--patch-only` in the same folder: only a new card file is built, for the loader already flashed (move the old `Z30/WL.PATCH` away first):
+- To change features later, add `--patch-only` to build only the card file. Into a new empty folder it is built for the loader this program builds (the same every time for a given version); into a folder holding the flashed `EG209020.BIN`/`.json` it is built for that loader (move the old `Z30/WL.PATCH` away first):
 
 ```powershell
-python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0120.bin" --output "output/card"
+python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0120.bin" --output "output/card-2"
 ```
 
 - `.[sound]` installs the Keystone assembler.

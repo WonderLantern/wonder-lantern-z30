@@ -15,8 +15,10 @@ wonder-lantern-z30 = "z30_extensions.cli:main"
 wonder-lantern-z30-gui = "z30_extensions.gui:main"
 
 [project.optional-dependencies]
-gui = ["keystone-engine==0.9.2", "pywebview>=6"]
-gui-exe = ["keystone-engine==0.9.2", "pywebview>=6", "pyinstaller>=6"]  # Keystone ships inside the program.
+# pywebview uses WebView2 on Windows and WebKit on macOS; on Linux the packaged
+# program uses Qt WebEngine through PySide6 (LGPL), from source GTK works too.
+gui = ["keystone-engine==0.9.2", "pywebview>=6", "PySide6>=6.5; sys_platform == 'linux'", "QtPy; sys_platform == 'linux'"]
+gui-exe = ["keystone-engine==0.9.2", "pywebview>=6", "PySide6>=6.5; sys_platform == 'linux'", "QtPy; sys_platform == 'linux'", "pyinstaller>=6"]  # Keystone ships inside the program.
 sound = ["keystone-engine==0.9.2"]
 video = ["keystone-engine==0.9.2"]
 verify = ["unicorn==2.1.4"]

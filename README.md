@@ -78,18 +78,18 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的固件
 | 文件 | `Z_30_0120.bin`，34,496,798 字节 |
 | SHA-256 | `1a5449ef505f1f347ed4e066a6a3f588ea542240680e83f4ebcae3b16da3434a` |
 
-### 图形界面（Windows，推荐）
+### 图形界面（Windows / Linux / macOS，推荐）
 
 每一步的截图和常见问题见 **[图形界面打包教程](docs/gui-tutorial.md)**。
 
-1. 从 [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) 下载 `WonderLanternZ30-windows-x64.zip`，**完整解压**后再运行。
+1. 从 [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) 按系统下载 `WonderLanternZ30-windows-x64.zip`、`WonderLanternZ30-linux-x64.tar.gz` 或 `WonderLanternZ30-macos-x64.zip`（Intel 和 Apple 芯片通用，后者经 Rosetta 2 运行），**完整解压**后再运行。
 2. 把 `Z_30_0120.bin` 放进解压后的文件夹，或在程序里手动选择。
-3. 打开 `WonderLanternZ30.exe`，等待固件校验通过。界面可切换中文或英文、深色或浅色。
+3. 打开 `WonderLanternZ30`（Windows 是 `WonderLanternZ30.exe`，macOS 是 `WonderLanternZ30.app`），等待固件校验通过。界面可切换中文或英文、深色或浅色。
 4. **第一次：打包加载器固件。** 点“打包加载器 EG”，把 `output/card` 里的 `EG209020.BIN` 刷进相机（设定菜单 → 固件版本）。先不放卡文件，确认相机和原厂一样、固件版本页正常。
-5. **打包功能卡文件。** “加载器文件夹”会自动指向刚才的文件夹；勾选功能，点“打包卡文件”，把生成的 `Z30` 文件夹复制到存储卡根目录，重启相机。
-6. **以后换功能或更新版本：** 用新版程序、同一个加载器文件夹重新打包卡文件（先移走旧的 `Z30/WL.PATCH`），替换卡上的文件即可，不用重刷。程序提示需要更新加载器时，才重复第 4 步。
+5. **打包功能卡文件。** 勾选功能，点“打包卡文件”，把生成的 `Z30` 文件夹复制到存储卡根目录，重启相机。
+6. **以后换功能：** 直接打包卡文件即可，不用再打包或重刷加载器——输出文件夹里没有加载器 EG 时，卡文件按本程序打包出的加载器构建（同一版本程序每次打包出的加载器完全相同）。相机里刷的是**更早版本**程序打包的加载器时，把输出文件夹选成那次的文件夹（先移走旧的 `Z30/WL.PATCH`）。程序提示需要更新加载器时，才重复第 4 步。
 
-程序没有代码签名，Windows SmartScreen 可能提示风险，可以先核对 Release 页面列出的 SHA-256。程序需要 Windows 10/11 自带的 Microsoft Edge WebView2 运行时。其他系统可以运行 `python patch_gui.py`，或改用命令行。
+程序没有代码签名，可以先核对 Release 页面列出的 SHA-256。Windows SmartScreen 可能提示风险，程序需要 Windows 10/11 自带的 Microsoft Edge WebView2 运行时；macOS 第一次请在 Finder 里右键 → 打开；Linux 版自带 Qt WebEngine，只需要系统装有 `libnss3`。各系统的细节见教程第 1 节。也可以从源码运行 `python patch_gui.py`，或改用命令行。
 
 ### 命令行
 
@@ -101,10 +101,10 @@ python patch.py full --card --source "Z_30_0120.bin" --output "output/card"
 ```
 
 - 生成 `output/card/EG209020.BIN`（加载器固件，刷一次）和 `output/card/Z30/WL.PATCH`（复制到卡上）。
-- 以后换功能，在同一个目录加 `--patch-only`，只按已刷的加载器生成新卡文件（先移走旧的 `Z30/WL.PATCH`）：
+- 以后换功能，加 `--patch-only` 只生成卡文件。输出到一个新的空目录时，按本程序构建的加载器打包（同一版本每次相同）；输出到含已刷 `EG209020.BIN`/`.json` 的目录时，按那份加载器打包（先移走旧的 `Z30/WL.PATCH`）：
 
 ```powershell
-python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0120.bin" --output "output/card"
+python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0120.bin" --output "output/card-2"
 ```
 
 - `.[sound]` 安装 Keystone 汇编器。

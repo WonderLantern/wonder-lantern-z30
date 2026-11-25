@@ -90,7 +90,7 @@ python patch.py full --card --source "Z_30_0120.bin" --output "output/card"
 
 ## 以后换功能：只换卡文件
 
-在同一个 `output/card` 目录运行同一命令，加 `--patch-only`（先移走旧的 `Z30/WL.PATCH`）：
+加 `--patch-only` 只生成卡文件。输出到新的空目录时按本程序构建的加载器打包（同一版本程序每次构建的加载器完全相同，不用先打包加载器）；相机里刷的是更早版本的加载器时，输出到当时的 `output/card` 目录（先移走旧的 `Z30/WL.PATCH`），按那份加载器打包：
 
 ```powershell
 python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0120.bin" --output "output/card"
