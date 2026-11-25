@@ -1,19 +1,23 @@
-"""Local firmware build GUI; never connects to a camera or writes an SD card."""
+"""Local firmware build GUI (pywebview page in gui_page.html); never connects to a camera
+or writes an SD card."""
 import hashlib
 import locale
 import os
-import queue
 import subprocess
 import sys
 import threading
+from importlib.resources import files
 from pathlib import Path
 
+from . import card
 from .build import FULL_FEATURES, PRESETS, resolve_presets
-from .cli import PRESET_LABELS, build_to_files
+from .cli import PRESET_LABELS
 from .container import CONTAINER_SHA256, CONTAINER_SIZE
 
 SOURCE_NAME = 'Z_30_0120.bin'
-OUTPUT_STEM = 'EG209020'
+KIT_STEM = 'card'
+MODES = ('loader', 'patch')
+PAGE = 'gui_page.html'
 # Selectable next to full instead of being implied by it.
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
@@ -40,49 +44,27 @@ PRESET_LABELS_EN = {
     'af-frame-colour': 'AF frame colours in the style of Nikon EXPEED 7 cameras (Z9, Z8, Z6III and others): the tracking and person / animal boxes are white, green when a half-press focuses and red when it does not, in AF-S and AF-C alike; the movie-mode person / animal box is white; plain auto-area AF-C frames turn green in focus; other frames unchanged; photo shooting menu Enable / Disable (Enable by default); included in full',
 }
 
-TEXT = {
+# Short titles for the feature cards; PRESET_LABELS / PRESET_LABELS_EN hold the details.
+PRESET_TITLES = {
     'zh': {
-        'switch': 'English',
-        'title': 'Wonder Lantern Z30 固件构建',
-        'source': '原厂固件', 'browse': '浏览…', 'features': '功能',
-        'output': '输出文件', 'build': '开始构建', 'building': '正在构建，请稍候…',
-        'open_folder': '打开输出文件夹', 'enabled': '将启用：{}', 'none': '（未选择）',
-        'notes': '注意：wifi-5ghz（包含在 full 中）可能影响 2.4 GHz 第 12、13 信道的网络，'
-                 '可用信道与功率规定因使用地点而异。',
-        'source_empty': '请选择原版 Z_30_0120.bin（Z30 C 1.20）。',
-        'source_ok': '已校验：原版 Z30 C 1.20 固件。',
-        'source_missing': '找不到该文件。',
-        'source_bad': '文件不匹配：需要未经修改的原版 Z30 C 1.20 固件。',
-        'need_source': '请先选择通过校验的原版固件。',
-        'need_preset': '请至少选择一项功能。',
-        'need_output': '请指定输出文件，且不能使用 .json 后缀。',
-        'exists': '输出文件或同名 JSON 报告已存在，程序不会覆盖。请换一个文件名。',
-        'keystone': '缺少 Keystone 汇编组件。请运行：python -m pip install ".[sound]"',
-        'failed': '构建失败：{}',
-        'built': '构建完成：{}\nSHA-256：{}\n报告：{}',
-        'reminder': '该文件是独立 EG 模块，不是完整 Nikon 更新包。构建成功不代表所有机身行为均已验证。',
+        'full': '全部功能', 'liveview-dual': '直方图＋水平仪同屏', 'shutter-sound': '自定义快门声音',
+        'm900': 'M 档 900 秒曝光', 'mtp-fast': 'MTP 加速', 'video-rot': '视频自动方向',
+        'bitrate-slowmo-uncap': '高码率与慢动作扩展', 'aspect-profiles': '多画幅与遮幅',
+        'photo-zebra': '照片斑马纹', 'wifi-5ghz': 'Wi-Fi 5 GHz', 'date-stamp': '日期水印',
+        'portrait-ui': '竖拍显示', 'gyro-evr': '陀螺仪电子防抖', '3d-tracking': '3D 跟踪',
+        'af-frame-colour': '对焦框颜色', 'focal-length': '焦距显示', 'nef-menu': 'NEF 压缩菜单',
+        'nef-uncompressed': 'NEF 固定未压缩', 'nef-compressed': 'NEF 固定压缩',
+        'battery-percent': '电量百分比',
     },
     'en': {
-        'switch': '中文',
-        'title': 'Wonder Lantern Z30 Firmware Builder',
-        'source': 'Stock firmware', 'browse': 'Browse…', 'features': 'Features',
-        'output': 'Output file', 'build': 'Build', 'building': 'Building, please wait…',
-        'open_folder': 'Open output folder', 'enabled': 'Enabled: {}', 'none': '(none selected)',
-        'notes': 'Note: wifi-5ghz (included in full) may affect 2.4 GHz channel 12/13 '
-                 'networks, and channel and power rules vary by location.',
-        'source_empty': 'Select the original Z_30_0120.bin (Z30 C 1.20).',
-        'source_ok': 'Verified: original Z30 C 1.20 firmware.',
-        'source_missing': 'File not found.',
-        'source_bad': 'File does not match: an unmodified Z30 C 1.20 firmware is required.',
-        'need_source': 'Select a verified original firmware first.',
-        'need_preset': 'Select at least one feature.',
-        'need_output': 'Choose an output file; it must not have a .json suffix.',
-        'exists': 'The output file or its JSON report already exists and will not be overwritten. Choose another name.',
-        'keystone': 'The Keystone assembler is missing. Run: python -m pip install ".[sound]"',
-        'failed': 'Build failed: {}',
-        'built': 'Built: {}\nSHA-256: {}\nReport: {}',
-        'reminder': 'This is a standalone EG module, not a full Nikon update package. '
-                    'A successful build does not prove camera behaviour.',
+        'full': 'Everything', 'liveview-dual': 'Histogram + level', 'shutter-sound': 'Custom shutter sound',
+        'm900': '900 s in M mode', 'mtp-fast': 'Faster MTP', 'video-rot': 'Video orientation',
+        'bitrate-slowmo-uncap': 'Bitrate & slow motion', 'aspect-profiles': 'Aspect profiles',
+        'photo-zebra': 'Photo zebra', 'wifi-5ghz': 'Wi-Fi 5 GHz', 'date-stamp': 'Date stamp',
+        'portrait-ui': 'Portrait layout', 'gyro-evr': 'Gyro e-VR', '3d-tracking': '3D tracking',
+        'af-frame-colour': 'AF frame colours', 'focal-length': 'Focal length', 'nef-menu': 'NEF compression menu',
+        'nef-uncompressed': 'NEF fixed uncompressed', 'nef-compressed': 'NEF fixed compressed',
+        'battery-percent': 'Battery percent',
     },
 }
 
@@ -98,16 +80,25 @@ def check_source(path):
     return 'ok' if digest == CONTAINER_SHA256 else 'bad'
 
 
-def next_free_output(folder):
-    """Pick the first image name whose BIN and JSON report are both unused."""
+def next_free_kit(folder):
+    """Pick the first kit folder that does not exist yet."""
     folder = Path(folder)
     index = 1
     while True:
-        suffix = '' if index == 1 else f'-{index}'
-        candidate = folder / f'{OUTPUT_STEM}{suffix}.BIN'
-        if not candidate.exists() and not candidate.with_suffix('.json').exists():
+        candidate = folder / (KIT_STEM if index == 1 else f'{KIT_STEM}-{index}')
+        if not candidate.exists():
             return candidate
         index += 1
+
+
+def latest_kit(folder):
+    """The newest folder under FOLDER that holds a resident loader EG, or None."""
+    folder = Path(folder)
+    if not folder.is_dir():
+        return None
+    kits = [p for p in folder.iterdir()
+            if (p / card.RESIDENT_NAME).is_file() and (p / card.REPORT_NAME).is_file()]
+    return max(kits, key=lambda p: (p / card.RESIDENT_NAME).stat().st_mtime, default=None)
 
 
 def selected_presets(states):
@@ -117,6 +108,11 @@ def selected_presets(states):
     return [name for name in PRESETS if states.get(name)]
 
 
+def gui_states(states):
+    """The page offers only full and what it contains; opt-in presets stay on the command line."""
+    return {name: on for name, on in states.items() if name not in OPT_IN_PRESETS}
+
+
 def app_folder():
     """Folder beside the exe when frozen, otherwise the working directory."""
     return Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path.cwd()
@@ -124,213 +120,132 @@ def app_folder():
 
 def ui_language():
     name = locale.getlocale()[0] or ''
+    if not name and sys.platform == 'win32':
+        import ctypes
+        return 'zh' if ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF == 0x04 else 'en'
     return 'zh' if name.lower().startswith(('zh', 'chinese')) else 'en'
 
 
-def friendly_error(error, text):
-    message = str(error)
-    if 'Keystone' in message and not getattr(sys, 'frozen', False):
-        return text['keystone']
-    return text['failed'].format(message)
+def output_problem(mode, output):
+    """None when the folder OUTPUT can take this build, else (message key, detail)."""
+    existing = [str(p) for p in card.kit_outputs(output, mode == 'patch', mode == 'loader') if p.exists()]
+    if existing:
+        return 'kit_exists', ', '.join(existing)
+    if mode == 'patch' and not all((output / n).is_file() for n in (card.RESIDENT_NAME, card.REPORT_NAME)):
+        return 'need_resident', ''
+    return None
 
 
-def main(argv=None):
-    import tkinter as tk
-    from tkinter import filedialog, ttk
+def run_build(mode, source, presets, output):
+    """Build and describe the result for the page; raises ValueError/OSError on failure."""
+    kit = card.write_kit(source, presets, output, patch_only=mode == 'patch', loader_only=mode == 'loader')
+    return dict(kind=mode, folder=str(output), files=[str(p) for p in kit['written']],
+                sha256=kit['resident_sha256'], resident_id=f'{kit["resident"].identity:#010x}',
+                patch=str(output / card.PATCH_PATH), patch_bytes=kit['patch_bytes'])
 
-    language = ui_language()
-    # Handlers read these at call time, so switching language updates them in place.
-    text = dict(TEXT[language])
-    root = tk.Tk()
-    root.columnconfigure(1, weight=1)
-    events = queue.Queue()
-    base = app_folder()
 
-    source_var = tk.StringVar()
-    source_status = tk.StringVar()
-    output_var = tk.StringVar(value=str(next_free_output(base / 'output')))
-    enabled_var = tk.StringVar()
-    state = {'source_ok': False, 'check': 0, 'building': False, 'language': language, 'source_key': 'source_empty'}
-    checks = {name: tk.BooleanVar(value=name == 'full') for name in PRESETS}
-    boxes = {}
+class Api:
+    """Methods the page calls through window.pywebview.api; each runs on its own thread."""
 
-    def set_source_status(key):
-        state['source_key'] = key
-        source_status.set(text[key])
+    def __init__(self):
+        self._base = app_folder()
+        self._window = None
+        self._busy = threading.Lock()
 
-    def apply_language():
-        text.update(TEXT[state['language']])
-        labels = PRESET_LABELS if state['language'] == 'zh' else PRESET_LABELS_EN
-        root.title(text['title'])
-        for widget, key in translated:
-            widget.configure(text=text[key])
-        for name, box in boxes.items():
-            box.configure(text=f'{name} — {labels[name]}')
-        source_status.set(text[state['source_key']])
-        refresh_features()
+    def initial(self):
+        source = self._base / SOURCE_NAME
+        return dict(
+            language=ui_language(), presets=[n for n in PRESETS if n not in OPT_IN_PRESETS],
+            full=sorted(FULL_FEATURES),
+            titles=PRESET_TITLES,
+            labels={'zh': PRESET_LABELS, 'en': PRESET_LABELS_EN},
+            source=str(source) if source.is_file() else '',
+            outputs={'loader': str(next_free_kit(self._base / 'output')),
+                     'patch': str(latest_kit(self._base / 'output') or self._base / 'output' / KIT_STEM)})
 
-    def switch_language():
-        state['language'] = 'en' if state['language'] == 'zh' else 'zh'
-        apply_language()
-
-    def refresh_build_button():
-        build_button.configure(state='disabled' if state['building'] else 'normal')
-
-    def refresh_features(*_):
-        full = checks['full'].get()
-        for name, box in boxes.items():
-            if name != 'full' and name not in OPT_IN_PRESETS:
-                box.configure(state='disabled' if full else 'normal')
-                if full:
-                    checks[name].set(True)
-        chosen = selected_presets({name: var.get() for name, var in checks.items()})
+    def check_source(self, path):
         try:
-            enabled = resolve_presets(chosen)[1] if chosen else []
-        except ValueError as error:
-            enabled_var.set(str(error))
-            return
-        enabled_var.set(text['enabled'].format(', '.join(enabled) or text['none']))
+            return check_source(path.strip()) if path.strip() else 'empty'
+        except OSError:
+            return 'missing'
 
-    def start_source_check(*_):
-        # Hashing 34 MB is visible on slow disks, and only the newest path counts.
-        state['source_ok'] = False
-        state['check'] += 1
-        ticket, value = state['check'], source_var.get().strip()
-        if not value:
-            set_source_status('source_empty')
-            return
-
-        def work():
-            try:
-                events.put(('source', ticket, check_source(value)))
-            except OSError:
-                events.put(('source', ticket, 'missing'))
-        threading.Thread(target=work, daemon=True).start()
-
-    def choose_source():
-        path = filedialog.askopenfilename(filetypes=[('Firmware', '*.bin *.BIN'), ('*', '*')])
-        if path:
-            source_var.set(path)
-
-    def choose_output():
-        current = Path(output_var.get() or base / f'{OUTPUT_STEM}.BIN')
-        path = filedialog.asksaveasfilename(initialdir=current.parent, initialfile=current.name,
-                                            defaultextension='.BIN', confirmoverwrite=False)
-        if path:
-            output_var.set(path)
-
-    def log(message):
-        log_box.configure(state='normal')
-        log_box.insert('end', message + '\n')
-        log_box.see('end')
-        log_box.configure(state='disabled')
-
-    def start_build():
-        if not state['source_ok']:
-            return log(text['need_source'])
-        chosen = selected_presets({name: var.get() for name, var in checks.items()})
+    def resolve(self, states):
+        chosen = selected_presets(gui_states(states))
         if not chosen:
-            return log(text['need_preset'])
-        value = output_var.get().strip()
-        output = Path(value) if value else None
-        if output is None or output.suffix.lower() == '.json':
-            return log(text['need_output'])
-        if output.exists() or output.with_suffix('.json').exists():
-            return log(text['exists'])
-        source = Path(source_var.get().strip())
+            return dict(ok=True, presets=[], features=[])
+        try:
+            return dict(ok=True, presets=chosen, features=resolve_presets(chosen)[1])
+        except ValueError as error:
+            return dict(ok=False, error=str(error))
 
-        def work():
-            try:
-                output.parent.mkdir(parents=True, exist_ok=True)
-                report, metadata = build_to_files(source, chosen, output)
-                events.put(('built', output, report['sha256'], metadata))
-            except (ValueError, OSError) as error:
-                events.put(('failed', error))
+    def choose_source(self):
+        import webview
+        picked = self._window.create_file_dialog(webview.FileDialog.OPEN, directory=str(self._base),
+                                                file_types=('Firmware (*.bin;*.BIN)', 'All files (*.*)'))
+        return picked[0] if picked else None
 
-        state['building'] = True
-        refresh_build_button()
-        progress.start(12)
-        log(text['building'])
-        threading.Thread(target=work, daemon=True).start()
+    def choose_folder(self, current):
+        import webview
+        current = Path(current) if current else self._base / 'output'
+        start = current if current.is_dir() else current.parent
+        picked = self._window.create_file_dialog(webview.FileDialog.FOLDER,
+                                                directory=str(start if start.is_dir() else self._base))
+        return picked[0] if picked else None
 
-    def finish_build():
-        state['building'] = False
-        refresh_build_button()
-        progress.stop()
+    def next_kit(self, folder):
+        return str(next_free_kit(Path(folder).parent))
 
-    def poll():
-        while True:
-            try:
-                event = events.get_nowait()
-            except queue.Empty:
-                break
-            if event[0] == 'source' and event[1] == state['check']:
-                state['source_ok'] = event[2] == 'ok'
-                set_source_status('source_' + event[2])
-            elif event[0] == 'built':
-                finish_build()
-                log(text['built'].format(event[1], event[2], event[3]))
-                log(text['reminder'])
-                state['last_folder'] = event[1].parent
-                folder_button.configure(state='normal')
-                output_var.set(str(next_free_output(event[1].parent)))
-            elif event[0] == 'failed':
-                finish_build()
-                log(friendly_error(event[1], text))
-        root.after(100, poll)
+    def build(self, mode, source, states, output):
+        """MODE 'loader' writes the loader EG to OUTPUT; 'patch' writes OUTPUT/Z30/WL.PATCH for it."""
+        if mode not in MODES or not output.strip():
+            return dict(ok=False, key='need_folder')
+        if check_source(source) != 'ok':
+            return dict(ok=False, key='need_source')
+        presets = selected_presets(gui_states(states))
+        if not presets and mode == 'patch':
+            return dict(ok=False, key='need_preset')
+        output = Path(output.strip())
+        problem = output_problem(mode, output)
+        if problem:
+            return dict(ok=False, key=problem[0], detail=problem[1])
+        if not self._busy.acquire(blocking=False):
+            return dict(ok=False, key='busy')
+        try:
+            return dict(ok=True, **run_build(mode, Path(source), presets, output))
+        except (ValueError, OSError) as error:
+            return dict(ok=False, key='failed', detail=str(error))
+        finally:
+            self._busy.release()
 
-    def open_folder():
-        folder = state.get('last_folder')
-        if folder is None:
-            return
+    def open_folder(self, folder):
         if sys.platform == 'win32':
             os.startfile(folder)
         else:
-            subprocess.run(['open' if sys.platform == 'darwin' else 'xdg-open', str(folder)], check=False)
+            subprocess.run(['open' if sys.platform == 'darwin' else 'xdg-open', folder], check=False)
 
-    pad = {'padx': 8, 'pady': 4}
-    source_label = ttk.Label(root)
-    source_label.grid(row=0, column=0, sticky='w', **pad)
-    ttk.Entry(root, textvariable=source_var, width=60).grid(row=0, column=1, sticky='ew', **pad)
-    source_button = ttk.Button(root, command=choose_source)
-    source_button.grid(row=0, column=2, **pad)
-    ttk.Label(root, textvariable=source_status).grid(row=1, column=1, sticky='w', padx=8)
-    language_button = ttk.Button(root, command=switch_language)
-    language_button.grid(row=1, column=2, **pad)
 
-    frame = ttk.LabelFrame(root)
-    frame.grid(row=2, column=0, columnspan=3, sticky='ew', **pad)
-    for row, name in enumerate(PRESETS):
-        boxes[name] = ttk.Checkbutton(frame, variable=checks[name], command=refresh_features)
-        boxes[name].grid(row=row, column=0, sticky='w', padx=6, pady=1)
-    ttk.Label(root, textvariable=enabled_var, wraplength=680).grid(row=3, column=0, columnspan=3, sticky='w', **pad)
-    notes_label = ttk.Label(root, wraplength=680)
-    notes_label.grid(row=4, column=0, columnspan=3, sticky='w', **pad)
+def selftest(source, folder):
+    """Maintainer check of a packaged program: loader EG then a full card file, no window."""
+    import json
+    folder = Path(folder)
+    try:
+        result = [run_build(mode, Path(source), ['full'], folder) for mode in MODES]
+    except Exception as error:  # noqa: BLE001 - reported to the file, the exe has no console
+        result = {'error': repr(error)}
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / 'selftest.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+    return 0 if isinstance(result, list) else 1
 
-    output_label = ttk.Label(root)
-    output_label.grid(row=5, column=0, sticky='w', **pad)
-    ttk.Entry(root, textvariable=output_var).grid(row=5, column=1, sticky='ew', **pad)
-    output_button = ttk.Button(root, command=choose_output)
-    output_button.grid(row=5, column=2, **pad)
 
-    build_button = ttk.Button(root, command=start_build)
-    build_button.grid(row=6, column=0, **pad)
-    progress = ttk.Progressbar(root, mode='indeterminate')
-    progress.grid(row=6, column=1, sticky='ew', **pad)
-    folder_button = ttk.Button(root, command=open_folder, state='disabled')
-    folder_button.grid(row=6, column=2, **pad)
-
-    log_box = tk.Text(root, height=8, state='disabled', wrap='word')
-    log_box.grid(row=7, column=0, columnspan=3, sticky='nsew', **pad)
-    root.rowconfigure(7, weight=1)
-
-    translated = [(source_label, 'source'), (source_button, 'browse'), (language_button, 'switch'),
-                  (frame, 'features'), (notes_label, 'notes'), (output_label, 'output'),
-                  (output_button, 'browse'), (build_button, 'build'), (folder_button, 'open_folder')]
-    apply_language()
-    source_var.trace_add('write', start_source_check)
-    if (base / SOURCE_NAME).is_file():
-        source_var.set(str(base / SOURCE_NAME))
-    poll()
-    root.mainloop()
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if len(argv) == 3 and argv[0] == '--selftest':
+        return selftest(argv[1], argv[2])
+    import webview
+    api = Api()
+    page = files('z30_extensions').joinpath(PAGE).read_text(encoding='utf-8')
+    title = 'Z30 固件构建' if ui_language() == 'zh' else 'Z30 Firmware Builder'
+    api._window = webview.create_window(title, html=page, js_api=api,
+                                       width=1080, height=820, min_size=(860, 640))
+    webview.start()
     return 0

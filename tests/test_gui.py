@@ -20,14 +20,6 @@ class GuiHelperTests(unittest.TestCase):
                 with patch.object(gui, 'CONTAINER_SHA256', hashlib.sha256(b'abc').hexdigest()):
                     self.assertEqual(gui.check_source(path), 'ok')
 
-    def test_next_free_output_skips_bin_and_report(self):
-        with tempfile.TemporaryDirectory() as folder:
-            folder = Path(folder)
-            self.assertEqual(gui.next_free_output(folder).name, 'EG209020.BIN')
-            (folder / 'EG209020.BIN').write_bytes(b'')
-            (folder / 'EG209020-2.json').write_text('')
-            self.assertEqual(gui.next_free_output(folder).name, 'EG209020-3.BIN')
-
     def test_selected_presets(self):
         self.assertEqual(gui.selected_presets({'full': True, 'm900': True}), ['full'])
         self.assertEqual(gui.selected_presets({'full': True, 'date-stamp': True}), ['full'])
@@ -38,6 +30,33 @@ class GuiHelperTests(unittest.TestCase):
         self.assertEqual(gui.selected_presets({'nef-menu': True, 'm900': True}), ['m900', 'nef-menu'])
         self.assertEqual(gui.selected_presets({'wifi-5ghz': True, 'm900': True}), ['m900', 'wifi-5ghz'])
         self.assertEqual(gui.selected_presets({}), [])
+
+    def test_next_free_kit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            folder = Path(folder)
+            self.assertEqual(gui.next_free_kit(folder).name, 'card')
+            (folder / 'card').mkdir()
+            self.assertEqual(gui.next_free_kit(folder).name, 'card-2')
+
+    def test_output_problem(self):
+        with tempfile.TemporaryDirectory() as folder:
+            kit = Path(folder) / 'card'
+            self.assertIsNone(gui.output_problem('loader', kit))
+            self.assertEqual(gui.output_problem('patch', kit)[0], 'need_resident')
+            (kit / 'Z30').mkdir(parents=True)
+            (kit / 'Z30' / 'WL.PATCH').write_bytes(b'')
+            self.assertIsNone(gui.output_problem('loader', kit))
+            (kit / 'EG209020.BIN').write_bytes(b'')
+            self.assertEqual(gui.output_problem('loader', kit)[0], 'kit_exists')
+            (kit / 'EG209020.json').write_text('')
+            self.assertEqual(gui.output_problem('patch', kit)[0], 'kit_exists')
+            (kit / 'Z30' / 'WL.PATCH').unlink()
+            self.assertIsNone(gui.output_problem('patch', kit))
+            self.assertEqual(gui.latest_kit(Path(folder)), kit)
+
+    def test_every_preset_has_titles(self):
+        for language in ('zh', 'en'):
+            self.assertEqual(set(gui.PRESET_TITLES[language]), set(gui.PRESETS))
 
     def test_every_preset_has_english_label(self):
         self.assertEqual(set(gui.PRESET_LABELS_EN), set(gui.PRESETS))

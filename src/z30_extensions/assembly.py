@@ -47,7 +47,7 @@ def keystone_assemble(source, address):
         from keystone import KS_ARCH_ARM, KS_MODE_THUMB, KS_MODE_V8, Ks
     except ImportError as error:
         if getattr(sys, 'frozen', False):
-            message = 'This feature combination is missing from the pre-assembled data of this program.'
+            message = f'The Keystone assembler bundled with this program failed to load: {error}'
         elif isinstance(error, ModuleNotFoundError) and error.name == 'keystone':
             message = 'Keystone is not installed; run python -m pip install ".[sound]".'
         else:

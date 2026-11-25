@@ -1,0 +1,354 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title></title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1d212a; --line: #2a2f3a; --line-2: #363c49;
+    --text: #e8eaef; --muted: #8b93a3; --faint: #5d6575;
+    --accent: #f2c94c; --accent-ink: #1b1607; --ok: #4fcf8a; --bad: #f06a6a; --info: #6aa8f0;
+    --tip: #252a35; --locked: #6b5a22; --ok-line: #2c5d43; --bad-line: #6b3434; --stripe: #e0b73f;
+    --radius: 12px; color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f0f2f5; --line: #e1e4ea; --line-2: #cdd2db;
+    --text: #1b1f27; --muted: #5d6676; --faint: #8a92a1;
+    --accent: #e0a800; --accent-ink: #1b1607; --ok: #1f9d5c; --bad: #d64545; --info: #2f7de1;
+    --tip: #ffffff; --locked: #f0d88a; --ok-line: #9fd9b9; --bad-line: #efb4b4; --stripe: #f2c94c;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif; }
+  body { user-select: none; }
+  button, input { font: inherit; color: inherit; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 18px 36px 36px; }
+
+  header { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+  .ghost { background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 12px;
+    cursor: pointer; color: var(--muted); }
+  .ghost:hover { color: var(--text); border-color: var(--faint); }
+
+  section { margin-bottom: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
+  .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .head .n { color: var(--accent); font-weight: 700; font-size: 12px; letter-spacing: 1px; }
+  .head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .plain .head { margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row label { color: var(--muted); font-size: 12.5px; white-space: nowrap; min-width: 84px; }
+  .row input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 9px; padding: 9px 12px; outline: none; user-select: text; }
+  .plain .row input { background: var(--panel); }
+  .row input:focus { border-color: var(--faint); }
+  .btn { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 9px; padding: 9px 14px;
+    cursor: pointer; white-space: nowrap; }
+  .btn:hover { border-color: var(--faint); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .pill.ok { color: var(--ok); } .pill.ok::before { background: var(--ok); }
+  .pill.bad { color: var(--bad); } .pill.bad::before { background: var(--bad); }
+  .pill.wait::before { background: var(--info); animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .files { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 0; }
+  .file { font: 12px/1.4 "Cascadia Mono", Consolas, monospace; color: var(--muted); background: var(--bg);
+    border: 1px dashed var(--line-2); border-radius: 6px; padding: 3px 8px; }
+  .file em { font-style: normal; color: var(--text); }
+  .actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+  .everything { display: flex; align-items: center; gap: 14px; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; margin: 16px 0 8px; cursor: pointer; }
+  .everything.on { border-color: var(--accent); }
+  .everything .t { flex: 1; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+  .feat { display: flex; gap: 10px; align-items: flex-start; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .feat:hover { border-color: var(--line-2); }
+  .feat.locked { cursor: default; }
+  .feat .t { flex: 1; min-width: 0; }
+  .feat b { display: block; font-weight: 600; font-size: 13.5px; }
+  .feat code { font: 11.5px "Cascadia Mono", Consolas, monospace; color: var(--faint); }
+  .sw { flex: none; width: 34px; height: 20px; border-radius: 20px; background: var(--line-2); position: relative;
+    transition: background .15s; margin-top: 1px; }
+  .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--muted); transition: transform .15s, background .15s; }
+  .on > .sw { background: var(--accent); }
+  .on > .sw::after { transform: translateX(14px); background: var(--accent-ink); }
+  .locked.on > .sw { background: var(--locked); }
+  .summary { margin-top: 12px; color: var(--muted); font-size: 12.5px; }
+  .summary.bad { color: var(--bad); }
+  .tip { position: fixed; z-index: 10; max-width: 360px; background: var(--tip); border: 1px solid var(--line-2);
+    border-radius: 9px; padding: 9px 11px; font-size: 12.5px; color: var(--text); pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18); display: none; }
+
+  .result { display: none; border-radius: 10px; border: 1px solid var(--line); padding: 14px 16px; margin-top: 14px;
+    user-select: text; background: var(--bg); }
+  .result.ok { display: block; border-color: var(--ok-line); }
+  .result.bad { display: block; border-color: var(--bad-line); }
+  .result h3 { margin: 0; font-size: 14px; flex: 1; }
+  .result.ok h3 { color: var(--ok); } .result.bad h3 { color: var(--bad); }
+  .result .top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .result .kv { font: 12px/1.7 "Cascadia Mono", Consolas, monospace; color: var(--muted); word-break: break-all; }
+  .result ol { margin: 10px 0 0; padding-left: 20px; }
+  .result li { margin: 3px 0; }
+
+  .go { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 9px; padding: 10px 22px;
+    font-weight: 650; cursor: pointer; white-space: nowrap; min-width: 168px; }
+  .go:hover { filter: brightness(1.06); }
+  .go:disabled { filter: none; opacity: .55; cursor: default; }
+  .go.busy { opacity: 1 !important; background: repeating-linear-gradient(-45deg, var(--accent) 0 10px, var(--stripe) 10px 20px);
+    background-size: 28px 28px; animation: slide .6s linear infinite; }
+  @keyframes slide { to { background-position: 28px 0; } }
+  ::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button class="ghost" id="theme"></button>
+    <button class="ghost" id="lang"></button>
+  </header>
+
+  <section class="plain">
+    <div class="head"><h2 data-t="source"></h2></div>
+    <div class="row">
+      <input id="source" spellcheck="false">
+      <button class="btn" id="pickSource" data-t="browse"></button>
+    </div>
+    <div class="pill" id="sourceState"></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><span class="n">01</span><h2 data-t="loader"></h2></div>
+    <div class="row">
+      <label data-t="out_folder"></label>
+      <input id="loaderOut" spellcheck="false">
+      <button class="btn" data-pick="loaderOut" data-t="browse"></button>
+    </div>
+    <div class="files"><span class="file">→ <em>EG209020.BIN</em></span><span class="file">→ <em>EG209020.json</em></span></div>
+    <div class="actions"><button class="go" id="goLoader"></button></div>
+    <div class="result" id="resultLoader"></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><span class="n">02</span><h2 data-t="patch"></h2></div>
+    <div class="row">
+      <label data-t="loader_folder"></label>
+      <input id="patchOut" spellcheck="false">
+      <button class="btn" data-pick="patchOut" data-t="browse"></button>
+    </div>
+    <div class="files"><span class="file">→ <em>Z30/WL.PATCH</em></span></div>
+    <div class="everything" id="everything"><div class="t" id="fullTitle"></div><div class="sw"></div></div>
+    <div class="grid" id="grid"></div>
+    <div class="summary" id="summary"></div>
+    <div class="actions"><button class="go" id="goPatch"></button></div>
+    <div class="result" id="resultPatch"></div>
+  </section>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const TEXT = {
+  zh: {
+    switch: 'English', theme_auto: '主题：跟随系统', theme_light: '主题：浅色', theme_dark: '主题：深色',
+    source: '原厂固件', browse: '浏览…',
+    loader: '打包加载器 EG 固件', patch: '打包功能卡文件',
+    out_folder: '输出文件夹', loader_folder: '加载器文件夹',
+    source_empty: '请选择原版 Z_30_0120.bin（Z30 C 1.20）', source_wait: '正在校验…',
+    source_ok: '已校验：原版 Z30 C 1.20 固件', source_missing: '找不到该文件',
+    source_bad: '文件不匹配：需要未经修改的原版 Z30 C 1.20 固件',
+    enabled: '将启用 {n} 项：{list}', none: '未选择任何功能',
+    go_loader: '打包加载器 EG', go_patch: '打包卡文件', building: '正在打包…',
+    need_source: '请先选择通过校验的原版固件。', need_preset: '请至少选择一项功能。',
+    need_folder: '请指定文件夹。',
+    kit_exists: '文件已存在，程序不会覆盖：{d}',
+    need_resident: '这个文件夹里没有加载器 EG（EG209020.BIN 和 EG209020.json）。请选择打包加载器时的输出文件夹。',
+    busy: '已有打包在进行。', failed: '打包失败：{d}',
+    done: '打包完成', fail_title: '没有生成文件', open: '打开文件夹',
+    resident_id: '加载器 ID', bytes: '字节',
+    steps_loader: ['刷 EG209020.BIN（只需一次），先不放卡文件，确认 设置 → 固件版本 正常。'],
+    steps_patch: ['把 Z30 文件夹复制到存储卡根目录（替换旧的 WL.PATCH），重启相机。',
+                  '删掉卡上的 WL.PATCH 即恢复原厂行为。'],
+  },
+  en: {
+    switch: '中文', theme_auto: 'Theme: system', theme_light: 'Theme: light', theme_dark: 'Theme: dark',
+    source: 'Stock firmware', browse: 'Browse…',
+    loader: 'Build the loader EG firmware', patch: 'Build the feature card file',
+    out_folder: 'Output folder', loader_folder: 'Loader folder',
+    source_empty: 'Select the original Z_30_0120.bin (Z30 C 1.20)', source_wait: 'Checking…',
+    source_ok: 'Verified: original Z30 C 1.20 firmware', source_missing: 'File not found',
+    source_bad: 'Does not match: an unmodified Z30 C 1.20 firmware is required',
+    enabled: '{n} enabled: {list}', none: 'Nothing selected',
+    go_loader: 'Build loader EG', go_patch: 'Build card file', building: 'Building…',
+    need_source: 'Select a verified original firmware first.', need_preset: 'Select at least one feature.',
+    need_folder: 'Choose a folder.',
+    kit_exists: 'Already exists and will not be overwritten: {d}',
+    need_resident: 'This folder has no loader EG (EG209020.BIN and EG209020.json). Choose the folder the loader was built in.',
+    busy: 'A build is already running.', failed: 'Build failed: {d}',
+    done: 'Done', fail_title: 'Nothing was written', open: 'Open folder',
+    resident_id: 'Loader id', bytes: 'bytes',
+    steps_loader: ['Flash EG209020.BIN once; without the card file, check Setup > Firmware version.'],
+    steps_patch: ['Copy the Z30 folder to the root of the memory card (replacing the old WL.PATCH) and restart.',
+                  'Delete WL.PATCH from the card for stock behaviour.'],
+  },
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+let api, info, lang, states = {full: true}, check = 0, sourceKey = 'source_empty', running = null;
+const results = {loader: null, patch: null};
+let theme = (() => { try { return localStorage.getItem('theme') || 'auto'; } catch (e) { return 'auto'; } })();
+const systemLight = matchMedia('(prefers-color-scheme: light)');
+function applyTheme() {
+  const light = theme === 'light' || (theme === 'auto' && systemLight.matches);
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+}
+applyTheme();
+systemLight.addEventListener('change', applyTheme);
+const t = (k, v = {}) => TEXT[lang][k].replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '');
+
+function render() {
+  document.querySelectorAll('[data-t]').forEach(el => el.textContent = t(el.dataset.t));
+  $('lang').textContent = t('switch'); $('theme').textContent = t('theme_' + theme);
+  const full = !!states.full;
+  $('everything').classList.toggle('on', full);
+  $('fullTitle').textContent = info.titles[lang].full;
+  $('grid').innerHTML = info.presets.filter(n => n !== 'full').map(n => {
+    const locked = full, on = locked || !!states[n];
+    return `<div class="feat ${on ? 'on' : ''} ${locked ? 'locked' : ''}" data-p="${n}">
+      <div class="t"><b>${esc(info.titles[lang][n] || n)}</b><code>${n}</code></div><div class="sw"></div></div>`;
+  }).join('');
+  for (const [id, job] of [['goLoader', 'loader'], ['goPatch', 'patch']]) {
+    const b = $(id);
+    b.textContent = t(running === job ? 'building' : 'go_' + job);
+    b.classList.toggle('busy', running === job); b.disabled = running !== null;
+  }
+  showSource(); summarize();
+  for (const job in results) if (results[job]) showResult(job, results[job]);
+}
+
+async function summarize() {
+  const r = await api.resolve(states);
+  const el = $('summary');
+  el.classList.toggle('bad', !r.ok);
+  el.textContent = !r.ok ? r.error : r.features.length
+    ? t('enabled', {n: r.features.length, list: r.features.map(n => info.titles[lang][n] || n).join(lang === 'zh' ? '、' : ', ')}) : t('none');
+}
+
+function showSource() {
+  const el = $('sourceState');
+  el.className = 'pill ' + ({source_ok: 'ok', source_bad: 'bad', source_missing: 'bad', source_wait: 'wait'}[sourceKey] || '');
+  el.textContent = t(sourceKey);
+}
+async function checkSource() {
+  const ticket = ++check; sourceKey = 'source_wait'; showSource();
+  const r = await api.check_source($('source').value);
+  if (ticket !== check) return;
+  sourceKey = 'source_' + r; showSource();
+}
+
+function showResult(job, r) {
+  results[job] = r;
+  const el = $(job === 'loader' ? 'resultLoader' : 'resultPatch');
+  if (!r.ok) {
+    el.className = 'result bad';
+    el.innerHTML = `<div class="top"><h3>${t('fail_title')}</h3></div><div>${esc(t(r.key, {d: r.detail || ''}))}</div>`;
+    return;
+  }
+  const rows = r.files.map(esc).join('<br>')
+    + (job === 'loader' ? `<br>SHA-256 ${esc(r.sha256)}` : '')
+    + `<br>${t('resident_id')} ${r.resident_id}`
+    + (r.patch_bytes ? ` · WL.PATCH ${r.patch_bytes.toLocaleString()} ${t('bytes')}` : '');
+  el.className = 'result ok';
+  el.innerHTML = `<div class="top"><h3>${t('done')}</h3><button class="btn" data-open="${esc(r.folder)}">${t('open')}</button></div>
+    <div class="kv">${rows}</div>
+    <ol>${TEXT[lang]['steps_' + job].map(s => `<li>${esc(s)}</li>`).join('')}</ol>`;
+  el.querySelector('[data-open]').onclick = e => api.open_folder(e.target.dataset.open);
+}
+
+async function build(job) {
+  if (running) return;
+  const field = job === 'loader' ? 'loaderOut' : 'patchOut';
+  running = job; render();
+  let r;
+  try { r = await api.build(job, $('source').value, states, $(field).value); }
+  catch (e) { r = {ok: false, key: 'failed', detail: String(e)}; }
+  running = null;
+  if (r.ok && job === 'loader') {
+    // The card file belongs to the loader just built; the next loader goes to a fresh folder.
+    $('patchOut').value = r.folder;
+    $('loaderOut').value = await api.next_kit(r.folder);
+    results.patch = null; $('resultPatch').className = 'result';
+  }
+  render(); showResult(job, r);
+}
+
+function wire() {
+  $('lang').onclick = () => { lang = lang === 'zh' ? 'en' : 'zh'; render(); };
+  $('theme').onclick = () => {
+    theme = {auto: 'light', light: 'dark', dark: 'auto'}[theme];
+    try { localStorage.setItem('theme', theme); } catch (e) {}
+    applyTheme(); render();
+  };
+  $('source').oninput = checkSource;
+  $('pickSource').onclick = async () => { const p = await api.choose_source(); if (p) { $('source').value = p; checkSource(); } };
+  document.querySelectorAll('[data-pick]').forEach(b => b.onclick = async () => {
+    const field = $(b.dataset.pick), p = await api.choose_folder(field.value);
+    if (p) field.value = p;
+  });
+  $('goLoader').onclick = () => build('loader');
+  $('goPatch').onclick = () => build('patch');
+  $('everything').onclick = () => { states.full = !states.full; render(); };
+  $('grid').onclick = e => {
+    const f = e.target.closest('.feat'); if (!f || f.classList.contains('locked')) return;
+    states[f.dataset.p] = !states[f.dataset.p]; render();
+  };
+  const tip = $('tip');
+  document.addEventListener('mousemove', e => {
+    const f = e.target.closest('.feat, .everything');
+    const label = f && info.labels[lang][f.dataset.p || 'full'];
+    if (!label) { tip.style.display = 'none'; return; }
+    tip.textContent = label;
+    tip.style.display = 'block';
+    const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 10);
+    const y = e.clientY + 18 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 12 : e.clientY + 18;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  });
+}
+
+async function start(bridge) {
+  api = bridge;
+  info = await api.initial();
+  lang = info.language;
+  $('source').value = info.source;
+  $('loaderOut').value = info.outputs.loader; $('patchOut').value = info.outputs.patch;
+  wire(); render(); checkSource();
+}
+
+let started = false;
+window.addEventListener('pywebviewready', () => { if (!started) { started = true; start(window.pywebview.api); } });
+setTimeout(() => {
+  if (started || window.pywebview) return;
+  started = true;
+  // Opened in a plain browser, without Python: canned answers to preview the layout.
+  const presets = ['full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot', 'bitrate-slowmo-uncap',
+    'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking',
+    'af-frame-colour', 'focal-length', 'nef-menu'];
+  const dir = 'C:/WonderLanternZ30/output/';
+  start({
+    initial: async () => ({language: 'zh', presets, titles: {zh: {full: '全部功能'}, en: {full: 'Everything'}},
+      labels: {zh: {}, en: {}}, source: 'C:/WonderLanternZ30/Z_30_0120.bin',
+      outputs: {loader: dir + 'card', patch: dir + 'card'}}),
+    check_source: async () => 'ok',
+    resolve: async st => ({ok: true, features: st.full ? presets.slice(1) : Object.keys(st).filter(k => st[k])}),
+    build: async job => job === 'loader'
+      ? {ok: true, folder: dir + 'card', files: [dir + 'card/EG209020.BIN', dir + 'card/EG209020.json'],
+         sha256: 'be618dea203bffa5…', resident_id: '0x67f308e7'}
+      : {ok: true, folder: dir + 'card', files: [dir + 'card/Z30/WL.PATCH'], resident_id: '0x67f308e7', patch_bytes: 409864},
+    next_kit: async () => dir + 'card-2', open_folder: async () => {}, choose_source: async () => null,
+    choose_folder: async () => null,
+  });
+}, 1500);
+</script>
+</body>
+</html>
