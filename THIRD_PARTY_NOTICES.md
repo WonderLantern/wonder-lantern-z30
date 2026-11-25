@@ -81,7 +81,7 @@ Keystone 和 Unicorn 通过 Python 依赖安装，各自保留其许可证。本
 图形界面打包程序（`tools/build_gui_exe.py`）有 Windows、Linux 和 macOS 三个版本，都内置 Keystone 汇编器（GPLv2，`keystone-engine` 0.9.2，源码见 <https://github.com/keystone-engine/keystone>）、pywebview（BSD）、Python 和 PyInstaller 引导程序，不包含 Unicorn。各版本的界面后端不同：
 
 - **Windows：** 内置 pythonnet（MIT）；界面由系统的 Microsoft Edge WebView2 运行时显示，该运行时不随程序分发。
-- **macOS：** 内置 PyObjC（MIT）；界面由系统的 WebKit 显示。
+- **macOS：** 内置 PyObjC（[MIT](licenses/PyObjC-MIT.txt)）；界面由系统的 WebKit 显示。
 - **Linux：** 内置 PySide6、Shiboken6 和 Qt 6（含 Qt WebEngine），按 [LGPL-3.0](licenses/LGPL-3.0.txt)（以及它引用的 [GPL-3.0](licenses/GPL-3.0.txt)）使用，未经修改，以独立的共享库形式随程序分发，可以替换。源码见 <https://code.qt.io/> 和 <https://download.qt.io/official_releases/QtForPython/>；QtPy（MIT）。
 
 发布包的 `licenses` 文件夹附有这些许可证文本。

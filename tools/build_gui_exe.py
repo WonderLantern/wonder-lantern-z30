@@ -72,11 +72,11 @@ def backend():
         return (['--hidden-import', 'clr'],
                 [(dist_info_file(pythonnet, 'pythonnet-*.dist-info', 'LICENSE*'), 'pythonnet-LICENSE.txt')])
     if SYSTEM == 'macos':
-        import objc
         return (['--hidden-import', 'objc', '--hidden-import', 'Foundation', '--hidden-import', 'AppKit',
                  '--hidden-import', 'WebKit', '--hidden-import', 'Quartz', '--hidden-import', 'UniformTypeIdentifiers',
                  '--osx-bundle-identifier', 'io.github.wonderlantern.z30'],
-                [(dist_info_file(objc, 'pyobjc_core-*.dist-info', 'LICENSE*'), 'PyObjC-LICENSE.txt')])
+                # PyObjC wheels carry no licence file; licenses/PyObjC-MIT.txt is pyobjc-core/License.txt.
+                [(ROOT / 'licenses' / 'PyObjC-MIT.txt', 'PyObjC-LICENSE.txt')])
     import qtpy
     return (['--hidden-import', 'qtpy', '--hidden-import', 'PySide6.QtWebEngineWidgets',
              '--hidden-import', 'PySide6.QtWebEngineCore', '--hidden-import', 'PySide6.QtWebChannel',
@@ -143,11 +143,13 @@ def drop_system_nss(folder):
 
 
 def keystone_library():
+    """The library keystone.py loads first: keystone.dll, libkeystone.so or libkeystone.dylib.
+
+    The macOS wheel also has libkeystone.0.dylib, which keystone.py never loads."""
     folder = Path(keystone.__file__).parent
-    for pattern in ('*keystone*.dll', 'libkeystone*.dylib', 'libkeystone*.so*'):
-        found = sorted(folder.glob(pattern))
-        if found:
-            return found[0]
+    for name in ('keystone.dll', 'libkeystone.so', 'libkeystone.dylib'):
+        if (folder / name).is_file():
+            return folder / name
     raise SystemExit(f'No Keystone library next to {keystone.__file__}')
 
 
