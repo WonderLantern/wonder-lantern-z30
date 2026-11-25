@@ -24,7 +24,7 @@ def main():
     from display_session import Session,png_from_ppm
     report=json.loads(a.report.read_text());image=a.image.read_bytes()
     fixture=json.loads(a.fixture.read_text())
-    sound=report['features']['shutter_sound'];aspect=report['features']['aspect_profiles']
+    sound=report['features']['menu_framework'];aspect=report['features']['aspect_profiles']
     s=Session(str(a.output_dir.resolve()));observations=[]
     if a.observe_fonts:
         stock_input=s.input
@@ -90,11 +90,11 @@ def main():
         state=word(int(sound['state_anchor'],16));assert state
         root=state+sound['page_offsets']['955'];page=state+aspect['page_offset']
         root_ids=sound['control_identifiers']['955'];ids=sound['control_identifiers']['961']
-        category=next((c for c in sound.get('menu_categories',[]) if c['key']=='aspect'),None)
-        aspect_row=category['row'] if category else len(root_ids)-1
-        aspect_control=root_ids[aspect_row]
         assert current()==root
         frame('01-root')
+        # Through its category page when the root groups the pages; 'root' is then that page.
+        from menu_path import enter_parent
+        root,aspect_control,aspect_row=enter_parent(sound,'aspect',state,activate,s)
         if a.trace_export_only:
             assert aspect.get('diagnostic_trace') and 'trace_address' in fixture
             from read_aspect_trace import decode
@@ -175,6 +175,12 @@ def main():
             assert marks==['*' if i==profile else '' for i in range(7)]
             touch(675,28);assert current()==root
             observations.append({'profile':profile,'area':area,'selection_marks':marks,'config':config.hex()})
+        # From the category page (if any) back to the extension root before leaving.
+        custom_root=state+sound['page_offsets']['955']
+        for _ in range(3):
+            if current()==custom_root:break
+            touch(675,28)
+        root=custom_root;assert current()==root
         frame('root-before-exit')
         for _ in range(3):
             touch(675,28)

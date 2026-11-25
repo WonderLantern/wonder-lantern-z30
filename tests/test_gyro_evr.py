@@ -26,7 +26,7 @@ class GyroEvrPayloadTest(unittest.TestCase):
         self.assertIn('gyro-evr', PRESETS)
         self.assertIn('gyro-evr', resolve_presets('full')[1])
         # the Gyro e-VR menu page lives in the extension menu framework
-        self.assertEqual(resolve_presets(['gyro-evr'])[1], ['shutter-sound', 'gyro-evr'])
+        self.assertEqual(resolve_presets(['gyro-evr'])[1], ['gyro-evr'])
 
     def test_payload_matches_source(self):
         # The committed payload is only reproducible with the pinned compiler

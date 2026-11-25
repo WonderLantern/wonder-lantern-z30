@@ -22,7 +22,7 @@ def verify(stock,image,report):
     from z30_extensions.features.sound_layout import PAGE_INDEX,FILES_INDEX,SWITCH_INDEX,POPUP_INDEX
     from unicorn import UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1
-    sound=report['features']['shutter_sound'];functions={k:int(v,16) for k,v in sound['functions'].items()}
+    sound=report['features']['menu_framework'];functions={k:int(v,16) for k,v in sound['functions'].items()}
     stream=io.BytesIO()
     with wave.open(stream,'wb') as audio:
         audio.setnchannels(1);audio.setsampwidth(2);audio.setframerate(8000);audio.writeframes(b'\x01\0'*80)
@@ -50,18 +50,51 @@ def verify(stock,image,report):
     for index,pointer in pages.items():
         assert fixture.call(functions['getter'],(2,index))==pointer
         assert int.from_bytes(fixture.u.mem_read(pointer+2,2),'little')==index
-    categories=sound['menu_categories']
-    expected=[key for key,feature in (('aspect','aspect_profiles'),('zebra','photo_zebra_control'),('stamp','date_stamp_control'),('bitrate','bitrate_profiles'),
-                                     ('sound','shutter_sound'),('modules','module_host'))
-              if feature in report['features']]
-    if len(expected)==1:expected=[]
-    assert [item['key'] for item in categories]==expected
-    for item in categories:
-        target=item['page_index']
-        assert word(pages[target]+4)==pages[PAGE_INDEX]
-        click(PAGE_INDEX,item['row'])
-        assert nav==[target],(item,nav)
-        cases.append(dict(category=item['key'],target_page=target,real_action_executed=True))
+    from z30_extensions.features.menu_framework import root_layout
+    paths=sound['menu_paths']
+    status=sound.get('status_page')
+    rows,_=root_layout(set(paths)-{'status'}) if status else ([],[])
+    rows=(['status'] if status else [])+rows
+    assert [item['key'] for item in sound['menu_categories']]==rows,(sound['menu_categories'],rows)
+    for cat in sound['category_pages'].values():
+        assert word(pages[cat['index']]+4)==pages[PAGE_INDEX],cat
+    for key,path in paths.items():
+        # Walk root -> (category ->) page; each step opens the next page, which answers to the step's page.
+        for step in path:
+            if step['page']!=PAGE_INDEX:
+                # A native shooting-menu row may have pointed the page at the tab container.
+                fixture.u.mem_write(pages[step['opens']]+4,struct.pack('<I',int(sound['root_parent'],16)))
+            click(step['page'],step['row'])
+            assert nav[:1]==[step['opens']],(key,step,nav)
+            assert word(pages[step['opens']]+4)==pages[step['page']],(key,step)
+            if step['page']!=PAGE_INDEX:
+                assert focus and focus[-1][0]==pages[step['opens']],(key,step,focus)
+        cases.append(dict(page=key,path=[step['opens'] for step in path],parent=path[-1]['page'],real_action_executed=True))
+    if status:
+        # Status rows: system rows do nothing; a value row opens its page, which answers to
+        # the status page and to its own holder again when opened from there.
+        for row,key in enumerate(status['rows']):
+            click(status['index'],row)
+            if key not in paths:
+                assert nav==[],(key,nav);continue
+            target=paths[key][-1]['opens']
+            assert nav==[target] and word(pages[target]+4)==pages[status['index']],(key,nav)
+            holder=paths[key][-1]['page']
+            for step in paths[key]:click(step['page'],step['row'])
+            assert word(pages[target]+4)==pages[holder],(key,'parent back to its holder')
+            cases.append(dict(status_row=key,opens=target,parent_restored=holder))
+        # A failed save marks the status page.
+        fixture.set(52,8);assert word(fixture.state+status['flag_offset'])==0
+        fixture.call(functions['show_error'],(pages[PAGE_INDEX],))
+        assert word(fixture.state+status['flag_offset'])==1
+        fixture.set(52,0);fixture.u.mem_write(fixture.state+status['flag_offset'],bytes(4))
+        cases.append(dict(save_failure_marks_status=True))
+    for cat in list(sound['category_pages'].values())+([status] if status else []):
+        fixture.u.mem_write(pages[cat['index']]+22,struct.pack('<2H',1,1))   # a stale cursor from an earlier visit
+        click(PAGE_INDEX,cat['root_row'])
+        top=struct.unpack('<2H',bytes(fixture.u.mem_read(pages[cat['index']]+22,4)))
+        assert nav==[cat['index']] and top==(0,0) and focus==[[pages[cat['index']],sound['control_identifiers'][str(cat['index'])][0]]],(cat,nav,focus)
+        cases.append(dict(category=cat['index'],opens_at_first_row=True,focus_first_row=True))
     sound_page=sound['sound_settings_page']
     for index in (FILES_INDEX,SWITCH_INDEX):
         assert word(pages[index]+4)==pages[sound_page]

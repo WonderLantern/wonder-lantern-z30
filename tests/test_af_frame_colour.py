@@ -21,12 +21,12 @@ except ImportError:  # pragma: no cover
 class PresetTest(unittest.TestCase):
     def test_in_full_and_brings_the_menu_framework(self):
         self.assertIn('af-frame-colour', resolve_presets('full')[1])
-        self.assertEqual(resolve_presets('af-frame-colour')[1], ['shutter-sound', 'af-frame-colour'])
+        self.assertEqual(resolve_presets('af-frame-colour')[1], ['af-frame-colour'])
 
-    def test_page_is_a_native_photo_row(self):
-        from z30_extensions.features.shutter_sound import ROOT_ORDER
+    def test_page_is_a_native_photo_row_and_in_the_focus_category(self):
+        from z30_extensions.features.menu_framework import CATEGORIES
         from z30_extensions.features.sound_layout import NATIVE_MENUS
-        self.assertNotIn('afcol', ROOT_ORDER)
+        self.assertIn('afcol', dict((key, members) for key, _, members in CATEGORIES)['focus'])
         self.assertIn('afcol', dict((m[0], m[3]) for m in NATIVE_MENUS)['photo'])
 
 

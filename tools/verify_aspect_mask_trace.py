@@ -31,7 +31,7 @@ def main():
     c=Fixture(stock,image,report,{},properties={0x188c:0,0x501:2})
     base=c.state+feature['state_offset'];trace=base+TRACE_OFFSET
     page_bytes={name:bytes(c.u.mem_read(c.state+offset,44))
-                for name,offset in report['features']['shutter_sound']['page_offsets'].items()}
+                for name,offset in report['features']['menu_framework']['page_offsets'].items()}
     values={}
     for index,(name,address,width) in enumerate(FIELDS):
         c.map(address,width);value=(index+1)*3
@@ -63,7 +63,7 @@ def main():
     assert not c.opened and int.from_bytes(c.u.mem_read(trace+20,4),'little')==0
     # Previously observed pixels/state are never embedded as a variable blob.
     assert len(exported)==TRACE_BYTES and all(row['profile']==1 for row in parse()['records'])
-    for name,offset in report['features']['shutter_sound']['page_offsets'].items():
+    for name,offset in report['features']['menu_framework']['page_offsets'].items():
         assert bytes(c.u.mem_read(c.state+offset,44))==page_bytes[name],name
     failures=[]
     for short,close in ((True,False),(False,True)):

@@ -52,7 +52,7 @@ class NefCompressionTests(unittest.TestCase):
         self.assertNotIn('nef-uncompressed', resolve_presets('full')[1])
         self.assertNotIn('nef-compressed', resolve_presets('full')[1])
         self.assertEqual(resolve_presets('nef-uncompressed')[1], ['nef-uncompressed'])
-        self.assertIn('shutter-sound', resolve_presets('nef-menu')[1])
+        self.assertNotIn('shutter-sound', resolve_presets('nef-menu')[1])
 
     def test_fixed_presets_replace_the_menu_inside_full(self):
         base = resolve_presets('full')[1]

@@ -66,7 +66,9 @@ class NefPageTests(unittest.TestCase):
         base = self.STATE_BASE if state_present else 0
         uc.mem_write(self.functions['get'], self.assemble(
             f'movw r0,#{base & 0xFFFF};movt r0,#{base >> 16};bx lr;', self.functions['get'], 32))
-        uc.mem_write(self.functions['ensure'], self.assemble('movs r0,#1;bx lr;', self.functions['ensure'], 16))
+        # Like the framework's ensure: the state block (or 0 when none could be made).
+        uc.mem_write(self.functions['ensure'], self.assemble(
+            f'movw r0,#{base & 0xFFFF};movt r0,#{base >> 16};bx lr;', self.functions['ensure'], 32))
         uc.mem_write(self.functions['text'], bytes.fromhex('7047'))
         uc.mem_write(self.functions['show_error'], bytes.fromhex('7047'))
         uc.mem_write(self.functions['page_return'], bytes.fromhex('7047'))
@@ -128,14 +130,18 @@ class NefPageTests(unittest.TestCase):
             last = [(self.resources.names[r0], r1) for kind, r0, r1, r2 in self.calls if kind == 'text'][-1]
             self.assertEqual(last, ('Lossless', nu.CURRENT_SLOT))
 
-    def test_open_focuses_the_row_of_the_current_selection(self):
+    def test_open_starts_at_the_first_row(self):
+        # Whatever is selected, the page opens with its list cursor and scroll
+        # reset and the focus on the first row (the current choice keeps its mark).
         for selection in (0, 1, 2):
             uc = self.machine(selection)
+            page = self.STATE_BASE + self.extension['page_offset']
+            uc.mem_write(page + 22, struct.pack('<2H', 2, 1))
             self.call(uc, 'nef_open')
             self.assertEqual([c[0] for c in self.calls], ['open', 'focus'])
             self.assertEqual(self.calls[0][1:3], (2, nu.PAGE_INDEX))
-            page = self.STATE_BASE + self.extension['page_offset']
-            self.assertEqual(self.calls[1][1:3], (page, self.IDS[selection]))
+            self.assertEqual(self.calls[1][1:3], (page, self.IDS[0]))
+            self.assertEqual(struct.unpack('<2H', uc.mem_read(page + 22, 4)), (0, 0))
 
     def test_action_stores_each_row_and_returns_to_the_root(self):
         for row in (0, 1, 2):

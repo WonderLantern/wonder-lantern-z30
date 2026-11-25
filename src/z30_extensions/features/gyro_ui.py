@@ -16,6 +16,7 @@ shared ensure(), so the saved choice is restored without opening the menu.
 """
 import struct
 from ..assembly import constant as c, invoke as n, assemble
+from .menu_ui import list_top
 from .menu_slots import page_slots
 
 PAGE_INDEX = 967   # 965 portrait (7ba48a9), 966 NEF compression (d3f6a0c)
@@ -61,11 +62,10 @@ def prepare(plan, f, resources, allocation_size):
         adds r5,#1;cmp r5,#{ROWS};bne loop;
         {c('r0',labels)}ldr r0,[r0,r4,lsl #2];movs r1,#{CURRENT_SLOT};movs r2,#0;{call('text')}
         movs r0,#0;pop {{r4-r6,pc}};'''
-    codes['gyro_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;
+    codes['gyro_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;{list_top(page_offset)}
         movs r0,#2;{c('r1',PAGE_INDEX)}{n(0x1045f732)}
-        {call('gyro_get')}ldr r4,[r0];cmp r4,#{ROWS - 1};it hi;movhi r4,#0;
         {call('get')}{c('r1',page_offset)}add r0,r0,r1;
-        GYRO_IDS;ldr r1,[r1,r4,lsl #2];{n(0x1045d54c)}
+        GYRO_IDS;ldr r1,[r1];{n(0x1045d54c)}
         done:movs r0,#0;pop {{r4,pc}};'''
     # The stabilizer polls the choice from the IMU task, so a stored word is all
     # it needs; no native property changes here.

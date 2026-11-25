@@ -34,7 +34,7 @@ def main() -> int:
     image = args.image.read_bytes()
     stock = (args.qemu_root / '.local/firmware/eg2090_0120a0.bi').read_bytes()
     aspect = report['features']['aspect_profiles']
-    sound = report['features']['shutter_sound']
+    sound = report['features']['menu_framework']
     aspect_get = int(aspect['functions']['aspect_get'], 16) & ~1
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

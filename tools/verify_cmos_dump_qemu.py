@@ -56,7 +56,7 @@ def main():
     spi = 'cmos_spi' in report['features']
     trace = spi or 'cmos_trace' in report['features']
     feature = report['features']['cmos_window' if window else 'cmos_spi' if spi else 'cmos_trace' if trace else 'cmos_dump']
-    sound = report['features']['shutter_sound']
+    sound = report['features']['menu_framework']
     session = Session(str(args.output_dir.resolve()), fresh=True)
     result = dict(scope=__doc__.splitlines()[0], candidate_sha256=hashlib.sha256(image).hexdigest(),
                   camera_verified=False, sd_fixture=False)
@@ -115,7 +115,7 @@ def main():
         frame('02-cmos-page')
         state = int(session.input(functions['bitrate_get'], [])['registers']['r0'], 16)
         assert word(state) == 0
-        controls = report['features']['shutter_sound']['control_identifiers'][str(feature['page_index'])]
+        controls = report['features']['menu_framework']['control_identifiers'][str(feature['page_index'])]
         session.input(0x1045D54C, [page, controls[0]])
         session.input(0x103CE96E, [KEY_OK], seconds=60)
         session.run_for(2)

@@ -1,5 +1,6 @@
 import struct
 from ..assembly import constant as c, invoke as n, assemble
+from .menu_ui import list_top
 from .menu_slots import page_slots
 
 PAGE_INDEX = 966
@@ -42,11 +43,10 @@ def prepare(plan, f, resources, allocation_size):
         adds r5,#1;cmp r5,#{OPTION_COUNT};bne loop;
         {c('r0',labels)}ldr r0,[r0,r4,lsl #2];movs r1,#{CURRENT_SLOT};movs r2,#0;{call('text')}
         movs r0,#0;pop {{r4-r6,pc}};'''
-    codes['nef_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;
+    codes['nef_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;{list_top(page_offset)}
         movs r0,#2;{c('r1',PAGE_INDEX)}{n(0x1045f732)}
-        {call('nef_get')}ldr r4,[r0];cmp r4,#{OPTION_COUNT - 1};it hi;movhi r4,#0;
         {call('get')}{c('r1',page_offset)}add r0,r0,r1;
-        NEF_IDS;ldr r1,[r1,r4,lsl #2];{n(0x1045d54c)}
+        NEF_IDS;ldr r1,[r1];{n(0x1045d54c)}
         done:movs r0,#0;pop {{r4,pc}};'''
     codes['nef_action'] = f'''push {{r4-r6,lr}};mov r4,r0;
         ldrh r5,[r4,#22];ldrh r0,[r4,#24];add r5,r5,r0;cmp r5,#{OPTION_COUNT - 1};bhi done;

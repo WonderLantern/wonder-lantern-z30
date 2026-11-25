@@ -86,7 +86,7 @@ def main() -> int:
     stock = (args.qemu_root / '.local/firmware/eg2090_0120a0.bi').read_bytes()
     feature = report['features']['lut_sd_menu']
     state_offset = feature['state_offset']
-    getter = int(report['features']['shutter_sound']['functions']['bitrate_get'], 16) & ~1
+    getter = int(report['features']['menu_framework']['functions']['bitrate_get'], 16) & ~1
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     session = Session('lut-sd-qemu',

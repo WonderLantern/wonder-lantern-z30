@@ -31,9 +31,9 @@ from unicorn.arm_const import UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R4, UC_AR
 class Fixture(Context):
     def __init__(self, stock, image, report):
         super().__init__(stock, image)
-        self.f = {key: int(value, 16) for key, value in report['features']['shutter_sound']['functions'].items()}
+        self.f = {key: int(value, 16) for key, value in report['features']['menu_framework']['functions'].items()}
         self.feature = report['features']['lut_sd_menu']
-        self.host_bytes = report['features']['shutter_sound']['persistent_state_size']
+        self.host_bytes = report['features']['menu_framework']['persistent_state_size']
         self.state = self.host = self.page = None
         self.next_heap, self.live = 0x53000000, {}
         self.heap_error = False

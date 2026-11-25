@@ -22,7 +22,7 @@ class PresetTests(unittest.TestCase):
     def test_date_stamp_is_in_full_and_brings_the_menu_framework(self):
         self.assertIn('date-stamp', PRESETS)
         self.assertIn('date-stamp', resolve_presets('full')[1])
-        self.assertEqual(resolve_presets('date-stamp')[1], ['shutter-sound', 'date-stamp'])
+        self.assertEqual(resolve_presets('date-stamp')[1], ['date-stamp'])
         self.assertEqual(resolve_presets(['full', 'date-stamp'])[1], resolve_presets('full')[1])
         with patch('builtins.input', return_value='11'), patch('sys.stdout', new=io.StringIO()):
             self.assertEqual(choose_presets(), ['date-stamp'])
@@ -30,14 +30,14 @@ class PresetTests(unittest.TestCase):
     def test_photo_zebra_is_in_full_and_composes_without_duplicates(self):
         self.assertIn('photo-zebra', PRESETS)
         self.assertIn('photo-zebra', resolve_presets('full')[1])
-        self.assertEqual(resolve_presets('photo-zebra')[1], ['shutter-sound', 'photo-zebra'])
+        self.assertEqual(resolve_presets('photo-zebra')[1], ['photo-zebra'])
         self.assertEqual(resolve_presets(['full', 'photo-zebra', 'photo-zebra'])[1],
                          resolve_presets('full')[1])
 
     def test_aspect_profiles_is_in_full_and_composes_without_duplicates(self):
         self.assertIn('aspect-profiles', PRESETS)
         self.assertIn('aspect-profiles', resolve_presets('full')[1])
-        self.assertEqual(resolve_presets('aspect-profiles')[1], ['shutter-sound', 'aspect-profiles'])
+        self.assertEqual(resolve_presets('aspect-profiles')[1], ['aspect-profiles'])
         self.assertEqual(resolve_presets(['aspect-profiles','full'])[1],
                          resolve_presets('full')[1])
     def test_module_host_is_not_a_patcher_preset(self):
@@ -77,7 +77,7 @@ class PresetTests(unittest.TestCase):
     def test_portrait_ui_is_in_full_and_brings_the_menu_framework(self):
         self.assertIn('portrait-ui', PRESETS)
         self.assertIn('portrait-ui', resolve_presets('full')[1])
-        self.assertEqual(resolve_presets('portrait-ui')[1], ['shutter-sound', 'portrait-ui'])
+        self.assertEqual(resolve_presets('portrait-ui')[1], ['portrait-ui'])
         self.assertIn('portrait-ui', resolve_presets(['portrait-ui', 'full'])[1])
 
     def test_invalid_and_empty_selection(self):
@@ -99,9 +99,9 @@ class PresetTests(unittest.TestCase):
     def test_bitrate_slowmo_uncap_is_in_full_and_composes_in_stable_order(self):
         self.assertIn('bitrate-slowmo-uncap', resolve_presets()[1])
         self.assertNotIn('bitrate-slowmo-uncap', resolve_presets('modular')[1])
-        self.assertEqual(resolve_presets('bitrate-slowmo-uncap')[1], ['shutter-sound', 'bitrate-slowmo-uncap'])
+        self.assertEqual(resolve_presets('bitrate-slowmo-uncap')[1], ['bitrate-slowmo-uncap'])
         self.assertEqual(resolve_presets(['bitrate-slowmo-uncap', 'video-rot'])[1],
-                         ['shutter-sound', 'video-rot', 'bitrate-slowmo-uncap'])
+                         ['video-rot', 'bitrate-slowmo-uncap'])
         with patch('builtins.input', return_value='7'), patch('sys.stdout', new=io.StringIO()):
             self.assertEqual(choose_presets(), ['bitrate-slowmo-uncap'])
 

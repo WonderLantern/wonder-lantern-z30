@@ -17,7 +17,7 @@ def main():
     from display_session import Session,png_from_ppm
     report=json.loads(a.report.read_text());image=a.image.read_bytes()
     fixture=json.loads(a.fixture.read_text())
-    sound=report['features']['shutter_sound'];zebra=report['features']['photo_zebra_control']
+    sound=report['features']['menu_framework'];zebra=report['features']['photo_zebra_control']
     s=Session(str(a.output_dir.resolve()));observations=[]
     s.audit.append({'candidate_sha256':hashlib.sha256(image).hexdigest(),
                     'selected_presets':report['selected_presets']})
@@ -73,11 +73,11 @@ def main():
         state=word(int(sound['state_anchor'],16));assert state
         root=state+sound['page_offsets']['955'];page=state+zebra['page_offset']
         root_ids=sound['control_identifiers']['955'];ids=sound['control_identifiers']['963']
-        category=next((c for c in sound.get('menu_categories',[]) if c['key']=='zebra'),None)
-        zebra_row=category['row'] if category else len(root_ids)-1
-        zebra_control=root_ids[zebra_row]
         assert current()==root
         frame('01-root')
+        # Through its category page when the root groups the pages; 'root' is then that page.
+        from menu_path import enter_parent
+        root,zebra_control,zebra_row=enter_parent(sound,'zebra',state,activate,s)
         assert word(state+zebra['state_offset']) == 0
         for value in (1,0,1):
             activate(root,zebra_control,zebra_row);assert current()==page

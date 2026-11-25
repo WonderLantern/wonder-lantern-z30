@@ -20,6 +20,10 @@ NEF_COMPRESSION_FEATURES = ('nef-menu',) + NEF_FIXED_FEATURES
 FULL_FEATURES = tuple(name for name in FEATURE_ORDER
                       if name not in NEF_FIXED_FEATURES + EXPERIMENTAL_FEATURES)
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
+# Features with a page in the extension menu. Any of them (or the shutter sound)
+# brings the menu framework; none of them brings the shutter sound any more.
+MENU_FEATURES = ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui', 'nef-menu',
+                 'gyro-evr', '3d-tracking', 'af-frame-colour')
 
 
 def resolve_presets(preset='full'):
@@ -42,24 +46,20 @@ def resolve_presets(preset='full'):
         features.discard('nef-menu')
     if sum(name in features for name in NEF_COMPRESSION_FEATURES) > 1:
         raise ValueError('Select only one NEF compression preset')
-    # These pages share the sound menu/state framework.
-    if any(f in features for f in ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui', 'nef-menu',
-                                   'gyro-evr', '3d-tracking', 'af-frame-colour')):
-        features.add('shutter-sound')
     return list(dict.fromkeys(selected)), [f for f in FEATURE_ORDER if f in features]
 
 
 def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
           aspect_border_diagnostic=False, aspect_border_lease=False,
           aspect_mask=None, aspect_mask_trial=False, module_host=False, ptp_read=False,
-          evr_hook=False, imu_hook=False, face_hook=False, tail_base=None, card=False, resident=None):
+          evr_hook=False, imu_hook=False, face_hook=False, tail_base=None, card=False, resident=None,
+          build_tag='dev', resident_id=None, ready_banner=True, banner_debug=False,
+          menu_tab=False):
     """card=True returns (plan, report) without writing an image: card.py turns
     the plan's edits and tail (assembled at tail_base) into an SD-card patch."""
     # module_host is a research option only: the SD module host is no longer a
-    # patcher preset, but its tools still build it on top of the sound framework.
+    # patcher preset; its tools still build it as a page of the menu framework.
     selected, features = resolve_presets(preset)
-    if module_host and 'shutter-sound' not in features:
-        raise ValueError('The module host requires the shutter-sound framework')
     # evr_hook is research-only: a dormant e-VR result hook that only SD modules
     # can arm, so it is never built without the module host.
     if evr_hook and not module_host:
@@ -114,15 +114,26 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'm900' in features:
         from .features.long_exposure import add
         add(plan)
-    if 'shutter-sound' in features:
-        from .features.shutter_sound import add
-        add(plan, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
+    # The menu framework keeps the place the shutter sound had in FEATURE_ORDER.
+    from .features.ready_banner import REPAINT_TRIGGER
+    if card and ready_banner and REPAINT_TRIGGER and 'portrait-ui' in features:
+        # The banner's repaint trigger runs from portrait-ui's UI hooks (built later).
+        from .features.ready_banner import prepare_hooks
+        plan.banner_hooks = prepare_hooks(plan)
+    if card and ready_banner and banner_debug:
+        # Diagnostic readout of the ready banner in the status page's version row.
+        from .features.ready_banner import prepare_debug
+        plan.banner_debug = prepare_debug(plan)
+    if module_host or 'shutter-sound' in features or any(name in features for name in MENU_FEATURES):
+        from .features.menu_framework import add
+        add(plan, sound='shutter-sound' in features, menu_tab=menu_tab, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
             nef='nef-menu' in features,
             gyro='gyro-evr' in features, trk3d='3d-tracking' in features, afcol='af-frame-colour' in features,
             aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
-            aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial)
+            aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial,
+            build_tag=build_tag, resident_id=resident_id, feature_count=len(features))
     if 'mtp-fast' in features:
         from .features.mtp_fast import add
         add(plan)
@@ -166,6 +177,10 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'battery-percent' in features:
         from .features.battery_percent import add
         add(plan)
+    if (card and ready_banner) or ready_banner == 'qemu-test':
+        # Card builds: "Wonder Lantern ready · N features" on the live view after loading.
+        from .features.ready_banner import add
+        add(plan, len(features), qemu_test=not card, debug=getattr(plan, 'banner_debug', None))
     if ptp_read:
         # Research only: read-only USB PTP 0x9FF1 ReadMemory for live readouts.
         from .features.ptp_read import add

@@ -23,7 +23,7 @@ from z30_extensions.features import module_host as mh
 class Fixture(Context):
     def __init__(self, stock, image, report, payload, *, chunk=None, cache=True):
         super().__init__(stock, image)
-        self.f = {k: int(v, 16) for k, v in report['features']['shutter_sound']['functions'].items()}
+        self.f = {k: int(v, 16) for k, v in report['features']['menu_framework']['functions'].items()}
         self.payload, self.chunk = payload, chunk
         self.position, self.fd, self.close_failures = 0, None, 0
         self.read_error = self.free_error = self.alloc_error = False

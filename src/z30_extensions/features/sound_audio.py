@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-Wonder-Lantern-Community
 # Copyright (c) 2026 Wonder Lantern Z30 contributors
 # See licenses/Wonder-Lantern.txt and THIRD_PARTY_NOTICES.md.
-"""Native Z30 sound routines and menu support."""
+"""Native Z30 shutter-sound routines: WAV load and validation, playback hooks."""
 from .sound_layout import *
 from ..assembly import constant, invoke
 
@@ -14,22 +14,6 @@ def audio_code(addresses, path_table, anchor_table):
         return f"""{c('r0',0xc21c0e28)} ldrb r1,[r0,#28]; cmp r1,#18; bne {else_label};
             ldr r1,[r0,#32]; {c('r2',addresses['complete']|1)} cmp r1,r2; bne {else_label};
             {call('get')} cmp r0,#0; beq {else_label}; ldr r1,[r0,#{LENGTH}]; cmp r1,#0; beq {else_label};"""
-    codes['get']=f"""
-            {c('r0',STATE_ANCHOR)} ldr r0,[r0,#16]; {c('r1',anchor_table)}
-            cmp r0,r1; beq absent; cmp r0,#0; beq absent;
-            ldr r1,[r0,#56]; {c('r2',MAGIC)} cmp r1,r2; bne absent; bx lr;
-            absent: movs r0,#0; bx lr;
-        """
-
-    codes['cas']="""
-            movs r12,#8;
-            retry: ldrex r3,[r0]; cmp r3,r1; bne mismatch;
-            strex r3,r2,[r0]; cmp r3,#0; beq good;
-            subs r12,r12,#1; bne retry;
-            mismatch: clrex; movs r0,#0; bx lr;
-            good: dmb ish; movs r0,#1; bx lr;
-        """
-
     codes['validate']=f"""
             push {{r4,lr}}; cmp r1,#46; blo bad;
             {c('r2',17324)} cmp r1,r2; bhi bad;
@@ -148,16 +132,6 @@ def audio_code(addresses, path_table, anchor_table):
             movs r0,#3; dmb ish; str r0,[r4,#{BUSY}];
             ldr r0,[r4,#{PENDING}]; cmp r0,#1; bne done; mov r0,r4; {call('stop')}
             done: movs r0,#1; pop {{r4-r6,pc}};
-        """
-
-    # The root page object persists, and its list cursor (+22) and first visible row
-    # (+24) with it. The camera can draw a re-entered list from the top while the
-    # cursor stays on the old row, so each entry starts both at the first row.
-    codes['open']=f"""
-            push {{r4,lr}}; {call('ensure')} cmp r0,#0; beq done;
-            movs r1,#0; strh r1,[r0,#{PAGE_OFFSET + 22}]; strh r1,[r0,#{PAGE_OFFSET + 24}]; {call('labels')}
-            movs r0,#2; {c('r1',PAGE_INDEX)} {native(0x1045f732)}
-            done: movs r0,#0; pop {{r4,pc}};
         """
 
     codes['config']=f"""

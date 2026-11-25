@@ -20,12 +20,12 @@ class Tracking3dPresetTest(unittest.TestCase):
     def test_full_includes_it_and_it_brings_the_menu_framework(self):
         from z30_extensions.build import resolve_presets
         self.assertIn('3d-tracking', resolve_presets('full')[1])
-        self.assertEqual(resolve_presets('3d-tracking')[1], ['shutter-sound', '3d-tracking'])
+        self.assertEqual(resolve_presets('3d-tracking')[1], ['3d-tracking'])
 
-    def test_page_is_native_only(self):
-        from z30_extensions.features.shutter_sound import ROOT_ORDER
+    def test_page_is_a_native_photo_row_and_in_the_focus_category(self):
+        from z30_extensions.features.menu_framework import CATEGORIES
         from z30_extensions.features.sound_layout import NATIVE_MENUS
-        self.assertNotIn('trk3d', ROOT_ORDER)               # the custom root is full (8 rows)
+        self.assertIn('trk3d', dict((key, members) for key, _, members in CATEGORIES)['focus'])
         self.assertIn('trk3d', dict((m[0], m[3]) for m in NATIVE_MENUS)['photo'])
 
 

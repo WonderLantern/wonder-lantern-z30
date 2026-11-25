@@ -4,6 +4,7 @@
 """Experimental native photo-aspect selector and grid reference-frame hook."""
 import struct
 from ..assembly import constant as c, invoke as n, assemble, jump
+from .menu_ui import list_top
 from .aspect_geometry import PROFILES, build_trial, preview_dimensions
 from .menu_slots import page_slots
 
@@ -118,11 +119,10 @@ def prepare(plan, f, resources, allocation_size, *, trace=False, border=False, b
         adds r5,#1;cmp r5,#7;bne loop;
         {c('r0',labels)}ldr r0,[r0,r4,lsl #2];movs r1,#{CURRENT_SLOT};movs r2,#0;{call('text')}
         movs r0,#0;pop {{r4-r6,pc}};'''
-    codes['aspect_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;{call('aspect_sync')}
+    codes['aspect_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;{list_top(page_offset)}{call('aspect_sync')}
         movs r0,#2;{c('r1',PAGE_INDEX)}{n(0x1045f732)}
-        {call('aspect_get')}ldr r4,[r0];cmp r4,#6;it hi;movhi r4,#0;
         {call('get')}{c('r1',page_offset)}add r0,r1;
-        ASPECT_IDS;ldr r1,[r1,r4,lsl #2];{n(0x1045d54c)}
+        ASPECT_IDS;ldr r1,[r1];{n(0x1045d54c)}
         done:movs r0,#0;pop {{r4,pc}};'''
     # Restore the native backend together with the profile. A persisted choice
     # alone must never apply custom area-2 geometry while the camera stays DX.

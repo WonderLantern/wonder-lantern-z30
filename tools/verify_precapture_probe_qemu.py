@@ -24,7 +24,7 @@ def main():
     report = json.loads(args.report.read_text())
     fixture = json.loads(args.fixture.read_text())
     feature = report['features']['jpg_capture_probe']
-    sound = report['features']['shutter_sound']
+    sound = report['features']['menu_framework']
     session = Session(str(args.output_dir.resolve()), fresh=True)
     result = dict(scope=__doc__, candidate_sha256=hashlib.sha256(image).hexdigest(),
                   camera_verified=False, file_services_modeled=True)

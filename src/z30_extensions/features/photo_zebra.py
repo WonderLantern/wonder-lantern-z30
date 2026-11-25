@@ -19,7 +19,7 @@ def add(plan):
     if plan.image.words(0x114E08B0, 2) != (34, 0x114E0828):
         raise ValueError('Unexpected native highlight dependency list')
     control = plan.features['photo_zebra_control']
-    get = plan.features['shutter_sound']['functions']['get']
+    get = plan.features['menu_framework']['functions']['get']
     switch = f"""cmp r5,#0;bne switch_done;
         push {{r0-r3,r12,lr}};{invoke(int(get,16))}cmp r0,#0;beq disabled;
         {constant('r1',control['state_offset'])}ldr r0,[r0,r1];cmp r0,#1;

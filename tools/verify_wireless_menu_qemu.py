@@ -18,7 +18,7 @@ def main():
     from display_session import Session,png_from_ppm
     from z30_extensions.features.wireless_ui import MAGIC
     report=json.loads(a.report.read_text());image=a.image.read_bytes();fixture=json.loads(a.fixture.read_text())
-    feature=report['features']['wireless_buffer'];sound=report['features']['shutter_sound']
+    feature=report['features']['wireless_buffer'];sound=report['features']['menu_framework']
     s=Session(str(a.output_dir.resolve()),fresh=True)
     checks=[]
 

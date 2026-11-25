@@ -8,6 +8,7 @@ formats existed still restore the same choice. Color and glow share the style wo
 """
 import struct
 from ..assembly import constant as c, invoke as n, assemble
+from .menu_ui import list_top
 from ..date_stamp import COLORS, FORMATS, GLOW_FLAG, STYLE_MAX
 from .date_stamp import COLOR_FIELD
 from .menu_slots import page_slots
@@ -62,11 +63,10 @@ def prepare(plan, f, resources, allocation_size):
         adds r5,#1;cmp r5,#{ROWS};bne loop;
         {c('r0',labels)}ldr r0,[r0,r4,lsl #2];movs r1,#{CURRENT_SLOT};movs r2,#0;{call('text')}
         movs r0,#0;pop {{r4-r7,pc}};'''
-    codes['stamp_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;
+    codes['stamp_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;{list_top(page_offset)}
         movs r0,#2;{c('r1',PAGE_INDEX)}{n(0x1045f732)}
-        {call('stamp_get')}ldr r4,[r0];cmp r4,#{COLOR_ROW - 1};it hi;movhi r4,#0;
         {call('get')}{c('r1',page_offset)}add r0,r0,r1;
-        STAMP_IDS;ldr r1,[r1,r4,lsl #2];{n(0x1045d54c)}
+        STAMP_IDS;ldr r1,[r1];{n(0x1045d54c)}
         done:movs r0,#0;pop {{r4,pc}};'''
     # A format choice returns to the parent; the color and glow rows stay here so
     # the user can step through them. The list keeps showing the old value until

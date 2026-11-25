@@ -36,7 +36,7 @@ def main():
         for _,address,width in FIELDS:
             c.map(address,width)
     page_bytes={name:bytes(c.u.mem_read(c.state+offset,44))
-                for name,offset in report['features']['shutter_sound']['page_offsets'].items()}
+                for name,offset in report['features']['menu_framework']['page_offsets'].items()}
     from unicorn import UC_PROT_READ, UC_PROT_EXEC
     c.u.mem_protect(0x10020000,(len(image)+4095)&~4095,UC_PROT_READ|UC_PROT_EXEC)
     # Explicit native photo-overlay state; does not follow the grid setting.
@@ -242,7 +242,7 @@ def main():
                         contexts.append(dict(kind=kind,ready=ready,backend=backend,busy=busy,
                                              mask_allowed=allowed,native_overlay_allowed=native))
     finally:c.u.hook_del(snapshot_hook)
-    for name,offset in report['features']['shutter_sound']['page_offsets'].items():
+    for name,offset in report['features']['menu_framework']['page_offsets'].items():
         assert bytes(c.u.mem_read(c.state+offset,44))==page_bytes[name],('page overwritten by mask history',name)
     a.output.parent.mkdir(parents=True,exist_ok=True)
     a.output.write_text(json.dumps(dict(image_sha256=hashlib.sha256(image).hexdigest(),

@@ -41,7 +41,7 @@ class Frame:
         self.u = u = self.context.u
         self.control = report['features']['date_stamp_control']
         self.entry = int(report['features']['date_stamp']['gate_entry'], 16)
-        get = int(report['features']['shutter_sound']['functions']['get'], 16)
+        get = int(report['features']['menu_framework']['functions']['get'], 16)
         u.mem_map(Y_BASE, 0x2000000)
         u.mem_map(C_BASE, 0x2000000)
         self.cache = []

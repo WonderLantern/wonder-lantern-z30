@@ -108,7 +108,7 @@ def verify_m900(stock, image):
 
 def verify_wav(stock, image, report):
     s = Context(stock, image)
-    f = {k: int(v, 16) for k, v in report['features']['shutter_sound']['functions'].items()}
+    f = {k: int(v, 16) for k, v in report['features']['menu_framework']['functions'].items()}
     input_address, output_address = RAM + 0x10000, RAM + 0x30000
     def wav(samples):
         data = struct.pack('<' + 'h' * len(samples), *samples)

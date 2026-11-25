@@ -51,7 +51,7 @@ def cave_source(site, get, state_offset):
 
 def add(plan):
     control = plan.features['nef_compression_control']
-    get = int(plan.features['shutter_sound']['functions']['get'], 16)
+    get = int(plan.features['menu_framework']['functions']['get'], 16)
     hooks = []
     for site in SITES:
         entry = plan.address

@@ -14,7 +14,10 @@ SLOT_COUNT = 256
 STOCK_SLOTS = frozenset((*range(14), *range(20, 25), 26, 30, 31, 40, 59, 70, *range(72, 75), 77,
                          *range(79, 83), *range(84, 90), *range(100, 115), 177, *range(190, 200), 215))
 BLOCKS = dict(sound_group=(117, 1), zebra=(118, 8), stamp=(126, 19), sound=(145, 28),
-              nef=(178, 9), modules=(216, 8), video=(224, 11), aspect=(235, 17), portrait=(200, 11), gyro=(41, 13), trk3d=(60, 9), afcol=(32, 7))
+              nef=(178, 9), modules=(216, 8), video=(224, 11), aspect=(235, 17), portrait=(200, 11), gyro=(41, 13), trk3d=(60, 9), afcol=(32, 7),
+              category=(173, 4),  # one title per category page (menu_framework.CATEGORIES)
+              # The status page: title, root value, 4 labels, 4 values (menu_framework.STATUS_SLOTS).
+              status=(211, 4), status2=(252, 4), status3=(187, 2))
 _owned = [slot for base, size in BLOCKS.values() for slot in range(base, base + size)]
 if len(set(_owned)) != len(_owned) or max(_owned) >= SLOT_COUNT or STOCK_SLOTS.intersection(_owned):
     raise ValueError('Text slot blocks overlap each other or stock text')

@@ -44,7 +44,7 @@ def main() -> int:
 
     report = json.loads(Path(a.report).read_text(encoding='utf-8'))
     image = Path(a.image).read_bytes()
-    dialog = report['features']['shutter_sound']
+    dialog = report['features']['menu_framework']
     soft = report['features']['aspect_profiles']['soft_mask']
     mask_offset = int(soft['state'].rsplit('+', 1)[1], 16)
     stock = Path(a.qemu_root) / '.local/firmware/eg2090_0120a0.bi'

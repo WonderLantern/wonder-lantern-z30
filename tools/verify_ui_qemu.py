@@ -109,7 +109,7 @@ def main():
             assert int(result['registers']['r0'], 16) == code
             s.audit.append({'diagnostic_language': a.language, 'native_config': code, 'native_font': font})
         s.frame('01-stock-menu')
-        sound = report['features']['shutter_sound']
+        sound = report['features']['menu_framework']
         if a.stock_page is None:
             if a.back_cycles and not a.direct_setup:
                 for contact in (1, 0):

@@ -38,7 +38,7 @@ def main():
     report=json.loads(a.report.read_text());image=a.image.read_bytes()
     assert hashlib.sha256(image).hexdigest()==report['sha256'],'Build/report hash mismatch'
     fixture=json.loads(a.fixture.read_text())
-    sound=report['features']['shutter_sound'];aspect=report['features']['aspect_profiles']
+    sound=report['features']['menu_framework'];aspect=report['features']['aspect_profiles']
     s=Session(str(a.output_dir.resolve()),device_env={} if a.menus_only else DEVICE_ENV);observations=[];observations_mask=[]
     s.audit.append({'candidate_sha256':hashlib.sha256(image).hexdigest(),
                     'selected_presets':report['selected_presets']})

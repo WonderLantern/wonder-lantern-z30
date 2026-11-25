@@ -34,7 +34,7 @@ def main():
     report = json.loads(a.report.read_text())
     image = a.image.read_bytes()
     fixture = json.loads(a.fixture.read_text())
-    sound = report['features']['shutter_sound']
+    sound = report['features']['menu_framework']
     s = Session(str(a.output_dir.resolve()))
     s.audit.append({'candidate_sha256': hashlib.sha256(image).hexdigest(),
                     'selected_presets': report['selected_presets']})
@@ -224,7 +224,7 @@ def main():
                 s.run_for(1)
                 frame(f'{name}-{key}-4-after-choice')
                 if key in ('trk3d', 'afcol'):
-                    # Native-only pages (the custom root is full): the choice is saved in the page state.
+                    # The choice is saved in the page state (the custom path is covered by verify_menu_categories_qemu).
                     control = report['features']['tracking3d_control' if key == 'trk3d' else 'af_frame_colour_control']
                     assert word(state+control['state_offset']) == choice, (key, word(state+control['state_offset']))
                     observations.append(dict(menu=name, key=key, row=row, label=label, state=choice))
@@ -238,21 +238,29 @@ def main():
                 root = state+sound['page_offsets']['955']
                 assert active() == root
                 frame(f'{name}-{key}-5-custom-root')
-                category = next(c for c in sound['menu_categories'] if c['key'] == key)
-                s.input(0x1045d54c, [root, category['control_id']])
-                s.run_for(.5)
-                for _ in range(3):
-                    touch(250, 86+category['row']*52)
+                def open_row(holder, ident, row):
+                    s.input(0x1045d54c, [holder, ident])
                     s.run_for(.5)
-                    if active() != root:
-                        break
+                    for _ in range(3):
+                        touch(250, 86+row*52)
+                        s.run_for(.5)
+                        if active() != holder:
+                            break
+                from menu_path import enter_parent
+                holder, ident, holder_row = enter_parent(sound, key, state, open_row, s)
+                open_row(holder, ident, holder_row)
                 assert active() == page, (key, 'custom path', hex(active()))
-                assert word(page+4) == root, (key, hex(word(page+4)))
+                assert word(page+4) == holder, (key, hex(word(page+4)))
                 for _ in range(3):
                     touch(675, 28)
                     if active() != page:
                         break
-                assert active() == root, (key, 'custom back', hex(active()))
+                assert active() == holder, (key, 'custom back', hex(active()))
+                for _ in range(3):
+                    if active() == root:
+                        break
+                    touch(675, 28)
+                assert active() == root, (key, 'back to the custom root', hex(active()))
                 # Leave through the root's back arrow to the settings tab, then return.
                 for _ in range(3):
                     touch(675, 28)

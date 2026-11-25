@@ -25,7 +25,7 @@ def main():
     from z30_extensions.features.bitrate_slowmo_uncap import MODE_TABLE,RECORD,RATES,RECORDS,BITRATES_MBPS,rates
     from z30_extensions.features.bitrate_ui import BALANCED_MBPS
     report=json.loads(a.report.read_text());image=a.image.read_bytes();fixture=json.loads(a.fixture.read_text())
-    sound=report['features']['shutter_sound'];video=report['features']['bitrate_profiles']
+    sound=report['features']['menu_framework'];video=report['features']['bitrate_profiles']
     s=Session(str(a.output_dir.resolve()));frames={};observations=[]
     def write(address,data):
         for off in range(0,len(data),1024):
@@ -93,9 +93,10 @@ def main():
         s.input(0x1045f732,[2,397]);s.input(int(sound['functions']['open'],16)&~1,[]);s.run_for(1)
         root=state+sound['page_offsets']['955'];page=state+video['page_offset']
         root_ids=sound['control_identifiers']['955'];ids=sound['control_identifiers'][str(video['page_index'])]
-        category=next((c for c in sound.get('menu_categories',[]) if c['key']=='bitrate'),None)
-        bitrate_row=category['row'] if category else len(root_ids)-1
-        bitrate_control=root_ids[bitrate_row]
+        # Through its category page when the root groups the pages; 'root' is then that page.
+        from menu_path import enter_parent
+        root,bitrate_control,bitrate_row=enter_parent(sound,'bitrate',state,
+                                                      lambda page,ident,row:(select(page,ident),activate(page),s.run_for(1)),s)
         for profile in range(3):
             select(root,bitrate_control);activate(root);s.run_for(1)
             active=current();assert active==page,(hex(active),hex(page),s.remote.memory(root+20,8).hex())
@@ -138,7 +139,15 @@ def main():
             raw=frame('save-error-'+close_name);assert pixels(raw,(150,150,620,260),white=True)>100
             touch(*coords);frame('save-error-'+close_name+'-closed');assert word(state+52)==0 and current()==page
         touch(675,28);assert current()==root;frame('returned-root')
-        touch(675,28)
+        # From the category page (if any) back to the extension root before leaving.
+        custom_root=state+sound['page_offsets']['955']
+        for _ in range(3):
+            if current()==custom_root:break
+            touch(675,28)
+        assert current()==custom_root
+        for _ in range(3):
+            touch(675,28)
+            if current()!=custom_root:break
         active=current();assert active in (0xc1832d50,0xc1837160),hex(active)
         raw=frame('returned-stock');assert pixels(raw,(14,16,50,470))>500
         assert pixels(raw,(636,4,716,52))==0

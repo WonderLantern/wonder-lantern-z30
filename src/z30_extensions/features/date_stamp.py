@@ -251,7 +251,7 @@ def add(plan):
         if plan.image.read(site, 4) != _thumb_bl(site, ENCODE_GATEWAY):
             raise ValueError(f'Unexpected stock encode call at {site:#x}')
     control = plan.features['date_stamp_control']
-    get = int(plan.features['shutter_sound']['functions']['get'], 16)
+    get = int(plan.features['menu_framework']['functions']['get'], 16)
     table = plan.alloc(host.font_table())
     entry = plan.address
     code = build_core(entry, table, get, control['state_offset'])

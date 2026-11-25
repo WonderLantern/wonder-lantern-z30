@@ -17,7 +17,7 @@ def main():
     from display_session import Session,png_from_ppm
     report=json.loads(a.report.read_text());image=a.image.read_bytes()
     fixture=json.loads(a.fixture.read_text())
-    sound=report['features']['shutter_sound'];stamp=report['features']['date_stamp_control']
+    sound=report['features']['menu_framework'];stamp=report['features']['date_stamp_control']
     s=Session(str(a.output_dir.resolve()));observations=[]
     s.audit.append({'candidate_sha256':hashlib.sha256(image).hexdigest(),
                     'selected_presets':report['selected_presets']})
@@ -82,11 +82,11 @@ def main():
         state=word(int(sound['state_anchor'],16));assert state
         root=state+sound['page_offsets']['955'];page=state+stamp['page_offset']
         root_ids=sound['control_identifiers']['955'];ids=sound['control_identifiers']['964']
-        category=next((c for c in sound.get('menu_categories',[]) if c['key']=='stamp'),None)
-        stamp_row=category['row'] if category else len(root_ids)-1
-        stamp_control=root_ids[stamp_row]
         assert current()==root
         frame('01-root')
+        # Through its category page when the root groups the pages; 'root' is then that page.
+        from menu_path import enter_parent
+        root,stamp_control,stamp_row=enter_parent(sound,'stamp',state,activate,s)
         assert word(state+stamp['state_offset']) == 0
         color=0
         for value in (5,2,3,4,1,0,2):

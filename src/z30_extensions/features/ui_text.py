@@ -66,6 +66,20 @@ TRANSLATIONS = {
     'Settings not saved': ('设置保存失败', '設定儲存失敗'),
     'Shutter sound': ('快门声音', '快門聲音'),
     'Extensions': ('自定义菜单', '自訂選單'),
+    'Photo': ('拍照', '拍照'),
+    'Focus & display': ('对焦与显示', '對焦與顯示'),
+    'Video': ('视频', '影片'),
+    'Experimental': ('实验', '實驗'),
+    'Status': ('状态', '狀態'),
+    'Normal': ('正常', '正常'),
+    'Check': ('需检查', '需檢查'),
+    'Card file': ('卡文件', '卡檔案'),
+    'Version': ('版本', '版本'),
+    'Features': ('功能', '功能'),
+    'Settings': ('设置', '設定'),
+    'Built in': ('固件内置', '韌體內建'),
+    'Saved': ('已保存', '已儲存'),
+    'Not saved': ('未保存', '未儲存'),
     'Select sound': ('选择声音', '選擇聲音'),
     'Sound enabled': ('声音开关', '聲音開關'),
     'Enabled': ('启用声音', '啟用聲音'),
@@ -120,9 +134,10 @@ class TextResources:
         self.plan = plan
         self.records = {}
 
-    def alloc(self, english):
+    def alloc(self, english, translations=None):
+        """translations: (Hans, Hant) for a text built at build time (not in TRANSLATIONS)."""
         if english not in self.records:
-            hans, hant = TRANSLATIONS.get(english, (english, english))
+            hans, hant = translations or TRANSLATIONS.get(english, (english, english))
             check_glyphs(english, hans, hant)
             pointers = [self.plan.alloc(english.encode('ascii') + b'\0'),
                         self.plan.alloc(utf16_label(hans)), self.plan.alloc(utf16_label(hant)),

@@ -29,7 +29,7 @@ def main():
     from z30_extensions.features import gyro_ui
     report = json.loads(a.report.read_text()); image = a.image.read_bytes()
     fixture = json.loads(a.fixture.read_text())
-    sound = report['features']['shutter_sound']; gyro = report['features']['gyro_evr_control']
+    sound = report['features']['menu_framework']; gyro = report['features']['gyro_evr_control']
     s = Session(str(a.output_dir.resolve())); observations = []
     s.audit.append({'candidate_sha256': hashlib.sha256(image).hexdigest(), 'selected_presets': report['selected_presets']})
 
@@ -99,8 +99,6 @@ def main():
         state = word(int(sound['state_anchor'], 16)); assert state
         root = state + sound['page_offsets']['955']; page = state + gyro['page_offset']
         root_ids = sound['control_identifiers']['955']; ids = sound['control_identifiers'][str(gyro['page_index'])]
-        category = next(c for c in sound['menu_categories'] if c['key'] == 'gyro')
-        row, control = category['row'], root_ids[category['row']]
         slots = sound['text_slots'][str(gyro['page_index'])]
         def shown(slot):
             length, ptr, _ = struct.unpack('<3I', s.remote.memory(0xc2013368 + slot * 12, 12))
@@ -109,6 +107,9 @@ def main():
         def local(text): return text if lang == 3 else TRANSLATIONS[text][lang == 27]
         assert current() == root
         frame('01-root')
+        # Through its category page when the root groups the pages; 'root' is then that page.
+        from menu_path import enter_parent
+        root, control, row = enter_parent(sound, 'gyro', state, activate, s)
         assert word(state + gyro['state_offset']) == gyro_ui.STANDARD, 'a fresh state must read Standard'
         activate(root, control, row); assert current() == page
         assert shown(slots['title']) == local('Gyro e-VR'), shown(slots['title'])
