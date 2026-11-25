@@ -37,7 +37,7 @@ python -m pip install -e '.[sound,verify]'
 | `src/z30_extensions/assembly.py` | Keystone 汇编、预汇编缓存和常用指令片段 |
 | `src/z30_extensions/platform/z30_120.py` | 原厂模块身份、地址映射（`StockImage`） |
 | `src/z30_extensions/platform/fonts.py` | 原厂字体格式：字符表、字形索引、轮廓编解码、字体重建 |
-| `src/z30_extensions/features/` | 各功能实现；`ui_text.py` 管菜单文字，`cjk_fonts.py` 管补字 |
+| `src/z30_extensions/features/` | 各功能实现；`menu_framework.py`/`menu_ui.py` 是扩展菜单框架，`shutter_sound.py`/`sound_*.py` 是可选的快门声音部分，`ui_text.py` 管菜单文字，`cjk_fonts.py` 管补字，`menu_tab.py` 是可选的菜单左侧第 8 个标签（它从图像 ID `0x15E6` 起加了自己的图标，再加图像请接在后面），`ready_banner.py`/`ready_banner_image.py` 是卡文件的取景就绪提示，`firmware_banner.py` 是常驻 EG 固件版本页上的项目名 |
 | `tests/` | 单元测试（`unittest`） |
 | `tools/` | 研究与验证工具：`inspect_*`、`probe_*` 用于分析，`verify_*` 用于检查，`build_*` 用于生成数据和发布 |
 | `docs/` | 各功能的设计、证据与验证记录（以中文为主） |
@@ -66,7 +66,8 @@ def add(plan):
 - **地址：** 都是运行时地址。ROM 从 `0x10020000` 开始；初始化数据区映射在 `0xC1800000` 起，`StockImage` 会换算到文件偏移。读原厂内容用 `plan.image.read(address, size)` 和 `plan.image.words(address, count)`。
 - **跳转：** 挂钩原厂代码时用 `assembly.jump(site, target, length)` 生成长跳转。被覆盖的指令要在补丁里重新执行，再跳回原处。
 - **原厂数据表：** 不要直接改。先复制到尾部，再把引用它的字面量改过去。改之前要找全所有引用，例子见 `features/cjk_fonts.py`：字体指针表和大小表是两张表，只复制一张会让原厂语言页卡死。
-- **汇编缓存：** `assemble()` 先查 `asm_cache.gz`，没命中才调用 Keystone。改动汇编源码后，Windows 发布包需要重新生成缓存（见[发布](#发布)）。
+- **汇编缓存：** `assemble()` 先查 `asm_cache.gz`，没命中才调用 Keystone。Windows 发布包已改为内置 Keystone，不再使用缓存。
+- **自己的图像数据要 256 字节对齐。** 交给原厂渲染器的像素缓冲没对齐时，相机上什么也画不出来，但 QEMU 不检查、照常显示。卡文件的 tail 总在 64 KiB 边界上，所以 tail 内偏移对齐即可（见[取景就绪提示](docs/ready-banner.md#图像要对齐2026-11-25实机确认)）。
 
 ### SD 卡构建的额外要求
 
@@ -75,12 +76,14 @@ def add(plan):
 - **地址只能线性依赖尾部基址。** 用 `plan.alloc` 返回的地址、`constant()`（MOVW/MOVT）和 32 位字面量都可以；对尾部地址做移位、截断等非线性运算时，构建会报“address dependence is neither ABS32 nor MOVT”。不要写死尾部地址，也不要假设尾部紧跟在原厂镜像之后（`liveview_dual` 和 `liveview_full_info` 为此接受 `tail_base`）。
 - **edits 只能落在可写区。** 相机上只有 EG 的 `0x10000000..0x106FFFFF` 是 DRAM 副本，另外 scatter 数据开机后在 RAM `0xC1800000..`；`0x10700000` 之后的表、菜单记录等都写不进去，`card.runtime_address` 会拒绝。遇到这种表，在 `getattr(plan, 'card', False)` 分支里用 `plan.copy_table` 复制一份改好的副本，再改可写区里引用它的那个指针。例子：`wifi_5ghz.py`、`bitrate_slowmo_uncap.py`、`shutter_sound.seed_record`。普通整包构建不走这个分支，产物保持不变。
 - **开机就读的数据要放常驻 EG。** 加载器在开机约 3 秒后才运行，例如 CJK 字体表就在常驻 EG 里（`cjk_fonts.add(..., common=True)`），卡构建通过 `plan.resident` 引用它。
+- **主 RAM 与加载时初始化。** `plan.ram_edit(address, replacement, expected, name)` 可改 `0xC1800000..0xC79FFFFF` 的主 RAM（scatter、bss、堆），加载器先核对 `expected`。`plan.on_load(function)` 登记加载完成后调用一次的函数 `f(info, tail_base, tail_size)`，返回 1 表示成功。两者只用于卡构建，接口细节见[说明](docs/card-loader.md#功能代码可用的接口)。
+- **不要依赖最新加载器。** 卡文件按相机上已刷的常驻 EG 构建（`--patch-only`），它的 `capabilities` 决定能用哪些段和范围。需要新能力时，在 `card_loader.py` 加新的段类型并标为 REQUIRED，旧加载器会明确拒绝（`S=0D`），不会误加载；纯附加信息用可选段。
 - `full` 的卡构建由 `tests/test_card.py` 和 `tests/test_card_loader.py` 覆盖；新功能进入 `full` 后自动受检。
 
 ## 新增功能或预设
 
 1. 在 `src/z30_extensions/features/` 写实现，并在 `build.py` 的 `build()` 里按顺序调用。
-2. 公开预设：同时加入 `PRESETS` 和 `FEATURE_ORDER`。`FULL_FEATURES` 目前就等于 `FEATURE_ORDER`，所以新功能会自动进入 `full`。如果要做成不在 `full` 里的可选预设，就把 `FULL_FEATURES` 改成显式列表；图形界面会把不在 `full` 里的预设显示为附加选项。用到菜单框架的功能，还要在 `resolve_presets()` 里带上 `shutter-sound`。
+2. 公开预设：同时加入 `PRESETS` 和 `FEATURE_ORDER`。`FULL_FEATURES` 目前就等于 `FEATURE_ORDER`，所以新功能会自动进入 `full`。如果要做成不在 `full` 里的可选预设，就把 `FULL_FEATURES` 改成显式列表；图形界面只显示 `full` 及其包含的功能，不在 `full` 里的预设只能用命令行。有菜单页的功能，要加入 `build.py` 的 `MENU_FEATURES`，构建时会自动带上菜单框架（`features/menu_framework.py`）。
 3. 命令行菜单和图形界面直接读取 `PRESETS`，但 `tests/test_presets.py` 里的编号与组合预期要更新。
 4. 为新代码写单元测试。能用 Unicorn 执行的补丁代码，尽量执行一遍（参考 `tests/test_ui_text.py`）。
 5. 在 `docs/` 写专题文档，写明挂点、证据和未验证范围，并更新两份 README 的功能表。
@@ -143,7 +146,7 @@ python -m unittest discover -s tests
 
 只交付新的 `WL.PATCH`（常驻 EG 不变）时：
 
-1. 全部单元测试通过，`tools/build_card.py --patch-only` 在已刷 EG 的输出目录里生成成功（常驻 id 一致）。
+1. 全部单元测试通过，`tools/build_card.py --patch-only` 在已刷 EG 的输出目录里生成成功（按已刷常驻 EG 的能力和字体检查通过）。
 2. 实机清单：放入卡文件后 `Z30/WL.LOG` 为 `S=01`，相关功能正常；拔卡恢复原厂。
 
 ## 实机记录
@@ -161,14 +164,13 @@ python -m unittest discover -s tests
 
 ## 发布
 
-Windows 发布包不包含 Keystone（GPLv2），改为附带预汇编的机器码：
+Windows 发布包内置 Keystone，界面是 `src/z30_extensions/gui_page.html`（pywebview）：
 
 ```powershell
 python -m pip install '.[gui-exe]'
-python tools/build_asm_cache.py
 python tools/build_gui_exe.py
 ```
 
-- **生成缓存：** `build_asm_cache.py` 汇编全部功能组合，再在禁用 Keystone 的情况下重建并比对哈希。
-- **打包：** `build_gui_exe.py` 生成 `dist/WonderLanternZ30-windows-x64.zip`，附带全部许可证文本，包括 MIT、Wonder Lantern Community License、OFL、Python、Tcl/Tk 和 PyInstaller。
-- **SD 卡构建：** 预汇编缓存只覆盖整包构建，卡构建在其他基址链接，需要 Keystone；图形界面目前也不提供卡构建。
+- **打包：** `build_gui_exe.py` 生成 `dist/WonderLanternZ30-windows-x64.zip`，附带全部许可证文本，包括 MIT、Wonder Lantern Community License、OFL、Python、PyInstaller、Keystone、pywebview 和 pythonnet。
+- **自检：** `WonderLanternZ30.exe --selftest Z_30_0120.bin <空文件夹>` 不开窗口打包加载器 EG 和 `full` 卡文件，结果写入 `selftest.json`。
+- **界面预览：** 直接用浏览器打开 `gui_page.html`，1.5 秒内没有 pywebview 时会用假数据显示布局。

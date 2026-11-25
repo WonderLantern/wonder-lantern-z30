@@ -1,6 +1,6 @@
 # 从原始固件包构建功能扩展
 
-2026-11-11 新增 `gyro-evr`（陀螺仪电子防抖）并纳入 `full`；2026-11-13 上游加入 `portrait-ui`、2026-11-14 上游加入 `nef-menu`、同日新增 `3d-tracking`（[3D 跟踪](3d-tracking.md)）后共十四项功能（2026-11-14 再加 `af-frame-colour`，[对焦框颜色](af-frame-colour.md)，共十五项；2026-11-24 `focal-length`（[焦距显示](focal-length.md)）纳入 `full`，共十六项）；见[陀螺仪电子防抖](gyro-evr.md)。2026-11-12 起 `gyro-evr` 带有自定义菜单页（标准 / 增强 / 原厂裁切 / 关闭；2026-11-14 去掉标准 (RS)），单独选择时会自动带上 `shutter-sound` 菜单框架。
+2026-11-11 新增 `gyro-evr`（陀螺仪电子防抖）并纳入 `full`；2026-11-13 上游加入 `portrait-ui`、2026-11-14 上游加入 `nef-menu`、同日新增 `3d-tracking`（[3D 跟踪](3d-tracking.md)）后共十四项功能（2026-11-14 再加 `af-frame-colour`，[对焦框颜色](af-frame-colour.md)，共十五项；2026-11-24 `focal-length`（[焦距显示](focal-length.md)）纳入 `full`，共十六项）；见[陀螺仪电子防抖](gyro-evr.md)。2026-11-12 起 `gyro-evr` 带有自定义菜单页（标准 / 增强 / 原厂裁切 / 关闭；2026-11-14 去掉标准 (RS)），单独选择时会自动带上扩展菜单框架（2026-11-24 起框架与快门声音分开，不再带上声音）。
 
 2026-11-03 `date-stamp`（JPEG 胶片风格日期水印）纳入 `full`，机内默认关闭；SD 模块宿主不再作为构建预设提供，`full` 不再包含它。见[日期水印说明](date-stamp.md)。
 
@@ -17,15 +17,14 @@
 
 ## 发布 Windows 图形界面程序
 
-Keystone 为 GPLv2，其 FOSS 例外未列入 Wonder Lantern Community License，因此发布包不包含 Keystone，只附带预先汇编的机器码。维护者在项目根目录运行：
+2026-11-25 起发布包直接内置 Keystone（不再使用预汇编缓存），界面改为 pywebview（Edge WebView2），分“打包加载器 EG 固件”和“打包功能卡文件”两项功能。维护者在项目根目录运行：
 
 ```powershell
 python -m pip install '.[gui-exe]'
-python tools/build_asm_cache.py
 python tools/build_gui_exe.py
 ```
 
-`build_asm_cache.py` 汇编全部 1023 种功能组合，再禁用 Keystone 重建并比对哈希，不一致时删除缓存。补丁代码改动后必须重新生成，否则受影响的组合在打包程序中会报错。结果是 `dist/WonderLanternZ30-windows-x64.zip`，已附带许可证文本。缓存不覆盖 SD 卡构建（尾部链接在其他基址），卡构建需要 Keystone，图形界面暂不提供。
+结果是 `dist/WonderLanternZ30-windows-x64.zip`，已附带许可证文本。打包后可运行 `WonderLanternZ30.exe --selftest Z_30_0120.bin <空文件夹>` 自检：不开窗口，依次打包加载器 EG 和 `full` 卡文件，结果写入该文件夹的 `selftest.json`。卡文件里的状态页版本号在打包程序中为“月-日 app”，因此与源码构建的卡文件哈希不同；加载器 EG 相同。
 
 ## 运行
 

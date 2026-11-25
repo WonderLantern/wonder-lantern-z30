@@ -11,9 +11,10 @@ Windows 用户不需要安装 Python：
 1. 从 [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) 下载 `WonderLanternZ30-windows-x64.zip`，完整解压。
 2. 把原版固件 **Z_30_0120.bin** 放进解压后的文件夹，程序会自动填入；也可以手动选择。
 3. 打开 `WonderLanternZ30.exe`，等待显示校验通过。
-4. 勾选功能，点击“开始构建”，然后到 `output` 文件夹取 **EG209020.BIN**。再次构建会自动换一个文件名。
+4. **打包加载器 EG 固件**：点“打包加载器 EG”，到 `output/card` 取 **EG209020.BIN** 刷进相机（只需一次）。先不放卡文件，确认 设置 → 固件版本 正常。
+5. **打包功能卡文件**：“加载器文件夹”会自动指向刚才的文件夹；勾选功能，点“打包卡文件”，把生成的 `Z30` 文件夹复制到存储卡根目录，重启相机。以后换功能只需重新打包卡文件（先移走旧的 `Z30/WL.PATCH`），不用重刷。
 
-文件夹要整体保留，不能只复制 exe。需要命令行或其他系统时，继续看下面的步骤；安装依赖后也可以运行 `python patch_gui.py` 打开同一个界面。
+程序需要 Windows 10/11 自带的 Microsoft Edge WebView2 运行时。文件夹要整体保留，不能只复制 exe。需要命令行或其他系统时，继续看下面的步骤；安装依赖后也可以运行 `python patch_gui.py` 打开同一个界面。
 
 ## 命令行：准备文件
 
@@ -93,9 +94,9 @@ python tools/build_card.py --source "Z_30_0120.bin" --output "output/card"
 1. 刷 `output/card/EG209020.BIN`，先不插卡文件，确认固件版本页正常、相机与原厂一致。
 2. 把 `output/card/Z30/WL.PATCH` 复制到卡上的 `Z30` 文件夹（文件夹不存在就新建），重启。约 3 秒后功能出现。
 3. 卡上的 `Z30/WL.LOG` 应为 `WL.PATCH S=01 …`；其他代码的含义见说明文档。
-4. 以后只换卡文件：在同一个 `output/card` 目录运行同一命令并加 `--patch-only`（先移走旧的 `Z30/WL.PATCH`）。提示常驻固件已改变时，去掉 `--patch-only` 换一个新目录重新构建并重刷。
+4. 以后只换卡文件：在同一个 `output/card` 目录运行同一命令并加 `--patch-only`（先移走旧的 `Z30/WL.PATCH`）。卡文件按这份已刷的常驻 EG 构建；提示需要更新常驻 EG 时，去掉 `--patch-only` 换一个新目录重新构建并重刷。
 
-`--preset` 选择功能，默认 `full`。图形界面暂不支持此方式。
+`--preset` 选择功能，默认 `full`。也可以用 `python patch.py full --card --source "Z_30_0120.bin" --output "output/card"`（加 `--patch-only` 只生成卡文件），或者图形界面。
 
 ## 常见问题
 

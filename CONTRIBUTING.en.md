@@ -37,7 +37,7 @@ python -m pip install -e '.[sound,verify]'
 | `src/z30_extensions/assembly.py` | Keystone assembly, pre-assembled cache, common instruction snippets |
 | `src/z30_extensions/platform/z30_120.py` | Stock module identity and address mapping (`StockImage`) |
 | `src/z30_extensions/platform/fonts.py` | Stock font format: character maps, glyph index, outline codec, font rebuild |
-| `src/z30_extensions/features/` | Feature implementations; `ui_text.py` handles menu text, `cjk_fonts.py` the added glyphs |
+| `src/z30_extensions/features/` | Feature implementations; `menu_framework.py`/`menu_ui.py` are the extension menu framework, `shutter_sound.py`/`sound_*.py` the optional shutter sound part, `ui_text.py` handles menu text, `cjk_fonts.py` the added glyphs, `menu_tab.py` the optional eighth menu tab (it adds its icon as image IDs from `0x15E6`; further images go after it), `ready_banner.py`/`ready_banner_image.py` the card-file ready banner, `firmware_banner.py` the project name on the resident EG's firmware version page |
 | `tests/` | Unit tests (`unittest`) |
 | `tools/` | Research and verification tools: `inspect_*` and `probe_*` analyze, `verify_*` check, `build_*` generate data and releases |
 | `docs/` | Design, evidence and verification records per feature (mostly Chinese) |
@@ -66,7 +66,8 @@ def add(plan):
 - **Addresses:** all addresses are runtime addresses. ROM starts at `0x10020000`; initialized data is mapped from `0xC1800000`, and `StockImage` converts to file offsets. Read stock content with `plan.image.read(address, size)` and `plan.image.words(address, count)`.
 - **Hooks:** to hook stock code, build long jumps with `assembly.jump(site, target, length)`. The patch must re-execute the displaced instructions and then jump back.
 - **Stock tables:** never edit them in place. Copy the table into the tail and point the literals that reference it at the copy. Find every reference first. `features/cjk_fonts.py` is the example: the font pointer table and the size table are two tables, and copying only one of them hung the stock Language page.
-- **Assembly cache:** `assemble()` checks `asm_cache.gz` first and only calls Keystone on a miss. After you change assembly source, regenerate the cache for the Windows release (see [Releases](#releases)).
+- **Assembly cache:** `assemble()` checks `asm_cache.gz` first and only calls Keystone on a miss. The Windows release no longer uses the cache; it bundles Keystone.
+- **Align your own image data to 256 bytes.** If a pixel buffer handed to the stock renderer is not aligned, the camera draws nothing, while QEMU does not check and shows it anyway. A card file's tail always starts on a 64 KiB boundary, so aligning offsets inside the tail is enough (see the [ready banner notes](docs/ready-banner.md), Chinese).
 
 ### Extra rules for SD card builds
 
@@ -75,12 +76,14 @@ def add(plan):
 - **Depend on the tail base only linearly.** Addresses from `plan.alloc`, `constant()` (MOVW/MOVT) and 32-bit literals are fine; shifting or truncating a tail address makes the build fail with "address dependence is neither ABS32 nor MOVT". Never hard-code tail addresses or assume the tail directly follows the stock image (`liveview_dual` and `liveview_full_info` take `tail_base` for this).
 - **Edit only writable memory.** On the camera only EG `0x10000000..0x106FFFFF` is a DRAM copy, and the scatter data is RAM at `0xC1800000..` after boot; tables, menu records and anything else from `0x10700000` on cannot be written, and `card.runtime_address` rejects such edits. For such a table, add a `getattr(plan, 'card', False)` branch that uses `plan.copy_table` for an edited copy and changes the pointer to it in writable memory. Examples: `wifi_5ghz.py`, `bitrate_slowmo_uncap.py`, `shutter_sound.seed_record`. Full builds skip that branch and stay byte-identical.
 - **Keep data read at boot in the resident EG.** The loader runs about 3 s after power-on; the CJK font tables, for example, live in the resident EG (`cjk_fonts.add(..., common=True)`) and card builds reach them through `plan.resident`.
+- **Main RAM and load-time setup.** `plan.ram_edit(address, replacement, expected, name)` changes main RAM `0xC1800000..0xC79FFFFF` (scatter, bss, heap) after the loader checks `expected`. `plan.on_load(function)` registers a function called once after loading as `f(info, tail_base, tail_size)`, returning 1 on success. Both exist only in card builds; see the [interface notes](docs/card-loader.md) (Chinese).
+- **Do not rely on the newest loader.** Card files are built for the resident EG already on the camera (`--patch-only`), and its `capabilities` decide which sections and ranges a patch may use. For a new capability, add a section type in `card_loader.py` and mark it REQUIRED so older loaders refuse the file (`S=0D`) instead of half-loading it; use optional sections for extra information only.
 - `tests/test_card.py` and `tests/test_card_loader.py` cover the `full` card build, so a new feature in `full` is checked automatically.
 
 ## Adding a feature or preset
 
 1. Implement it under `src/z30_extensions/features/` and call it in order from `build()` in `build.py`.
-2. Public preset: add it to both `PRESETS` and `FEATURE_ORDER`. `FULL_FEATURES` currently equals `FEATURE_ORDER`, so a new feature joins `full` automatically. To make an opt-in preset outside `full`, turn `FULL_FEATURES` into an explicit list; the GUI shows presets outside `full` as extra options. If the feature uses the menu framework, also add `shutter-sound` in `resolve_presets()`.
+2. Public preset: add it to both `PRESETS` and `FEATURE_ORDER`. `FULL_FEATURES` currently equals `FEATURE_ORDER`, so a new feature joins `full` automatically. To make an opt-in preset outside `full`, turn `FULL_FEATURES` into an explicit list; the GUI shows only `full` and what it contains, so presets outside `full` are command-line only. A feature with a menu page also goes into `MENU_FEATURES` in `build.py`, which brings the menu framework (`features/menu_framework.py`).
 3. The command-line menu and GUI read `PRESETS` directly, but update the numbering and combination expectations in `tests/test_presets.py`.
 4. Write unit tests for new code. Where patch code can run under Unicorn, execute it (see `tests/test_ui_text.py`).
 5. Write a topic document in `docs/` covering hooks, evidence and what is unverified, and update the feature tables in both READMEs.
@@ -143,7 +146,7 @@ Before handing an EG that gets flashed (a full build or the resident EG) to some
 
 When only a new `WL.PATCH` is handed out (resident EG unchanged):
 
-1. All unit tests pass, and `tools/build_card.py --patch-only` succeeds in the output folder of the flashed EG (same resident id).
+1. All unit tests pass, and `tools/build_card.py --patch-only` succeeds in the output folder of the flashed EG (the flashed resident's capabilities and fonts cover the patch).
 2. Camera checklist: with the card file in place, `Z30/WL.LOG` shows `S=01` and the affected features work; removing the card restores stock.
 
 ## Camera records
@@ -161,14 +164,13 @@ When only a new `WL.PATCH` is handed out (resident EG unchanged):
 
 ## Releases
 
-The Windows release excludes Keystone (GPLv2) and ships pre-assembled machine code instead:
+The Windows release bundles Keystone; the interface is `src/z30_extensions/gui_page.html` (pywebview):
 
 ```powershell
 python -m pip install '.[gui-exe]'
-python tools/build_asm_cache.py
 python tools/build_gui_exe.py
 ```
 
-- **Cache:** `build_asm_cache.py` assembles every feature combination, then rebuilds with Keystone blocked and compares hashes.
-- **Package:** `build_gui_exe.py` produces `dist/WonderLanternZ30-windows-x64.zip` with every license text: MIT, the Wonder Lantern Community License, OFL, Python, Tcl/Tk and PyInstaller.
-- **SD card builds:** the pre-assembled cache covers full builds only; card builds link at other bases and need Keystone, and the GUI does not offer card builds yet.
+- **Package:** `build_gui_exe.py` produces `dist/WonderLanternZ30-windows-x64.zip` with every license text: MIT, the Wonder Lantern Community License, OFL, Python, PyInstaller, Keystone, pywebview and pythonnet.
+- **Self-test:** `WonderLanternZ30.exe --selftest Z_30_0120.bin <empty folder>` builds the loader EG and a `full` card file without a window and writes `selftest.json`.
+- **Preview:** open `gui_page.html` in a browser; without pywebview it shows the layout with canned data after 1.5 s.

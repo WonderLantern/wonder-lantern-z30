@@ -2,25 +2,59 @@
 
 ## 本项目代码
 
-除以下声音、菜单与画幅/遮幅实现文件外，本项目原创代码与文档采用 [MIT License](LICENSE)：
+除以下文件（声音、菜单框架、画幅与遮幅、日期水印、竖拍显示、对焦与跟踪、取景显示、LUT 及相关研究实现）外，本项目原创代码与文档采用 [MIT License](LICENSE)：
 
+- `src/z30_extensions/date_stamp.py`
+- `src/z30_extensions/features/af_frame_colour.py`
+- `src/z30_extensions/features/af_frame_colour_ui.py`
 - `src/z30_extensions/features/aspect_border.py`
 - `src/z30_extensions/features/aspect_border_lease.py`
 - `src/z30_extensions/features/aspect_frame.py`
 - `src/z30_extensions/features/aspect_mask.py`
 - `src/z30_extensions/features/aspect_mask_trace.py`
+- `src/z30_extensions/features/aspect_raw_playback.py`
 - `src/z30_extensions/features/aspect_trace.py`
 - `src/z30_extensions/features/aspect_ui.py`
+- `src/z30_extensions/features/aspect_xmp_crop.py`
+- `src/z30_extensions/features/battery_percent.py`
 - `src/z30_extensions/features/bitrate_ui.py`
-- `src/z30_extensions/date_stamp.py`
+- `src/z30_extensions/features/cmos_dump.py`
+- `src/z30_extensions/features/cmos_spi.py`
+- `src/z30_extensions/features/cmos_trace.py`
+- `src/z30_extensions/features/cmos_window.py`
 - `src/z30_extensions/features/date_stamp.py`
 - `src/z30_extensions/features/date_stamp_ui.py`
+- `src/z30_extensions/features/firmware_banner.py`
+- `src/z30_extensions/features/focal_length.py`
+- `src/z30_extensions/features/gyro_ui.py`
+- `src/z30_extensions/features/lut_core.py`
+- `src/z30_extensions/features/lut_failure.py`
+- `src/z30_extensions/features/lut_retouch.py`
+- `src/z30_extensions/features/lut_sdload.py`
+- `src/z30_extensions/features/lut_session.py`
+- `src/z30_extensions/features/lut_ui.py`
+- `src/z30_extensions/features/menu_framework.py`
+- `src/z30_extensions/features/menu_slots.py`
+- `src/z30_extensions/features/menu_tab.py`
+- `src/z30_extensions/features/menu_ui.py`
+- `src/z30_extensions/features/photo_zebra.py`
+- `src/z30_extensions/features/portrait_menu.py`
+- `src/z30_extensions/features/portrait_ui.py`
+- `src/z30_extensions/features/ptp_read.py`
+- `src/z30_extensions/features/ready_banner.py`
+- `src/z30_extensions/features/ready_banner_image.py`
 - `src/z30_extensions/features/shutter_sound.py`
 - `src/z30_extensions/features/sound_audio.py`
 - `src/z30_extensions/features/sound_layout.py`
 - `src/z30_extensions/features/sound_settings.py`
 - `src/z30_extensions/features/sound_ui.py`
+- `src/z30_extensions/features/tracking3d.py`
+- `src/z30_extensions/features/tracking3d_boxes.py`
+- `src/z30_extensions/features/tracking3d_ui.py`
 - `src/z30_extensions/features/ui_text.py`
+- `src/z30_extensions/features/zebra_ui.py`
+- `src/z30_extensions/lut.py`
+- `tools/verify_mask_firmware_qemu.py`
 
 上述文件采用 [Wonder Lantern Community License](licenses/Wonder-Lantern.txt)。该许可证允许使用、修改和免费分发，禁止收费分发，并要求公开分发的修改版本提供同许可证源码。完整条件以随附许可证为准。由于包含收费分发限制，该部分不是 OSI 意义上的开放源代码许可。
 
@@ -44,4 +78,4 @@
 
 Keystone 和 Unicorn 通过 Python 依赖安装，各自保留其许可证。本仓库不分发这些依赖的二进制，也不包含第三方固件工具的 XOR 表或密钥工具实现。
 
-图形界面打包程序（`tools/build_gui_exe.py`）不包含 Keystone 或 Unicorn。其中的 `asm_cache.gz` 是维护者用 Keystone 汇编本项目源码得到的机器码，由 `tools/build_asm_cache.py` 生成。打包程序内置 Python、Tcl/Tk 和 PyInstaller 引导程序，发布包的 `licenses` 文件夹附有这些许可证文本。
+图形界面打包程序（`tools/build_gui_exe.py`）内置 Keystone 汇编器（GPLv2，`keystone-engine` 0.9.2，源码见 <https://github.com/keystone-engine/keystone>）、pywebview（BSD）、pythonnet（MIT）、Python 和 PyInstaller 引导程序，不包含 Unicorn。界面由系统的 Microsoft Edge WebView2 运行时显示，该运行时不随程序分发。发布包的 `licenses` 文件夹附有这些许可证文本。

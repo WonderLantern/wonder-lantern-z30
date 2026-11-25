@@ -15,7 +15,7 @@ Wonder Lantern Z30 is the WonderLantern organization's experimental firmware ext
 
 ## Features
 
-`full` enables all sixteen features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate, date stamp, portrait UI, the NEF compression menu, gyro e-VR and 3D tracking automatically include the `shutter-sound` menu framework.
+`full` enables all sixteen features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate, date stamp, portrait UI, the NEF compression menu, gyro e-VR, 3D tracking and AF frame colour automatically include the extension menu framework; the framework no longer depends on the shutter sound, so without `shutter-sound` no sound feature is built.
 
 | Preset | What it does | Notes |
 | --- | --- | --- |
@@ -63,8 +63,8 @@ Bring your own firmware: the repository ships neither stock firmware nor a modif
 
 1. Download `WonderLanternZ30-windows-x64.zip` from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract all files** before running.
 2. Put `Z_30_0120.bin` in the extracted folder, or choose it in the app.
-3. Open `WonderLanternZ30.exe` and wait for the firmware check to pass. The interface switches between Chinese and English.
-4. Tick the features (default `full`) and click Build. Output goes to the `output` folder next to the app; existing files are never overwritten.
+3. Open `WonderLanternZ30.exe` and wait for the firmware check to pass. The interface switches between Chinese and English, and dark and light.
+4. The app does two things: **build the loader EG firmware** (`EG209020.BIN`, flashed once) and **build the feature card file** (`Z30/WL.PATCH`, from the ticked features, copied to the memory card). Output goes to the `output` folder next to the app; existing files are never overwritten.
 
 The app is not code-signed, so Windows SmartScreen may warn; compare the SHA-256 listed on the Release page first. On other systems, run `python patch_gui.py` or use the command line.
 
@@ -123,17 +123,24 @@ python tools/build_card.py --source "Z_30_0120.bin" --output "output/card"
 ```
 
 - Flash `output/card/EG209020.BIN` and copy `output/card/Z30/WL.PATCH` to the `Z30` folder on the card. `--preset` selects features (default `full`).
-- To change features later, only replace the card file: rebuild with `--patch-only` in the same output folder. A card file only works with the resident EG it was built with; if the resident EG changes (a loader change, or a new label using characters outside the common sets), the tool stops and asks for a reflash.
+- To change features later, only replace the card file: rebuild with `--patch-only` in the output folder that holds the flashed resident EG. The card file is built for the resident EG on the camera; the tool asks for a reflash only when a new feature needs something its loader cannot do, or characters its fonts lack.
 - Before writing anything the loader checks the CRC, the resident EG identity and every edit's original bytes; if any check fails it leaves camera memory untouched. Removing the card or replacing the file restores the camera.
-- The GUI does not support this mode yet; it needs the command line and Keystone.
+- The GUI supports it too: build the loader EG firmware first, then the feature card file. On the command line, `patch.py --card` does the same (`--patch-only` for the card file alone).
 
-Confirmed on a Z30 C 1.20 on 2026-11-24: with the `full` card file every feature works; removing the card restores stock; a damaged card file is rejected (`S=07`) and the camera stays stock; firmware updates still work. Design, log codes and limits: [SD card loading](docs/card-loader.md) (Chinese).
+Confirmed on a Z30 C 1.20 on 2026-11-24: with the `full` card file every feature works; removing the card restores stock; a damaged card file is rejected (`S=07`) and the camera stays stock; firmware updates still work. The second loader version (sectioned card file format, main RAM edits, load-time functions) loads correctly on camera since 2026-11-24, and the ready banner uses its load-time functions on camera; no feature uses main RAM edits yet.
+
+- **Ready banner:** after the card file loads, the photo live view shows "Wonder Lantern ready · 16 features" (the number of features in the card file) for about 2 s; it never appears in photos or videos. `--no-banner` removes it ([notes](docs/ready-banner.md), Chinese).
+- **Firmware version page:** the resident EG shows the project name and copyright as two lines on Setup → Firmware version, with or without a card.
+- **Eighth tab:** `build_card.py --menu-tab` puts the extension menu in an eighth tab (lantern icon) on the left of the menu, and the Setup menu loses its Extensions row. Off by default; tried on camera on 2026-11-25 ([notes](docs/menu-framework.md#菜单左侧第-8-个标签构建选项-menu_tab2026-11-24), Chinese).
+
+Design, log codes and limits: [SD card loading](docs/card-loader.md) (Chinese).
 
 ## Using the features
 
 ### Menus and language
 
 - **Menu entry:** new features live in **Setup menu → Extensions** (Simplified Chinese 自定义菜单, Traditional 自訂選單). A sound-only build names the entry `Shutter sound`.
+- **Root page:** the first row is Status (whether the card file loaded, version, feature count, whether settings were saved); below it the features are grouped by purpose, each feature page inside its category page ([notes](docs/menu-framework.md#根页分类2026-11-25), Chinese).
 - **Direct rows:** Photo aspect, Photo zebra and Date stamp are also listed at the end of the photo shooting menu, and Video bitrate at the end of the video shooting menu; press up once from the first row to reach them. Direct rows show `--` on the right. These direct rows are verified in QEMU only.
 - **Language:** menus follow the stock **Language** setting and show Simplified Chinese, Traditional Chinese or English; other languages show English.
 - **Added glyphs:** the stock Chinese fonts only carry menu characters. Builds add every printable ASCII character and the characters the Chinese labels need; the resident EG for SD card loading also adds GB2312 level 1 and Big5 level 1. The glyphs are converted from Noto Sans CJK (SIL OFL 1.1). This does not provide arbitrary Chinese text input.
@@ -181,7 +188,7 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 
 | Area | Evidence |
 | --- | --- |
-| Build and unit tests | 248 unit tests pass; builds are byte-for-byte reproducible with zero CRC residue |
+| Build and unit tests | 295 unit tests pass (19 more need optional tools such as arm-none-eabi-gcc and are skipped without them); builds are byte-for-byte reproducible with zero CRC residue |
 | EG installation | Maintainer confirmed installation on Z30 C 1.20 |
 | Menus, language and added glyphs | QEMU native pages and Unicorn instruction checks; the added Chinese glyphs, the Language page (every region's list) and the firmware update page have QEMU checks and user camera confirmation |
 | Dual live view, shutter sound, M900, aspect profiles | Confirmed by users on camera |
@@ -192,7 +199,7 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 | Photo zebra | Live view, stock thresholds and file integrity verified on camera; the separate switch is checked in QEMU only |
 | MTP acceleration | Matches stock on 590 property-list replies, with faster queries |
 | Wi-Fi 5 GHz | A user confirmed 5 GHz connections; throughput and long-term stability untested |
-| SD card loading | The loader matches the reference implementation byte for byte in Unicorn; the resident EG's Language and firmware version pages are checked in QEMU; loading the `full` card file, recovery by removing the card, rejection of a damaged file and firmware updates are confirmed on camera |
+| SD card loading | The loader matches the reference implementation byte for byte in Unicorn; the resident EG's Language and firmware version pages are checked in QEMU; loading the `full` card file, recovery by removing the card, rejection of a damaged file and firmware updates are confirmed on camera; the second loader version, the category root page, the eighth tab and the ready banner are confirmed on camera, the Status page is checked in QEMU only |
 
 `camera_verified: false` in a build report means **the build script itself ran no camera test**; camera results are recorded in the feature documents.
 
@@ -206,6 +213,8 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 | [Verification](docs/verification.md) | Unit tests, stock instruction execution, camera evidence |
 | [UI verification log](docs/ui-qemu.md) | Menus, Chinese text, fonts and added glyphs, Language and firmware update pages |
 | [SD card loading](docs/card-loader.md) | Resident EG, card file format, loading steps, log codes and camera record; the earlier memory probe is in [MMU probe](docs/card-loader-probe.md) |
+| [Extension menu framework](docs/menu-framework.md) | Framework split from the shutter sound, category root page, Status page, eighth tab; layout plan in [menu-layout](docs/menu-layout.md) |
+| [Ready banner](docs/ready-banner.md) | Live-view banner after the card file loads, image alignment rule |
 | Feature documents | Linked from the feature table |
 | [Licenses and third-party notices](THIRD_PARTY_NOTICES.md) | Per-file licenses and asset sources |
 
@@ -214,7 +223,7 @@ Topic documents are mostly in Chinese; this English README covers the same conte
 ## License
 
 - **Project identity:** this project belongs to the **WonderLantern** organization and is an independent experiment, not supported or endorsed by Nikon.
-- **Code:** original code and documents are under the [MIT License](LICENSE). The sound, menu and aspect implementation files listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are under the [Wonder Lantern Community License](licenses/Wonder-Lantern.txt), which allows use, modification and free redistribution but forbids paid distribution.
+- **Code:** original code and documents are under the [MIT License](LICENSE). The files listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are under the [Wonder Lantern Community License](licenses/Wonder-Lantern.txt), which allows use, modification and free redistribution but forbids paid distribution.
 - **Added glyphs:** the glyphs converted from Noto fonts are under the [SIL OFL 1.1](licenses/OFL-Noto-CJK.txt).
 - **Per-file terms:** each file's SPDX tag and the list above decide.
 - **Nikon:** nothing here grants rights to Nikon firmware, Nikon resources or trademarks.
