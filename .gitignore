@@ -23,6 +23,9 @@
 *.JPG
 *.jpeg
 *.png
+# Build inputs drawn by tools/build_tab_icon.py.
+!/src/z30_extensions/platform/menu_tab_icon_*.png
+!/src/z30_extensions/platform/menu_tab_strip.png
 *.mp4
 
 # Inputs, build products, research dumps and vendor caches.
