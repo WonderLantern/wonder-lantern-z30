@@ -1,13 +1,22 @@
 """Build the SD-card feature kit: resident EG + Z30/WL.PATCH (docs/card-loader.md).
 
 Writes OUTDIR/EG209020.BIN and .json (the resident firmware: stock, CJK fonts and
-the card loader) and OUTDIR/Z30/WL.PATCH for the chosen presets. A card patch
-only loads on the resident firmware it was built with.
+the card loader) and OUTDIR/Z30/WL.PATCH for the chosen presets.
 
-Usage: build_card.py --source Z_30_0120.bin --output OUTDIR [--preset full ...] [--patch-only]
+With --patch-only the card patch is built for the resident EG already in OUTDIR
+(the one on the camera), even if this tool would now build a newer resident. It
+stops when the patch needs something that resident lacks: a newer loader, or
+label characters outside its fonts. Then build a new resident and flash it.
+
+--menu-tab puts the extension menu in an eighth tab of the menu tab bar instead
+of a setup-menu row (docs/menu-framework.md); not yet verified on camera.
+
+The same kit is built by `patch.py --card` and the GUI; this tool keeps the
+developer switches.
+
+Usage: build_card.py --source Z_30_0120.bin --output OUTDIR [--preset full ...] [--patch-only] [--menu-tab]
 """
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -20,42 +29,32 @@ def main():
     p.add_argument('--source', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--preset', nargs='+', default=['full'])
-    p.add_argument('--patch-only', action='store_true', help='only Z30/WL.PATCH (same resident firmware)')
+    p.add_argument('--patch-only', action='store_true', help='only Z30/WL.PATCH, for the resident EG in OUTDIR')
+    p.add_argument('--menu-tab', action='store_true', help='extension menu as an eighth menu tab')
+    p.add_argument('--no-banner', action='store_true', help='no ready banner on the live view after loading')
+    p.add_argument('--banner-debug', action='store_true',
+                   help="show the ready banner's counters in the status page's version row")
+    p.add_argument('--build-tag', help='version shown on the status page (default: date and git commit)')
     a = p.parse_args()
     from z30_extensions import card
-    from z30_extensions.container import extract_eg, CONTAINER_SHA256
-    eg, meta, patch_path = (a.output / 'EG209020.BIN', a.output / 'EG209020.json',
-                            a.output / 'Z30' / 'WL.PATCH')
-    outputs = [patch_path] + ([] if a.patch_only else [eg, meta])
-    existing = [str(path) for path in outputs if path.exists()]
-    if existing:
-        sys.exit(f'Refusing to overwrite: {", ".join(existing)}')
-    stock = extract_eg(a.source.read_bytes())
-    image, report, resident, identity = card.build_resident(stock)
-    if a.patch_only:
-        # The card patch must match the resident EG already on the camera.
-        if not meta.exists():
-            sys.exit(f'--patch-only needs the resident report {meta} of the flashed EG')
-        flashed = json.loads(meta.read_text(encoding='utf-8')).get('resident_id')
-        if flashed != hex(identity):
-            sys.exit(f'The resident firmware changed ({flashed} -> {identity:#x}), for example new label '
-                     'characters outside the common sets or a loader change: build without --patch-only '
-                     'and reflash the EG.')
-    preset = a.preset[0] if len(a.preset) == 1 else a.preset
-    patch, card_report = card.build_card(stock, preset, resident, identity, image)
-    blob = card.pack(patch)
-    a.output.mkdir(parents=True, exist_ok=True)
-    if not a.patch_only:
-        report['container_sha256'] = CONTAINER_SHA256
-        report['card_patch'] = dict(presets=a.preset, **card_report['card'])
-        meta.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-        eg.write_bytes(image)
-        print(f'Built {eg}: {report["sha256"]} (resident id {identity:#010x})')
-    patch_path.parent.mkdir(parents=True, exist_ok=True)
-    patch_path.write_bytes(blob)
-    c = card_report['card']
-    print(f'Built {patch_path}: {len(blob)} bytes, tail {c["tail_bytes"]}, {c["tail_relocs"]} relocations, '
-          f'{c["edits"]} edits, presets {", ".join(a.preset)}')
+    try:
+        kit = card.write_kit(a.source, a.preset, a.output, patch_only=a.patch_only, menu_tab=a.menu_tab,
+                             build_tag=a.build_tag, ready_banner=not a.no_banner,
+                             banner_debug=a.banner_debug)
+    except (ValueError, OSError) as error:
+        sys.exit(f'{error}')
+    print_kit(kit, a.preset)
+
+
+def print_kit(kit, presets):
+    resident, c = kit['resident'], kit['card']
+    for path in kit['written']:
+        if path.suffix == '.BIN':
+            print(f'Built {path}: {kit["resident_sha256"]} (resident id {resident.identity:#010x})')
+        elif path.name == 'WL.PATCH':
+            print(f'Built {path}: {kit["patch_bytes"]} bytes, tail {c["tail_bytes"]}, {c["tail_relocs"]} relocations, '
+                  f'{c["edits"]} edits ({c["ram_edits"]} in RAM), {c["init_functions"]} load-time functions, '
+                  f'presets {", ".join(presets)} (resident id {resident.identity:#010x})')
 
 
 if __name__ == '__main__':

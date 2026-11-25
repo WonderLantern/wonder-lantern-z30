@@ -6,14 +6,18 @@ branch with the stock result (same contract as imu_hook). The loader waits
 START ticks after the task starts, tries to open the file every EVERY ticks
 and gives up at LIMIT ticks, so a camera without the file stays stock.
 
-One attempt that finds the file:
+One attempt that finds the file (format 2, see card.py):
   read the header, check magic / format / resident id / sizes;
-  allocate body + 64 KiB from the stock pool, read the body onto a 64 KiB
-  boundary (the tail is its first part), require end of file, close;
-  check CRC32, relocation bounds and every edit's target range and expected
-  bytes (code edits through the DRAM alias, scatter edits in RAM);
+  allocate body + 64 KiB from the stock pool and read the body so that the
+  first section's payload, the tail, starts on a 64 KiB boundary; require
+  end of file, close;
+  check CRC32, walk the sections (refuse an unknown REQUIRED one, skip other
+  unknown ones), check relocation bounds, load-time function offsets and
+  every edit's target range and expected bytes (code edits through the DRAM
+  alias, edits in main RAM directly);
   relocate the tail, clean / invalidate it on both cores;
-  only then relocate and write every edit, syncing each code range.
+  only then relocate and write every edit, syncing each code range, and
+  call every load-time function as f(INFO, tail_base, tail_size).
 Any failure before the writes frees the block and changes nothing.
 
 CELL (+0x0C of the unused page-0 menu record) holds the state:
@@ -32,13 +36,16 @@ CELL = 0xC1832D30
 PATH = b'A:\\Z30\\WL.PATCH\0'
 LOG_PATH = b'A:\\Z30\\WL.LOG\0'
 MAGIC = 0x50434C57          # 'WLCP'
-FORMAT = 1
+FORMAT = 2
+SECTIONS = (1, 2, 3, 4)     # TAIL, RELOCS, EDITS, INIT
+INIT_ABI = 1
+INFO_FIELDS = ('abi', 'size', 'sync', 'cell', 'pool_alloc', 'pool_free')  # words of the INFO table
 MAX_BODY = 0x00800000       # 8 MiB
 START, EVERY, LIMIT = 60, 10, 600   # ticks of ~50 ms: first try after ~3 s, give up after ~30 s
 DONE = 0x8000
 CODE_LO, CODE_HI = 0x10020000, 0x10700000
 ALIAS = 0xCC400000 - 0x10000000
-SCATTER_LO, SCATTER_HI = 0xC1800000, 0xC1800000 + 0xF8258
+RAM_LO, RAM_HI = 0xC1800000, 0xC7A00000     # main cacheable RAM: scatter data, bss, heap
 MEMSET, MEMCPY = 0x10199C40, 0x10199BDC
 SET_PATH, OPEN, READ, CLOSE = 0x1033829E, 0x103382A2, 0x10338414, 0x1033832E
 FD_CLOSE, FD_WRITE = 0x102C89EE, 0x102C8A6A
@@ -48,16 +55,18 @@ CREATE = 0x301
 RESULTS = {1: 'loaded', 2: 'no file', 3: 'read failed', 4: 'bad file', 5: 'other resident firmware',
            6: 'no memory', 7: 'CRC mismatch', 8: 'bad structure', 9: 'memory differs from the patch',
            10: 'close failed', 11: 'cache sync failed (nothing written)',
-           12: 'cache sync failed after writing (reboot)'}
+           12: 'cache sync failed after writing (reboot)', 13: 'needs a newer resident loader',
+           14: 'a load-time function reported failure'}
 SIZES = dict(stub=72, load=1024, read_all=96, crc32=64, check_relocs=64, target=96,
-             validate=192, apply_relocs=192, apply_edits=256, write_log=320, sync=160)
+             validate=192, apply_relocs=192, apply_edits=256, write_log=320, sync=160,
+             sections=256, check_init=64, call_init=96)
 
 
 def _n(address):
     return invoke(address)
 
 
-def sources(f, resident_id, strings):
+def sources(f, resident_id, strings, info):
     c, call = constant, lambda name: invoke(f[name])
     code = {}
     code['stub'] = f'''
@@ -97,12 +106,48 @@ def sources(f, resident_id, strings):
     # r0 address, r1 size -> writable alias / RAM address, or 0.
     code['target'] = f'''
         adds r2,r0,r1; bcs bad;
-        {c('r3', CODE_LO)} cmp r0,r3; blo scatter; {c('r3', CODE_HI)} cmp r2,r3; bhi scatter;
+        {c('r3', CODE_LO)} cmp r0,r3; blo ram; {c('r3', CODE_HI)} cmp r2,r3; bhi ram;
         {c('r3', ALIAS)} add r0,r0,r3; bx lr;
-        scatter: {c('r3', SCATTER_LO)} cmp r0,r3; blo bad; {c('r3', SCATTER_HI)} cmp r2,r3; bhi bad; bx lr;
+        ram: {c('r3', RAM_LO)} cmp r0,r3; blo bad; {c('r3', RAM_HI)} cmp r2,r3; bhi bad; bx lr;
         bad: movs r0,#0; bx lr;
     '''
-    # r0 first record, r1 count, r2 end -> 0, 8 (structure) or 9 (memory differs).
+    # r0 body, r1 body end, r2 out[8]: tail size, relocs, reloc count, edits, edit count,
+    # edits end, init, init count -> 0, 8 (structure) or 13 (unknown required section).
+    code['sections'] = '''
+        push {r4-r10,lr}; mov r4,r0; mov r5,r1; mov r6,r2;
+        movs r0,#0; movs r1,#8; mov r2,r6;
+        clear: str r0,[r2],#4; subs r1,#1; bne clear;
+        add r0,r4,#8; cmp r0,r5; bhi bad; ldrh r0,[r4]; cmp r0,#1; bne bad;
+        ldr r1,[r4,#4]; tst r1,#3; bne bad; add r0,r4,#8; adds r0,r0,r1; bcs bad; cmp r0,r5; bhi bad;
+        str r1,[r6]; mov r4,r0;
+        loop: cmp r4,r5; beq good; add r0,r4,#8; cmp r0,r5; bhi bad;
+        ldrh r7,[r4]; ldrh r8,[r4,#2]; ldr r9,[r4,#4]; tst r9,#3; bne bad;
+        add r0,r4,#8; adds r10,r0,r9; bcs bad; cmp r10,r5; bhi bad;
+        cmp r7,#2; bne not_relocs; str r0,[r6,#4]; lsrs r2,r9,#2; str r2,[r6,#8]; b next;
+        not_relocs: cmp r7,#3; bne not_edits; cmp r9,#4; blo bad;
+        ldr r2,[r0]; str r2,[r6,#16]; adds r2,r0,#4; str r2,[r6,#12]; str r10,[r6,#20]; b next;
+        not_edits: cmp r7,#4; bne unknown; str r0,[r6,#24]; lsrs r2,r9,#2; str r2,[r6,#28]; b next;
+        unknown: cmp r7,#1; beq bad; tst r8,#1; bne newer;
+        next: mov r4,r10; b loop;
+        good: movs r0,#0; pop {r4-r10,pc};
+        bad: movs r0,#8; pop {r4-r10,pc};
+        newer: movs r0,#13; pop {r4-r10,pc};
+    '''
+    # r0 offsets, r1 count, r2 tail size -> 1 when every offset is even and inside the tail.
+    code['check_init'] = '''
+        loop: cmp r1,#0; beq good; ldr r3,[r0],#4; tst r3,#1; bne bad; cmp r3,r2; bhs bad;
+        subs r1,#1; b loop;
+        good: movs r0,#1; bx lr;
+        bad: movs r0,#0; bx lr;
+    '''
+    # r0 offsets, r1 count, r2 tail base, r3 tail size -> 0, or 14 when a function did not return 1.
+    code['call_init'] = f'''
+        push {{r4-r10,lr}}; mov r4,r0; mov r5,r1; mov r6,r2; mov r7,r3; movs r8,#0;
+        loop: cmp r5,#0; beq done; ldr r3,[r4],#4; add r3,r3,r6; orr r3,r3,#1;
+        {c('r0', info)} mov r1,r6; mov r2,r7; blx r3; cmp r0,#1; beq next; mov r8,#14;
+        next: subs r5,#1; b loop;
+        done: mov r0,r8; pop {{r4-r10,pc}};
+    '''
     code['validate'] = f'''
         push {{r4-r10,lr}}; mov r4,r0; mov r5,r1; mov r6,r2;
         loop: cmp r5,#0; beq good;
@@ -174,47 +219,51 @@ def sources(f, resident_id, strings):
         hex: lsr.w r1,r0,r2; and r1,r1,#15; cmp r1,#10; blo digit; adds r1,#7; digit: adds r1,#48;
         strb r1,[r8],#1; subs r2,#4; bpl hex; bx lr;
     '''
+    # Frame: file object 0..47, header 48..71 (magic, format, id, link base, body size, crc),
+    # count 72, allocation 76, tail base 80, scratch 84, sections table 88..119.
     code['load'] = f'''
-        push {{r4-r11,lr}}; sub sp,#104;
+        push {{r4-r11,lr}}; sub sp,#140;
         {c('r11', CELL)} ldr r0,[r11]; tst r0,#{DONE}; bne out;
         adds r0,#1; str r0,[r11]; ubfx r1,r0,#0,#12;
         cmp r1,#{START}; blo out; cmp r1,#{LIMIT}; bhs give_up;
         sub r1,r1,#{START}; movs r2,#{EVERY}; udiv r3,r1,r2; mls r3,r3,r2,r1; cmp r3,#0; bne out;
-        movs r0,#0; str r0,[sp,#88];
+        movs r0,#0; str r0,[sp,#76]; str r0,[sp,#108];
         mov r0,sp; movs r1,#48; {_n(MEMSET)} mvn r0,#0; str r0,[sp,#8];
         mov r0,sp; {c('r1', strings['path'])} {_n(SET_PATH)}
         mov r0,sp; movs r1,#0; movs r2,#0; {_n(OPEN)} {c('r1', SUCCESS)} cmp r0,r1; bne not_open;
-        mov r10,#3; mov r0,sp; add r1,sp,#48; movs r2,#36; {call('read_all')} cmp r0,#1; bne close_fail;
+        mov r10,#3; mov r0,sp; add r1,sp,#48; movs r2,#24; {call('read_all')} cmp r0,#1; bne close_fail;
         mov r10,#4; ldr r0,[sp,#48]; {c('r1', MAGIC)} cmp r0,r1; bne close_fail;
         ldr r0,[sp,#52]; cmp r0,#{FORMAT}; bne close_fail;
         mov r10,#5; ldr r0,[sp,#56]; {c('r1', resident_id)} cmp r0,r1; bne close_fail;
-        mov r10,#4; ldr r5,[sp,#76]; cmp r5,#0; beq close_fail; {c('r1', MAX_BODY)} cmp r5,r1; bhi close_fail;
-        tst r5,#3; bne close_fail; ldr r6,[sp,#64]; cmp r6,r5; bhi close_fail; tst r6,#3; bne close_fail;
-        ldr r0,[sp,#60]; lsls r1,r0,#16; bne close_fail;
-        mov r10,#6; add r0,r5,#0x10000; movs r1,#0; {_n(POOL_ALLOC)} cmp r0,#0; beq close_fail;
-        str r0,[sp,#88]; movw r1,#0xFFFF; add r4,r0,r1; bfc r4,#0,#16; str r4,[sp,#92];
-        mov r10,#3; mov r0,sp; mov r1,r4; mov r2,r5; {call('read_all')} cmp r0,#1; bne close_fail;
-        movs r0,#0; str r0,[sp,#84]; mov r0,sp; add r1,sp,#96; movs r2,#1; add r3,sp,#84; {_n(READ)}
-        {c('r1', SUCCESS)} cmp r0,r1; bne close_fail; mov r10,#4; ldr r0,[sp,#84]; cmp r0,#0; bne close_fail;
+        mov r10,#4; ldr r5,[sp,#64]; cmp r5,#8; blo close_fail; {c('r1', MAX_BODY)} cmp r5,r1; bhi close_fail;
+        tst r5,#3; bne close_fail; ldr r0,[sp,#60]; lsls r1,r0,#16; bne close_fail;
+        mov r10,#6; {c('r0', 0x10008)} add r0,r0,r5; movs r1,#0; {_n(POOL_ALLOC)} cmp r0,#0; beq close_fail;
+        str r0,[sp,#76]; movw r1,#7; movt r1,#1; add r4,r0,r1; bfc r4,#0,#16; str r4,[sp,#80];
+        mov r10,#3; mov r0,sp; sub r1,r4,#8; mov r2,r5; {call('read_all')} cmp r0,#1; bne close_fail;
+        movs r0,#0; str r0,[sp,#72]; mov r0,sp; add r1,sp,#84; movs r2,#1; add r3,sp,#72; {_n(READ)}
+        {c('r1', SUCCESS)} cmp r0,r1; bne close_fail; mov r10,#4; ldr r0,[sp,#72]; cmp r0,#0; bne close_fail;
         mov r10,#10; mov r0,sp; {_n(CLOSE)} {c('r1', SUCCESS)} cmp r0,r1; bne fail;
-        mov r10,#7; mov r0,r4; mov r1,r5; {call('crc32')} ldr r1,[sp,#80]; cmp r0,r1; bne fail;
-        mov r10,#8; ldr r8,[sp,#68]; add r7,r4,r6; sub r1,r5,r6; lsrs r1,r1,#2; cmp r8,r1; bhi fail;
+        mov r10,#7; sub r0,r4,#8; mov r1,r5; {call('crc32')} ldr r1,[sp,#68]; cmp r0,r1; bne fail;
+        sub r0,r4,#8; add r1,r0,r5; add r2,sp,#88; {call('sections')} mov r10,r0; cmp r0,#0; bne fail;
+        mov r10,#8; ldr r6,[sp,#88]; ldr r7,[sp,#92]; ldr r8,[sp,#96];
         mov r0,r7; mov r1,r8; mov r2,r6; {call('check_relocs')} cmp r0,#1; bne fail;
-        add r9,r7,r8,lsl #2;
-        mov r0,r9; ldr r1,[sp,#72]; add r2,r4,r5; {call('validate')} mov r10,r0; cmp r0,#0; bne fail;
+        ldr r0,[sp,#112]; ldr r1,[sp,#116]; mov r2,r6; {call('check_init')} cmp r0,#1; bne fail;
+        ldr r9,[sp,#100]; mov r0,r9; ldr r1,[sp,#104]; ldr r2,[sp,#108]; {call('validate')}
+        mov r10,r0; cmp r0,#0; bne fail;
         ldr r3,[sp,#60]; sub r3,r4,r3; mov r0,r4; mov r1,r7; mov r2,r8; {call('apply_relocs')}
         mov r10,#11; mov r0,r4; mov r1,r6; {call('sync')} cmp r0,#1; bne fail;
-        ldr r2,[sp,#60]; sub r2,r4,r2; mov r0,r9; ldr r1,[sp,#72]; {call('apply_edits')}
-        mov r10,r0; cmp r10,#0; bne status; mov r10,#1;
+        ldr r2,[sp,#60]; sub r2,r4,r2; mov r0,r9; ldr r1,[sp,#104]; {call('apply_edits')} mov r10,r0;
+        ldr r0,[sp,#112]; ldr r1,[sp,#116]; mov r2,r4; mov r3,r6; {call('call_init')}
+        cmp r10,#0; bne status; mov r10,r0; cmp r10,#0; bne status; mov r10,#1;
         status: orr r0,r4,#{DONE}; orr r0,r0,r10,lsl #8; str r0,[r11];
-        mov r0,r10; mov r1,r4; mov r2,r6; ldr r3,[sp,#72]; {call('write_log')} b out;
+        mov r0,r10; mov r1,r4; mov r2,r6; ldr r3,[sp,#104]; {call('write_log')} b out;
         close_fail: mov r0,sp; {_n(CLOSE)}
-        fail: ldr r0,[sp,#88]; cmp r0,#0; beq failed; {_n(POOL_FREE)}
+        fail: ldr r0,[sp,#76]; cmp r0,#0; beq failed; {_n(POOL_FREE)}
         failed: mov r0,#{DONE}; orr r0,r0,r10,lsl #8; str r0,[r11];
         mov r0,r10; movs r1,#0; movs r2,#0; movs r3,#0; {call('write_log')} b out;
         not_open: ldr r0,[sp,#8]; cmp r0,#0; blt out; {_n(FD_CLOSE)} b out;
         give_up: mov r0,#{DONE | (2 << 8)}; str r0,[r11];
-        out: add sp,#104; pop {{r4-r11,pc}};
+        out: add sp,#140; pop {{r4-r11,pc}};
     '''
     return code
 
@@ -228,10 +277,13 @@ def add(plan, resident_id):
     strings = dict(path=plan.alloc(PATH), log=plan.alloc(LOG_PATH), log_text=plan.alloc(b'WL.PATCH S=\0'))
     f = {name: plan.alloc(bytes(size)) for name, size in SIZES.items()}
     plan.put(f['sync'], sync_shared_code(f['sync'], MAX_BODY))
-    for name, source in sources(f, resident_id, strings).items():
+    info = plan.alloc(struct.pack(f'<{len(INFO_FIELDS)}I', INIT_ABI, 4 * len(INFO_FIELDS), f['sync'] | 1,
+                                  CELL, POOL_ALLOC | 1, POOL_FREE | 1))
+    for name, source in sources(f, resident_id, strings, info).items():
         plan.put(f[name], assemble(source, f[name], SIZES[name]))
     plan.edit(IMU_SITE, jump(IMU_SITE, f['stub'], 8), 'card-loader IMU trigger', expected=IMU_STOCK)
     plan.features['card_loader'] = dict(site=hex(IMU_SITE), cell=hex(CELL), path=PATH[:-1].decode(),
                                         log=LOG_PATH[:-1].decode(), resident_id=hex(resident_id),
+                                        format=FORMAT, info=hex(info), info_fields=list(INFO_FIELDS),
                                         functions={k: hex(v) for k, v in f.items()})
     return f

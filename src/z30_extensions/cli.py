@@ -3,6 +3,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from . import card
 from .build import build, PRESETS, resolve_presets
 from .container import extract_eg, CONTAINER_SHA256
 
@@ -82,13 +83,29 @@ def main(argv=None):
     parser.add_argument('--interactive', action='store_true', help='Prompt for presets even when stdin is redirected')
     parser.add_argument('--source', type=Path, required=True, help='Original Z_30_0120.bin, SHA-256 checked before decoding')
     parser.add_argument('--extracted-eg', action='store_true', help='Developer mode: input is an extracted stock EG module')
-    parser.add_argument('--output', type=Path, required=True, help='New output path; existing files are refused')
+    parser.add_argument('--output', type=Path, required=True,
+                        help='New output path (with --card: a folder); existing files are refused')
+    parser.add_argument('--card', action='store_true',
+                        help='Build the card kit instead: OUTPUT/EG209020.BIN (resident loader EG, flashed once) '
+                             'and OUTPUT/Z30/WL.PATCH (the features, copied to the SD card)')
+    parser.add_argument('--patch-only', action='store_true',
+                        help='With --card: only OUTPUT/Z30/WL.PATCH, for the resident EG already in OUTPUT')
     args = parser.parse_args(argv)
-    metadata = args.output.with_suffix('.json')
-    if args.output.resolve() == metadata.resolve():
-        parser.error('Output path must not have a .json suffix')
-    if args.output.exists() or metadata.exists():
-        parser.error('Output or report already exists; choose fresh paths')
+    if args.patch_only and not args.card:
+        parser.error('--patch-only needs --card')
+    if args.card:
+        if args.extracted_eg:
+            parser.error('--card needs the original Z_30_0120.bin')
+        existing = [str(p) for p in card.kit_outputs(args.output, args.patch_only) if p.exists()]
+        if existing:
+            parser.error('Already exists; choose a fresh folder (or move the old Z30/WL.PATCH away): '
+                         + ', '.join(existing))
+    else:
+        metadata = args.output.with_suffix('.json')
+        if args.output.resolve() == metadata.resolve():
+            parser.error('Output path must not have a .json suffix')
+        if args.output.exists() or metadata.exists():
+            parser.error('Output or report already exists; choose fresh paths')
     try:
         selected = args.feature
         if args.interactive or (not selected and sys.stdin.isatty()):
@@ -97,9 +114,19 @@ def main(argv=None):
             selected = ['full']
         selected, features = resolve_presets(selected)
         print('Enabled features: ' + ', '.join(features))
-        report, metadata = build_to_files(args.source, selected, args.output, args.extracted_eg)
+        if args.card:
+            kit = card.write_kit(args.source, selected, args.output, patch_only=args.patch_only)
+        else:
+            report, metadata = build_to_files(args.source, selected, args.output, args.extracted_eg)
     except (ValueError, OSError) as error:
         parser.exit(1, f'Build failed: {error}\n')
+    if args.card:
+        for path in kit['written']:
+            print(f'Built {path}')
+        print(f'Resident id {kit["resident"].identity:#010x}; WL.PATCH {kit["patch_bytes"]} bytes')
+        if not args.patch_only:
+            print(f'Flash {args.output / card.RESIDENT_NAME} once, then copy the Z30 folder to the SD card.')
+        return 0
     print(f'Built {args.output}: {report["sha256"]}')
     print(f'Report: {metadata}')
     return 0

@@ -24,6 +24,8 @@ class Plan:
         self.resident = dict(resident or {})
         self.tail = bytearray()
         self.edits = []
+        self.ram_edits = []      # card builds: (address, expected, replacement, name) in main RAM
+        self.init_functions = []  # card builds: tail functions the loader calls once after loading
         self.features = {}
 
     @property
@@ -49,6 +51,31 @@ class Plan:
             raise ValueError(f'Unexpected source instruction/data at {address:#x}')
         self.edits.append(Edit(self.image.rom(address, len(replacement)) - BASE,
                                actual, replacement, name))
+
+    def ram_edit(self, address, replacement, expected, name):
+        """Card builds only: replace bytes of main RAM (heap, bss, scatter) once loaded.
+
+        `expected` is what the loader must find there at run time; nothing in
+        the patch is written if it differs. Values only known at run time
+        belong in an on_load function instead.
+        """
+        if not self.card:
+            raise ValueError(f'{name}: RAM edits exist only in SD card builds')
+        replacement, expected = bytes(replacement), bytes(expected)
+        if not replacement or len(replacement) != len(expected):
+            raise ValueError(f'{name}: RAM edit sizes differ')
+        self.ram_edits.append((address, expected, replacement, name))
+
+    def on_load(self, function):
+        """Card builds only: call this Thumb tail function once after every edit is written.
+
+        It runs in the stock IMU task as f(info, tail_base, tail_size) and
+        returns 1 on success; info is the resident loader's service table
+        (card_loader.INFO_FIELDS).
+        """
+        if not self.card:
+            raise ValueError('Load-time functions exist only in SD card builds')
+        self.init_functions.append(function)
 
     def copy_table(self, address, size, patches=()):
         """Copy stock data into the tail with (offset, bytes, expected) patches applied."""
