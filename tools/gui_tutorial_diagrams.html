@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<!-- Diagrams for docs/gui-tutorial*.md, rendered by tools/make_gui_screenshots.py. -->
+<style>
+  :root { --bg: #0f1115; --panel: #171a21; --line: #2a2f3a; --line-2: #363c49; --text: #e8eaef; --muted: #8b93a3;
+    --accent: #f2c94c; --ok: #4fcf8a; --info: #6aa8f0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif; }
+  #figure { width: 1080px; padding: 28px 36px 30px; background: var(--bg); }
+  h1 { margin: 0 0 18px; font-size: 17px; font-weight: 650; }
+  .lane { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px 18px;
+    margin-bottom: 16px; position: relative; }
+  .lane-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .tag { font-size: 12px; font-weight: 700; letter-spacing: .5px; padding: 2px 9px; border-radius: 20px; }
+  .once .tag { background: #2a2f3a; color: var(--muted); }
+  .often .tag { background: var(--accent); color: #1b1607; }
+  .lane-head b { font-size: 14.5px; }
+  .lane-head span.sub { color: var(--muted); font-size: 12.5px; }
+  .row { display: flex; align-items: stretch; gap: 0; }
+  .step { flex: 1; background: var(--bg); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+  .step b { display: block; font-size: 13.5px; }
+  .step code { font: 12px "Cascadia Mono", Consolas, monospace; color: var(--accent); }
+  .step small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .step.hl { border-color: var(--accent); }
+  .arrow { flex: none; width: 34px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 20px; }
+  .note { margin-top: 12px; display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 12.5px; }
+  .note::before { content: ""; flex: none; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: var(--ok); }
+  .note.info::before { background: var(--info); }
+  .loop { color: var(--accent); font-size: 12.5px; text-align: right; margin-top: 8px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .os { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .os b { font-size: 15px; display: block; margin-bottom: 6px; }
+  .os code { font: 12px "Cascadia Mono", Consolas, monospace; color: var(--accent); display: block; word-break: break-all; }
+  .os dl { margin: 10px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12.5px; }
+  .os dt { color: var(--muted); } .os dd { margin: 0; }
+  .down { text-align: center; color: var(--muted); font-size: 20px; margin: 8px 0; }
+  .same { background: var(--panel); border: 1px solid #2c5d43; border-radius: 12px; padding: 14px 18px; display: flex; gap: 22px; }
+  .same div { flex: 1; } .same b { color: var(--ok); display: block; margin-bottom: 4px; }
+  .same .plain { color: var(--muted); font-size: 12.5px; }
+  .same code { font: 12px "Cascadia Mono", Consolas, monospace; color: var(--muted); word-break: break-all; }
+</style>
+</head>
+<body>
+<div id="figure"></div>
+<script>
+const T = {
+  zh: {
+    wf_title: '加载器只刷一次，以后只换卡文件',
+    once: '一次', once_t: '打包并刷入加载器 EG', once_s: '除非程序提示更新加载器',
+    fw: '原厂固件', fw_s: '未经修改的 C 1.20，程序先校验 SHA-256',
+    eg: '打包加载器 EG', eg_s: '原厂固件 + 中文字体 + 卡文件加载器',
+    flash: '刷进相机', flash_s: '设定菜单 → 固件版本',
+    often: '每次', often_t: '换功能或更新版本', often_s: '不用再打包加载器，不用重刷',
+    pick: '勾选功能', pick_s: '全部功能，或单独挑选',
+    card: '打包卡文件', card_s: '输出文件夹可以是任意空文件夹',
+    copy: '复制到存储卡', copy_s: '整个 Z30 文件夹放到卡根目录',
+    boot: '开机', boot_s: '约 3 秒后功能出现，第 8 个菜单标签',
+    n1: '同一版本的程序打包出的加载器每次都完全相同（这一版 ID 0x67f308e7），所以卡文件直接按它构建，不需要加载器文件夹。',
+    n2: '相机里刷的是更早版本程序的加载器时，把卡文件的输出文件夹选成当时打包加载器的文件夹，卡文件就按那份加载器构建。',
+    n3: '删掉卡上的 Z30\\WL.PATCH 即恢复原厂行为；随时可以从 设定菜单 → 固件版本 刷回原厂固件。',
+    loop: '↻ 下次换功能，从“勾选功能”重新开始',
+    pf_title: '三个系统，打出完全相同的文件',
+    win: 'Windows 10/11', lin: 'Linux x86-64', mac: 'macOS 11+',
+    file: '下载', run: '运行', view: '界面', note: '说明',
+    win_v: '系统自带 WebView2', lin_v: '程序自带 Qt WebEngine', mac_v: '系统自带 WebKit',
+    win_n: 'SmartScreen：更多信息 → 仍要运行', lin_n: '需要系统的 libnss3', mac_n: '右键 → 打开；Apple 芯片经 Rosetta 2',
+    same_eg: '加载器 EG209020.BIN 相同', same_card: '卡文件 Z30/WL.PATCH 相同',
+    same_eg_s: 'SHA-256 be618dea203bffa5155fe1759f29284260cf781d76bf3e3f96a988bb15fbc760',
+    same_card_s: '同一天、同一版本、同样的功能选择，逐字节相同；发布流程会核对三个系统的加载器',
+  },
+  en: {
+    wf_title: 'Flash the loader once, then only swap the card file',
+    once: 'ONCE', once_t: 'Build and flash the loader EG', once_s: 'unless the program asks for a loader update',
+    fw: 'Stock firmware', fw_s: 'unmodified C 1.20; its SHA-256 is checked first',
+    eg: 'Build loader EG', eg_s: 'stock + CJK font + card file loader',
+    flash: 'Flash the camera', flash_s: 'Setup menu → Firmware version',
+    often: 'EVERY TIME', often_t: 'Change features or update', often_s: 'no loader build, no reflash',
+    pick: 'Pick features', pick_s: 'everything, or your own choice',
+    card: 'Build card file', card_s: 'into any empty output folder',
+    copy: 'Copy to the card', copy_s: 'the whole Z30 folder to the card root',
+    boot: 'Start the camera', boot_s: 'ready in about 3 s, eighth menu tab',
+    n1: 'A given program version always builds the same loader (ID 0x67f308e7 for this one), so the card file is built for it directly; no loader folder needed.',
+    n2: 'If the camera has a loader from an older program version, choose that build\'s output folder for the card file; it is then built for that loader.',
+    n3: 'Delete Z30\\WL.PATCH from the card for stock behaviour; Setup menu → Firmware version flashes the stock firmware back at any time.',
+    loop: '↻ To change features again, start over at “Pick features”',
+    pf_title: 'Three systems, identical files',
+    win: 'Windows 10/11', lin: 'Linux x86-64', mac: 'macOS 11+',
+    file: 'Download', run: 'Start', view: 'Window', note: 'Note',
+    win_v: 'system WebView2', lin_v: 'bundled Qt WebEngine', mac_v: 'system WebKit',
+    win_n: 'SmartScreen: More info → Run anyway', lin_n: 'needs the system libnss3', mac_n: 'right-click → Open; Rosetta 2 on Apple silicon',
+    same_eg: 'Same loader EG209020.BIN', same_card: 'Same card file Z30/WL.PATCH',
+    same_eg_s: 'SHA-256 be618dea203bffa5155fe1759f29284260cf781d76bf3e3f96a988bb15fbc760',
+    same_card_s: 'byte for byte for the same day, version and features; the release build checks the loader of all three',
+  },
+};
+
+function step(t, k, cls = '') {
+  return `<div class="step ${cls}"><b>${t[k]}</b><small>${t[k + '_s']}</small></div>`;
+}
+const arrow = '<div class="arrow">→</div>';
+
+function workflow(t) {
+  return `<h1>${t.wf_title}</h1>
+  <div class="lane once"><div class="lane-head"><span class="tag">${t.once}</span><b>${t.once_t}</b><span class="sub">${t.once_s}</span></div>
+    <div class="row">${step(t, 'fw')}${arrow}${step(t, 'eg')}${arrow}${step(t, 'flash')}</div></div>
+  <div class="lane often"><div class="lane-head"><span class="tag">${t.often}</span><b>${t.often_t}</b><span class="sub">${t.often_s}</span></div>
+    <div class="row">${step(t, 'pick')}${arrow}${step(t, 'card', 'hl')}${arrow}${step(t, 'copy')}${arrow}${step(t, 'boot')}</div>
+    <div class="loop">${t.loop}</div>
+    <div class="note">${t.n1}</div><div class="note info">${t.n2}</div><div class="note info">${t.n3}</div></div>`;
+}
+
+function platforms(t) {
+  const os = (name, file, run, view, note) => `<div class="os"><b>${t[name]}</b><code>${file}</code>
+    <dl><dt>${t.run}</dt><dd><code>${run}</code></dd><dt>${t.view}</dt><dd>${t[view]}</dd><dt>${t.note}</dt><dd>${t[note]}</dd></dl></div>`;
+  return `<h1>${t.pf_title}</h1>
+  <div class="grid3">
+    ${os('win', 'WonderLanternZ30-windows-x64.zip', 'WonderLanternZ30.exe', 'win_v', 'win_n')}
+    ${os('lin', 'WonderLanternZ30-linux-x64.tar.gz', './WonderLanternZ30', 'lin_v', 'lin_n')}
+    ${os('mac', 'WonderLanternZ30-macos-x64.zip', 'WonderLanternZ30.app', 'mac_v', 'mac_n')}
+  </div>
+  <div class="down">↓ ↓ ↓</div>
+  <div class="same"><div><b>${t.same_eg}</b><code>${t.same_eg_s}</code></div>
+    <div><b>${t.same_card}</b><span class="plain">${t.same_card_s}</span></div></div>`;
+}
+
+function show(figure, language) {
+  document.getElementById('figure').innerHTML = (figure === 'workflow' ? workflow : platforms)(T[language]);
+}
+show('workflow', 'zh');
+</script>
+</body>
+</html>
