@@ -173,5 +173,7 @@ python tools/build_gui_exe.py
 ```
 
 - **Package:** `build_gui_exe.py` produces `dist/WonderLanternZ30-windows-x64.zip` with every license text: MIT, the Wonder Lantern Community License, OFL, Python, PyInstaller, Keystone, pywebview and pythonnet.
+- **Version:** `build_gui_exe.py --version v0.5.0` stamps the version into the program; the status page of every card file it builds shows "MM-DD v0.5.0" (the day the card file was built). Without `--version` the program gets the short git commit, with `+` when tracked files have changes. Card files built from source show "MM-DD commit" as well.
 - **Self-test:** `WonderLanternZ30.exe --selftest Z_30_0120.bin <empty folder>` builds the loader EG and a `full` card file without a window and writes `selftest.json`.
+- **Automatic release:** pushing a `v*` tag runs `.github/workflows/release.yml` on Windows: unit tests, packaging with the tag as version, the self-test and a check that the program's loader EG equals the source build, then the zip is uploaded to that tag's release (created as a draft when missing; publish it by hand). It can also run from Actions by hand: with a tag it uploads, without one it only leaves an Actions artifact.
 - **Preview:** open `gui_page.html` in a browser; without pywebview it shows the layout with canned data after 1.5 s.

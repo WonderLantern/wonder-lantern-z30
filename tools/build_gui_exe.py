@@ -1,5 +1,14 @@
-"""Build the GUI program folder into dist/; firmware is never bundled."""
+"""Build the GUI program folder into dist/; firmware is never bundled.
+
+usage: python tools/build_gui_exe.py [--version TEXT]
+
+--version is shown with the date on the status page of every card file the
+program builds (the release workflow passes the tag, e.g. v0.5.0). Without it
+the program gets the checkout's short commit ('+' when tracked files changed).
+"""
+import argparse
 import glob
+import re
 import os
 import shutil
 import subprocess
@@ -13,6 +22,8 @@ import webview
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / 'src' / 'z30_extensions'
+sys.path.insert(0, str(ROOT / 'src'))
+from z30_extensions.card import VERSION_FILE, source_version  # noqa: E402
 
 
 def dist_info_file(module, pattern, name):
@@ -45,7 +56,22 @@ def package():
     return shutil.make_archive(str(ROOT / 'dist' / 'WonderLanternZ30-windows-x64'), 'zip', folder.parent, folder.name)
 
 
+def version_file(version):
+    """The stamped version, in the build folder; plain ASCII so the status page can draw it."""
+    if not re.fullmatch(r'[0-9A-Za-z.+_-]{1,16}', version):
+        raise SystemExit(f'--version must be 1-16 characters of 0-9 A-Z a-z . + _ -: {version!r}')
+    path = ROOT / 'build' / 'pyinstaller' / VERSION_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(version + '\n', encoding='utf-8')
+    return path
+
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    parser.add_argument('--version', help='Version shown on the card status page (default: the git commit)')
+    args = parser.parse_args()
+    version = args.version or source_version() or 'app'
+    print(f'Program version: {version}')
     # Every data file in platform/ that build.py reads at run time.
     platform_data = [arg for path in sorted((PACKAGE / 'platform').glob('*'))
                      if path.suffix in ('.json', '.png')
@@ -66,6 +92,7 @@ if __name__ == '__main__':
         # --collect-data may read an older pip-installed copy instead of src/.
         '--collect-submodules', 'z30_extensions',
         '--add-data', f'{PACKAGE / "gui_page.html"}{os.pathsep}z30_extensions',
+        '--add-data', f'{version_file(version)}{os.pathsep}z30_extensions',
         # pywebview picks its Windows backend (WinForms + WebView2 via pythonnet) at run time.
         '--collect-all', 'webview', '--hidden-import', 'clr',
         '--exclude-module', 'tkinter',

@@ -432,26 +432,46 @@ def load(patch, memory, base, resident_id, call=None):
 RESIDENT_NAME, REPORT_NAME, PATCH_PATH = 'EG209020.BIN', 'EG209020.json', Path('Z30') / 'WL.PATCH'
 
 
-def default_build_tag():
-    """MM-DD and the short git commit, '+' when the tree has changes: shown on the status page.
+# Written into the packaged program by tools/build_gui_exe.py (the release tag or commit).
+VERSION_FILE = 'build_version.txt'
 
-    The packaged program has no git checkout and says 'app' instead."""
-    import datetime
+
+def source_version():
+    """The short git commit of this checkout, '+' when tracked files have changes; None without git."""
     import subprocess
-    import sys
     root = Path(__file__).resolve().parents[2]
-    commit = None
-    if not getattr(sys, 'frozen', False):
-        def git(*args):
-            try:
-                return subprocess.run(['git', *args], cwd=root, capture_output=True, text=True,
-                                      check=True).stdout.strip()
-            except (OSError, subprocess.CalledProcessError):
-                return None
-        commit = git('rev-parse', '--short=7', 'HEAD')
-        if commit and git('status', '--porcelain', '--untracked-files=no'):
-            commit += '+'
-    return f'{datetime.date.today():%m-%d} {commit or "app"}'
+
+    def git(*args):
+        try:
+            return subprocess.run(['git', *args], cwd=root, capture_output=True, text=True,
+                                  check=True).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            return None
+    commit = git('rev-parse', '--short=7', 'HEAD')
+    if commit and git('status', '--porcelain', '--untracked-files=no'):
+        commit += '+'
+    return commit
+
+
+def packaged_version():
+    """The version tools/build_gui_exe.py stamped into the packaged program, or None."""
+    from importlib.resources import files
+    try:
+        return files('z30_extensions').joinpath(VERSION_FILE).read_text(encoding='utf-8').strip() or None
+    except OSError:
+        return None
+
+
+def default_build_tag():
+    """MM-DD of the build and the program's version, shown on the status page.
+
+    From source the version is the git commit (source_version); the packaged
+    program has no checkout and shows the version stamped in at packaging
+    (a release tag such as v0.5.0), or 'app' when none was."""
+    import datetime
+    import sys
+    version = packaged_version() if getattr(sys, 'frozen', False) else source_version()
+    return f'{datetime.date.today():%m-%d} {version or "app"}'
 
 
 def kit_outputs(folder, patch_only=False, loader_only=False):

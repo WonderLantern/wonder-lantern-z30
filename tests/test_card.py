@@ -37,6 +37,22 @@ def synthetic_feature():
     return mock.patch.object(focal_length, 'add', add)
 
 
+class BuildTagTests(unittest.TestCase):
+    def test_source_builds_show_the_commit(self):
+        with mock.patch.object(card, 'source_version', return_value='abc1234+'):
+            tag = card.default_build_tag()
+        self.assertRegex(tag, r'^\d\d-\d\d abc1234\+$')
+
+    def test_packaged_program_shows_its_stamped_version(self):
+        no_git = AssertionError('the packaged program has no git checkout')
+        with (mock.patch('sys.frozen', True, create=True),
+              mock.patch.object(card, 'source_version', side_effect=no_git)):
+            with mock.patch.object(card, 'packaged_version', return_value='v0.5.0'):
+                self.assertRegex(card.default_build_tag(), r'^\d\d-\d\d v0\.5\.0$')
+            with mock.patch.object(card, 'packaged_version', return_value=None):
+                self.assertRegex(card.default_build_tag(), r'^\d\d-\d\d app$')
+
+
 class RelocationTests(unittest.TestCase):
     def test_abs32_and_movt_roundtrip(self):
         # movw r0,#0x1234; movt r0,#0x2000; .word 0x20000101

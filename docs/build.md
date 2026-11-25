@@ -24,7 +24,7 @@ python -m pip install '.[gui-exe]'
 python tools/build_gui_exe.py
 ```
 
-结果是 `dist/WonderLanternZ30-windows-x64.zip`，已附带许可证文本。打包后可运行 `WonderLanternZ30.exe --selftest Z_30_0120.bin <空文件夹>` 自检：不开窗口，依次打包加载器 EG 和 `full` 卡文件，结果写入该文件夹的 `selftest.json`。卡文件里的状态页版本号在打包程序中为“月-日 app”，因此与源码构建的卡文件哈希不同；加载器 EG 相同。
+结果是 `dist/WonderLanternZ30-windows-x64.zip`，已附带许可证文本。打包后可运行 `WonderLanternZ30.exe --selftest Z_30_0120.bin <空文件夹>` 自检：不开窗口，依次打包加载器 EG 和 `full` 卡文件，结果写入该文件夹的 `selftest.json`。卡文件状态页的版本号是“月-日 版本”：源码构建用 git 短提交号（有未提交改动时加 `+`），打包程序用打包时 `--version` 写入的版本（发布工作流传入标签，如 `v0.5.0`；未写入时为 `app`）。因此程序与源码构建的卡文件哈希不同，加载器 EG 相同（发布工作流会核对）。
 
 ## 运行
 

@@ -173,5 +173,7 @@ python tools/build_gui_exe.py
 ```
 
 - **打包：** `build_gui_exe.py` 生成 `dist/WonderLanternZ30-windows-x64.zip`，附带全部许可证文本，包括 MIT、Wonder Lantern Community License、OFL、Python、PyInstaller、Keystone、pywebview 和 pythonnet。
+- **版本号：** `build_gui_exe.py --version v0.5.0` 把版本写进程序；它打包的每个卡文件，状态页“版本”都显示“月-日 v0.5.0”（日期是打包卡文件当天）。不加 `--version` 时用当前 git 短提交号，有未提交改动时加 `+`。从源码直接打包的卡文件同样显示“月-日 提交号”。
 - **自检：** `WonderLanternZ30.exe --selftest Z_30_0120.bin <空文件夹>` 不开窗口打包加载器 EG 和 `full` 卡文件，结果写入 `selftest.json`。
+- **自动发布：** 推送 `v*` 标签后，`.github/workflows/release.yml` 在 Windows 上跑单元测试，用标签作版本打包，运行自检并核对程序打包的加载器 EG 与源码构建的相同，再把 zip 上传到该标签的 release（不存在时新建草稿，需手动发布）。也可以在 Actions 里手动运行，填上标签即上传，留空只生成 Actions 构件。
 - **界面预览：** 直接用浏览器打开 `gui_page.html`，1.5 秒内没有 pywebview 时会用假数据显示布局。

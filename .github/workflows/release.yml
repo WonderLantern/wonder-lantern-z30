@@ -1,4 +1,8 @@
-# Builds WonderLanternZ30-windows-x64.zip and attaches it to the GitHub release.
+# Builds the Windows packaging tool (WonderLanternZ30-windows-x64.zip: the GUI
+# that packs the loader EG and the WL.PATCH card file, with Keystone inside),
+# checks the packaged program and attaches it to the GitHub release of the tag.
+# The release version (the tag) is stamped into the program and shown on the
+# status page of every card file it builds.
 #
 # The stock firmware is never stored in the repository or uploaded anywhere by
 # this workflow. It is fetched from Nikon's official download server; the
@@ -83,46 +87,61 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
-      # The cache only depends on the patch sources, the cache builder and the
-      # pinned Keystone version, so unchanged code reuses the previous result.
-      # Tag runs can restore caches saved by runs on the default branch.
-      - name: Restore pre-assembled code
-        id: asm-cache
-        uses: actions/cache@v4
-        with:
-          path: src/z30_extensions/asm_cache.gz
-          key: asm-cache-${{ env.FIRMWARE_SHA256 }}-${{ hashFiles('src/**/*.py', 'src/**/*.json', 'tools/build_asm_cache.py', 'pyproject.toml') }}
+      # The tag on tag pushes and on manual runs that name one; otherwise the commit.
+      - name: Program version
+        id: version
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+        run: |
+          $version = if ($env:TAG) { $env:TAG } else { git rev-parse --short=7 HEAD }
+          "value=$version" >> $env:GITHUB_OUTPUT
+          "Program version: $version"
 
-      - name: Pre-assemble every preset combination
-        if: steps.asm-cache.outputs.cache-hit != 'true'
-        run: python tools/build_asm_cache.py --source Z_30_0120.bin
+      - name: Build packaging tool
+        run: python tools/build_gui_exe.py --version '${{ steps.version.outputs.value }}'
 
-      - name: Build GUI program
-        run: python tools/build_gui_exe.py
-
-      - name: Record checksums
+      # The packaged program builds the loader EG and a full card file without a
+      # window; its loader EG must equal the one built from source.
+      - name: Check packaged program
         id: sums
         run: |
+          $check = Join-Path $env:RUNNER_TEMP 'selftest'
+          $exe = 'dist/WonderLanternZ30/WonderLanternZ30.exe'
+          $firmware = (Resolve-Path Z_30_0120.bin).Path
+          # A windowed exe: Start-Process -Wait is what waits for it to exit.
+          $run = Start-Process -FilePath $exe -ArgumentList '--selftest', $firmware, $check -PassThru -Wait
+          $report = Get-Content (Join-Path $check 'selftest.json') -Raw
+          $report
+          if ($run.ExitCode) { throw "Packaged program selftest failed ($($run.ExitCode))" }
+          $result = $report | ConvertFrom-Json
+          $loaderDir = $result[0].folder
+          $patchFile = $result[1].patch
+          $loaderHash = (Get-FileHash (Join-Path $loaderDir 'EG209020.BIN') -Algorithm SHA256).Hash.ToLower()
+          $patchHash = (Get-FileHash $patchFile -Algorithm SHA256).Hash.ToLower()
+
+          $source = Join-Path $env:RUNNER_TEMP 'source-card'
+          python patch.py full --card --source Z_30_0120.bin --output $source
+          if ($LASTEXITCODE) { throw 'source card build failed' }
+          $sourceHash = (Get-FileHash (Join-Path $source 'EG209020.BIN') -Algorithm SHA256).Hash.ToLower()
+          if ($sourceHash -ne $loaderHash) { throw "Loader EG differs: packaged $loaderHash, source $sourceHash" }
+
           $zip = 'dist/WonderLanternZ30-windows-x64.zip'
           $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          New-Item -ItemType Directory -Force output | Out-Null
-          python patch.py full --source Z_30_0120.bin --output output/EG209020.BIN
-          if ($LASTEXITCODE) { throw 'full build failed' }
-          $fullHash = (Get-FileHash output/EG209020.BIN -Algorithm SHA256).Hash.ToLower()
           "zip=$zipHash" >> $env:GITHUB_OUTPUT
-          "full=$fullHash" >> $env:GITHUB_OUTPUT
+          "loader=$loaderHash" >> $env:GITHUB_OUTPUT
           @"
-          ## Checksums
+          ## ${{ steps.version.outputs.value }}
           | File | SHA-256 |
           | --- | --- |
           | WonderLanternZ30-windows-x64.zip | ``$zipHash`` |
-          | full EG209020.BIN | ``$fullHash`` |
+          | Loader EG209020.BIN | ``$loaderHash`` |
+          | full Z30/WL.PATCH (selftest, dated today) | ``$patchHash`` |
           "@ >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload Actions artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WonderLanternZ30-windows-x64
+          name: WonderLanternZ30-windows-x64-${{ steps.version.outputs.value }}
           path: dist/WonderLanternZ30-windows-x64.zip
           if-no-files-found: error
 
@@ -130,15 +149,15 @@ jobs:
         if: github.ref_type == 'tag' || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+          TAG: ${{ steps.version.outputs.value }}
           ZIP_SHA: ${{ steps.sums.outputs.zip }}
-          FULL_SHA: ${{ steps.sums.outputs.full }}
+          LOADER_SHA: ${{ steps.sums.outputs.loader }}
         run: |
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE) {
             # New releases start as drafts so the notes can be written before publishing.
             $notes = "``WonderLanternZ30-windows-x64.zip`` SHA-256:`n`n``$env:ZIP_SHA```n`n" +
-                     "full ``EG209020.BIN`` SHA-256:`n`n``$env:FULL_SHA``"
+                     "Loader ``EG209020.BIN`` SHA-256 (the same from the program and from source):`n`n``$env:LOADER_SHA``"
             gh release create $env:TAG --draft --verify-tag --title "Wonder Lantern Z30 $env:TAG" --notes $notes
             if ($LASTEXITCODE) { throw 'gh release create failed' }
           }
