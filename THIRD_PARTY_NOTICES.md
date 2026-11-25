@@ -34,6 +34,8 @@
 - `src/z30_extensions/features/photo/battery_percent.py`
 - `src/z30_extensions/features/photo/date_stamp.py`
 - `src/z30_extensions/features/photo/date_stamp_ui.py`
+- `src/z30_extensions/features/photo/film_grain.py`
+- `src/z30_extensions/features/photo/film_grain_ui.py`
 - `src/z30_extensions/features/photo/focal_length.py`
 - `src/z30_extensions/features/photo/zebra.py`
 - `src/z30_extensions/features/photo/zebra_ui.py`
@@ -53,7 +55,9 @@
 - `src/z30_extensions/features/tracking3d/ui.py`
 - `src/z30_extensions/features/video/bitrate_ui.py`
 - `src/z30_extensions/host/date_stamp.py`
+- `src/z30_extensions/host/film_grain.py`
 - `src/z30_extensions/host/lut.py`
+- `modules/film_grain/film_grain.c`
 - `tools/verify_mask_firmware_qemu.py`
 
 上述文件采用 [Wonder Lantern Community License](licenses/Wonder-Lantern.txt)。该许可证允许使用、修改和免费分发，禁止收费分发，并要求公开分发的修改版本提供同许可证源码。完整条件以随附许可证为准。由于包含收费分发限制，该部分不是 OSI 意义上的开放源代码许可。
@@ -63,6 +67,10 @@
 [Wonder-Lantern](https://github.com/vic2349/Wonder-Lantern) 是自定义电子快门声音功能的参考项目。本仓库属于 WonderLantern 组织，提供面向 Z30 的独立实现，不包含该参考项目的 Z6 固件、SHCORE 二进制或示例音频。许可证中“不得自称为官方 Wonder Lantern 发布”的要求，指不得将受许可约束的衍生版本宣称为 Wonder Lantern 软件本身的官方发行版；这不影响本仓库属于 WonderLantern 组织。
 
 随附许可证保留其原始名称与版权声明；本项目声音实现的版权归本项目贡献者所有。
+
+## Wonder Lantern Z5 胶片颗粒
+
+胶片颗粒（`film-grain`）移植自 [wonder-lantern-z5](https://github.com/WonderLantern/wonder-lantern-z5) 的 FILM 功能（A52）：颗粒场的生成方法和滤波系数、亮度强度曲线、每 4 像素的运算和分块相位都沿用该项目。原项目按 [MIT License](licenses/Z5-Extensions-MIT.txt) 授权（Copyright (c) 2026 Z5 Extensions contributors），许可文本随附。Z30 上的挂点、调用方判断、页表检查、缓存维护、菜单和设置文件为本项目实现。
 
 ## Nikon 固件
 

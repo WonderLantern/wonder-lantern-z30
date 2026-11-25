@@ -83,7 +83,7 @@ class MenuFrameworkTests(unittest.TestCase):
         self.assertEqual([c['key'] for c in menu['menu_categories']], ['status', 'photo', 'focus', 'video', 'sound'])
         self.assertEqual([c['page_index'] for c in menu['menu_categories']], [974, 970, 971, 972, 962])
         # Every feature page is reachable, the photo-menu-only pages included.
-        self.assertEqual(sorted(menu['menu_paths']), sorted(['aspect', 'zebra', 'stamp', 'nef', 'portrait', 'bitrate',
+        self.assertEqual(sorted(menu['menu_paths']), sorted(['aspect', 'zebra', 'stamp', 'grain', 'nef', 'portrait', 'bitrate',
                                                              'gyro', 'trk3d', 'afcol', 'sound', 'status']))
         for key, path in menu['menu_paths'].items():
             self.assertEqual(path[0]['page'], 955)
@@ -96,7 +96,7 @@ class MenuFrameworkTests(unittest.TestCase):
         # Category rows run the label to the right edge; the status and sound rows keep a value column.
         self.assertEqual([r[0] == r[2] for r in root['value_rectangles']], [False, True, True, True, False])
         photo = menu['pages']['970']
-        self.assertEqual(photo['count'], 4)
+        self.assertEqual(photo['count'], 5)   # aspect, zebra, date stamp, film grain, NEF
         self.assertTrue(photo['back_icon'])
         self.assertEqual(photo['title_index'], menu['category_pages']['photo']['title_slot'])
         self.assertTrue(all(r[0] < r[2] for r in photo['value_rectangles']))
@@ -118,7 +118,7 @@ class MenuFrameworkTests(unittest.TestCase):
                                                           page_index=STATUS_INDEX))
         # Information only: four rows, none opens a page. Flash builds: the build tag defaults to 'dev'.
         self.assertEqual(status['rows'], ['card', 'version', 'features', 'settings'])
-        self.assertEqual((status['card'], status['build_tag'], status['features']), (False, 'dev', 16))
+        self.assertEqual((status['card'], status['build_tag'], status['features']), (False, 'dev', 17))
         self.assertEqual(menu['pages'][str(STATUS_INDEX)]['count'], 4)
         self.assertFalse(any(step['page'] == STATUS_INDEX for path in menu['menu_paths'].values() for step in path))
         self.assertEqual(len(set(STATUS_SLOTS)), 10)
@@ -131,9 +131,10 @@ class MenuFrameworkTests(unittest.TestCase):
     def test_labels_add_only_the_known_extra_glyphs(self):
         # Pulling one more extra glyph (驻, 2026-11-25) made the camera font engine drop
         # the stock 画 in the Hans font. New labels must use stock characters, or be checked
-        # on every page in QEMU and on the camera (docs/menu-layout.md).
+        # on every page in QEMU and on the camera (docs/menu-layout.md). The film grain title
+        # adds 胶颗粒 / 膠顆粒 (2026-11-25; QEMU Hans and Hant checked, docs/film-grain.md).
         fonts = self.build('full')['features']['cjk_fonts']['added_glyphs']
-        self.assertEqual({font: len(chars) for font, chars in fonts.items()}, {'0': 34, '2': 32})
+        self.assertEqual({font: len(chars) for font, chars in fonts.items()}, {'0': 37, '2': 35})
 
     def test_menu_tab_is_opt_in(self):
         from z30_extensions.build import build

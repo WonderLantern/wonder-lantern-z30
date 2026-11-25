@@ -23,7 +23,7 @@ from .slots import BLOCKS
 # whose build has one member puts that member straight on the root; an empty one
 # is left out; a root that would hold a single category lists its members instead.
 # A None title marks a member that is always a root row (the sound's own group page).
-CATEGORIES = (('photo', 'Photo', ('aspect', 'zebra', 'stamp', 'nef')),
+CATEGORIES = (('photo', 'Photo', ('aspect', 'zebra', 'stamp', 'grain', 'nef')),
               ('focus', 'Focus & display', ('trk3d', 'afcol', 'portrait')),
               ('video', 'Video', ('bitrate', 'gyro')),
               ('sound', None, ('sound',)),
@@ -120,7 +120,7 @@ def seed_record(plan, menu_object, callback, name):
         plan.edit(record, struct.pack('<I', callback | 1), name)
 
 
-def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, cmos_dump=False, cmos_trace=False, cmos_spi=False, cmos_window=False, lut_sd=False, lut_cube_text=None, lut_size=17,
+def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, grain=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, cmos_dump=False, cmos_trace=False, cmos_spi=False, cmos_window=False, lut_sd=False, lut_cube_text=None, lut_size=17,
         build_tag='dev', resident_id=None, feature_count=None):
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
@@ -135,7 +135,7 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
         raise ValueError('Wireless research menu and bitrate menu currently share one owned page slot')
     bitrate = bitrate or wireless or precapture_probe or lut_sd or cmos_dump
     # A menu tab is always grouped, so its root has the status page even without feature pages.
-    grouped = bool(menu_tab or modules or bitrate or aspect or zebra or stamp or portrait or nef or gyro or trk3d or afcol)
+    grouped = bool(menu_tab or modules or bitrate or aspect or zebra or stamp or grain or portrait or nef or gyro or trk3d or afcol)
     if not (sound or grouped):
         raise ValueError('The extension menu needs the shutter sound or at least one feature page')
     if sound:
@@ -167,8 +167,11 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
     if nef:
         sizes.update(ensure=sizes['ensure'] + 128, getter=sizes['getter'] + 64,
                      route=sizes['route'] + 64, action=sizes['action'] + 128)
+    if grain:
+        sizes.update(ensure=sizes['ensure'] + 128, getter=sizes['getter'] + 64,
+                     route=sizes['route'] + 64, action=sizes['action'] + 128)
     # Research builds keep their single-purpose page inside the custom menu only.
-    present = {key for key, on in dict(modules=modules, bitrate=bitrate, aspect=aspect, zebra=zebra, stamp=stamp,
+    present = {key for key, on in dict(modules=modules, bitrate=bitrate, aspect=aspect, zebra=zebra, stamp=stamp, grain=grain,
                portrait=portrait, nef=nef, gyro=gyro, trk3d=trk3d, afcol=afcol, sound=sound and grouped).items() if on}
     root_keys, categories = root_layout(present) if grouped else ([], [])
     card = bool(getattr(plan, 'card', False))
@@ -200,6 +203,10 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
             sizes.update({f'direct_{key}': 96 for key in keys if key != 'portrait' or portrait})
     f = {name: plan.alloc(bytes(size)) for name, size in sizes.items()}
     from . import text as ui_text
+    if grain:
+        # Its title uses characters outside the stock fonts; only builds with the page add them.
+        from ..photo.film_grain_ui import TITLE
+        plan.feature_labels = getattr(plan, 'feature_labels', ()) + (TITLE,)
     text_resources = ui_text.prepare(plan, f)
     own_indexes = [PAGE_INDEX] + ([FILES_INDEX, SWITCH_INDEX] if sound else []) + [POPUP_INDEX]
     tables = {i: plan.alloc(bytes(32)) for i in own_indexes}
@@ -290,6 +297,9 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
     if stamp:
         from ..photo import date_stamp_ui as su
         register('stamp', su, su.ROWS, restore=('stamp_restore',))
+    if grain:
+        from ..photo import film_grain_ui as gr
+        register('grain', gr, gr.ROWS, restore=('grain_restore',))
     if nef:
         from ..nef import ui as nu
         register('nef', nu, 3, restore=('nef_restore',))

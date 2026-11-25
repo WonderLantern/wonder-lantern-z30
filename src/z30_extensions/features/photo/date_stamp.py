@@ -228,11 +228,17 @@ def _draw(table):
         + _cache_rows() + _rect() + _lighten() + _place())
 
 
-def _gate(get, state_offset):
+def _gate(get, state_offset, grain=None):
     sites = ''.join(c('r1', site + 5) + 'cmp r5,r1;beq gate_hit;' for site in CALL_SITES)
+    # With film-grain in the build its hook runs first, so the date lands on top of the grain.
+    if grain:
+        from .film_grain import gate_call
+        before = gate_call(grain)
+    else:
+        before = ''
     return (
         f'push {{r0-r3,r5,lr}};mov r5,lr;{sites}b gate_out;'
-        f'gate_hit:{n(get)}cmp r0,#0;beq gate_out;'
+        f'gate_hit:{before}{n(get)}cmp r0,#0;beq gate_out;'
         + c('r1', state_offset)
         + f'ldr r2,[r0,r1];adds r1,#{COLOR_FIELD};ldr r3,[r0,r1];subs r1,r2,#1;cmp r1,#{len(host.FORMATS) - 1};bhi gate_out;'
         f'ldr r0,[sp];ldr r1,[r0];cmp r1,#0;beq gate_out;'
@@ -241,9 +247,9 @@ def _gate(get, state_offset):
         f'.balign 4;ldr.w pc,[pc,#0];.word {RESUME | 1};')
 
 
-def build_core(address, table, get, state_offset):
+def build_core(address, table, get, state_offset, grain=None):
     """Gate plus drawing routines, assembled as one unit at address."""
-    return assemble(_gate(get, state_offset) + _draw(table), address, 2048)
+    return assemble(_gate(get, state_offset, grain) + _draw(table), address, 2048)
 
 
 def add(plan):
@@ -254,13 +260,16 @@ def add(plan):
     get = int(plan.features['menu_framework']['functions']['get'], 16)
     table = plan.alloc(host.font_table())
     entry = plan.address
-    code = build_core(entry, table, get, control['state_offset'])
+    grain = plan.features.get('film_grain')
+    grain_hook = int(grain['hook'], 16) if grain and 'gate_entry' not in grain else None
+    code = build_core(entry, table, get, control['state_offset'], grain_hook)
     plan.alloc(code)
     address, expected, name = GATE
     plan.edit(address, jump(address, entry, len(expected)), name, expected)
     plan.features['date_stamp'] = dict(
         gate=hex(address), gate_entry=hex(entry | 1), resume=hex(RESUME | 1), code_bytes=len(code),
         font_table=hex(table), call_sites=[hex(site) for site in CALL_SITES],
+        film_grain_first=bool(grain_hook),
         date_source=f'capture info +{DATE_OFFSET:#x}, validated before drawing',
         colors_rgb=[list(rgb) for rgb in host.COLORS_RGB], colors_ycbcr=[list(color) for color in host.COLORS],
         pixel_contract='Opaque Y/C writes; Cb-first interleaving pending on-device check',

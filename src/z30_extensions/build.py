@@ -6,12 +6,12 @@ from .platform.z30_120 import BASE
 
 
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot',
-           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
+           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'film-grain', 'portrait-ui',
            'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length', 'nef-menu', 'nef-uncompressed', 'nef-compressed',
            'battery-percent')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
-                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui',
+                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'film-grain', 'date-stamp', 'portrait-ui',
                  'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length', 'nef-menu', 'nef-uncompressed', 'nef-compressed',
                  'battery-percent')
 EXPERIMENTAL_FEATURES = ('battery-percent',)  # opt-in builds, not part of full
@@ -23,7 +23,7 @@ MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 # Features with a page in the extension menu. Any of them (or the shutter sound)
 # brings the menu framework; none of them brings the shutter sound any more.
 MENU_FEATURES = ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui', 'nef-menu',
-                 'gyro-evr', '3d-tracking', 'af-frame-colour')
+                 'gyro-evr', '3d-tracking', 'af-frame-colour', 'film-grain')
 
 
 def resolve_presets(preset='full'):
@@ -129,6 +129,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         from .features.menu.framework import add
         add(plan, sound='shutter-sound' in features, menu_tab=menu_tab, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
+            grain='film-grain' in features,
             nef='nef-menu' in features,
             gyro='gyro-evr' in features, trk3d='3d-tracking' in features, afcol='af-frame-colour' in features,
             aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
@@ -150,6 +151,10 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     if 'wifi-5ghz' in features:
         from .features.connect.wifi_5ghz import add
         add(plan)
+    if 'film-grain' in features:
+        # Before the date stamp: with both, the date stamp gate calls the grain hook first.
+        from .features.photo.film_grain import add
+        add(plan, stamp='date-stamp' in features)
     if 'date-stamp' in features:
         from .features.photo.date_stamp import add
         add(plan)

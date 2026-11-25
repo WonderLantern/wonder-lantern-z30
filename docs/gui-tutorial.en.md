@@ -143,7 +143,7 @@ This is done once. Changing features or updating needs no reflash unless the pro
 2. The note under it (②) says which loader the card file is built for:
    - **"Built for the loader EG this program builds"**: the folder has no loader EG. A given program version always builds the same loader, so the card file works on a camera flashed with the loader from this program version.
    - **"Built for the loader EG in this folder"**: the folder holds `EG209020.BIN` and `EG209020.json`; see [the camera has an older loader](#the-camera-has-an-older-loader) below.
-3. **Everything** (③) is on by default and includes all sixteen features.
+3. **Everything** (③) is on by default and includes all seventeen features.
 4. Click **Build card file** (④).
 
 ### Picking features

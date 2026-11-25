@@ -15,12 +15,17 @@ import struct
 from ...platform.fonts import CJK_FONTS, FONT_COUNT, FONT_SIZES, FONT_SIZES_LITERAL, FONT_TABLE, FONT_TABLE_LITERAL, decode_glyph, extend_font, extra_glyphs, font_blob
 
 
-def label_chars(font):
-    """Printable ASCII plus every character the Chinese labels use in `font`."""
+def label_chars(font, extra=()):
+    """Printable ASCII plus every character the Chinese labels use in `font`.
+
+    extra: (Hans, Hant) label pairs only some builds carry (see feature_labels),
+    so builds without that feature keep their fonts byte for byte.
+    """
     from ...platform.fonts import HANS_FONT
     from .text import TRANSLATIONS
     column = 0 if font == HANS_FONT else 1
-    return set(map(chr, range(0x20, 0x7F))) | {c for pair in TRANSLATIONS.values() for c in pair[column]}
+    pairs = list(TRANSLATIONS.values()) + list(extra)
+    return set(map(chr, range(0x20, 0x7F))) | {c for pair in pairs for c in pair[column]}
 
 
 def add(plan, functions, common=False):
@@ -35,7 +40,7 @@ def add(plan, functions, common=False):
     sizes = list(plan.image.words(FONT_SIZES, FONT_COUNT))
     added = {}
     for font in CJK_FONTS:
-        wanted = None if common else label_chars(font)
+        wanted = None if common else label_chars(font, getattr(plan, 'feature_labels', ()))
         chosen = {char: record for char, record in extra_glyphs(font).items()
                   if wanted is None or char in wanted}
         glyphs = {ord(char): decode_glyph(bytes.fromhex(record))[0] for char, record in chosen.items()}

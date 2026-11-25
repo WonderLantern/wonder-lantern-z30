@@ -135,7 +135,9 @@ class Camera:
                 result['success'] = stops[address]
                 uc.emu_stop()
         hook = self.uc.hook_add(UC_HOOK_CODE, stop)
-        self.uc.emu_start(card_loader_site(self) | 1, 0, count=20_000_000)
+        # The loading tick checks the CRC and relocates the whole tail; full carries 152 KiB of
+        # film grain tables since 2026-11-25, past the earlier 20M-instruction budget.
+        self.uc.emu_start(card_loader_site(self) | 1, 0, count=60_000_000)
         self.uc.hook_del(hook)
         return result.get('success')
 

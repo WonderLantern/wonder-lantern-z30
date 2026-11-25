@@ -22,7 +22,7 @@ PAGE = 'gui_page.html'
 OPT_IN_PRESETS = tuple(name for name in PRESETS if name != 'full' and name not in FULL_FEATURES)
 
 PRESET_LABELS_EN = {
-    'full': 'All sixteen features, including aspect profiles, the film-style date stamp, the portrait layout, the NEF compression menu, gyro e-VR, 3D tracking, the AF frame colours and the focal length',
+    'full': 'All seventeen features, including aspect profiles, the film-style date stamp, film grain, the portrait layout, the NEF compression menu, gyro e-VR, 3D tracking, the AF frame colours and the focal length',
     'liveview-dual': 'Histogram and level together on a new full-info DISP page',
     'shutter-sound': 'Custom electronic shutter sound',
     'm900': '900-second exposure in M mode',
@@ -36,6 +36,7 @@ PRESET_LABELS_EN = {
     'nef-uncompressed': 'Experimental: NEF fixed to uncompressed (confirmed on the camera as Packed 14-bit); not in full, replaces the nef-menu inside full',
     'nef-compressed': 'Experimental: NEF fixed to compressed (lossy), confirmed on the camera as Lossy type 2; not in full, replaces the nef-menu inside full',
     'focal-length': 'Show the focal length for every CPU lens in photo live view (stock: power zoom only); always on; included in full',
+    'film-grain': 'Film grain on JPEGs (FUJI400 / HP5, strength 1-6, ported from Wonder Lantern Z5), off by default in the camera menu; included in full',
     'battery-percent': 'Experimental: battery icon with the charge in percent in photo live view (red at 20% and below); always on; not in full',
     'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; included in full, all three choices confirmed on the camera',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
@@ -54,7 +55,7 @@ PRESET_TITLES = {
         'portrait-ui': '竖拍显示', 'gyro-evr': '陀螺仪电子防抖', '3d-tracking': '3D 跟踪',
         'af-frame-colour': '对焦框颜色', 'focal-length': '焦距显示', 'nef-menu': 'NEF 压缩菜单',
         'nef-uncompressed': 'NEF 固定未压缩', 'nef-compressed': 'NEF 固定压缩',
-        'battery-percent': '电量百分比',
+        'battery-percent': '电量百分比', 'film-grain': '胶片颗粒',
     },
     'en': {
         'full': 'Everything', 'liveview-dual': 'Histogram + level', 'shutter-sound': 'Custom shutter sound',
@@ -64,7 +65,7 @@ PRESET_TITLES = {
         'portrait-ui': 'Portrait layout', 'gyro-evr': 'Gyro e-VR', '3d-tracking': '3D tracking',
         'af-frame-colour': 'AF frame colours', 'focal-length': 'Focal length', 'nef-menu': 'NEF compression menu',
         'nef-uncompressed': 'NEF fixed uncompressed', 'nef-compressed': 'NEF fixed compressed',
-        'battery-percent': 'Battery percent',
+        'battery-percent': 'Battery percent', 'film-grain': 'Film grain',
     },
 }
 

@@ -28,13 +28,13 @@ Wonder Lantern Z30 is the WonderLantern organization's firmware extension projec
 - **Changing features only changes the card file:** pick the features again in the packaging tool, copy the new `WL.PATCH` to the card and restart.
 - **When the loader needs reflashing:** card files are built for the loader on the camera. Only when a new card file needs something that loader lacks (such as a new card file format), or characters its fonts do not have, does the packaging tool refuse and ask for a loader update. Adding features or updating versions normally does not.
 - **Safety checks:** before writing anything the loader checks the card file's CRC, the loader identity and every original byte; if anything differs it leaves the camera's memory untouched and the camera behaves as stock.
-- **Load feedback:** once loaded, the photo live view shows "Wonder Lantern ready · 16 features" for about 2 s, and the Status page of the extension menu shows whether the card file loaded, its version and the feature count.
+- **Load feedback:** once loaded, the photo live view shows "Wonder Lantern ready · 17 features" for about 2 s, and the Status page of the extension menu shows whether the card file loaded, its version and the feature count.
 
 Design, log codes and camera records: [SD card loading](docs/card-loader.md) (Chinese).
 
 ## Features
 
-`full` enables all sixteen features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate, date stamp, portrait UI, the NEF compression menu, gyro e-VR, 3D tracking and AF frame colour automatically include the extension menu framework; the framework no longer depends on the shutter sound, so without `shutter-sound` no sound feature is built.
+`full` enables all seventeen features below; each one can also be selected alone or in any combination. Aspect, zebra, bitrate, date stamp, film grain, portrait UI, the NEF compression menu, gyro e-VR, 3D tracking and AF frame colour automatically include the extension menu framework; the framework no longer depends on the shutter sound, so without `shutter-sound` no sound feature is built.
 
 | Preset | What it does | Notes |
 | --- | --- | --- |
@@ -48,6 +48,7 @@ Design, log codes and camera records: [SD card loading](docs/card-loader.md) (Ch
 | `photo-zebra` | Extends the stock zebra pattern to photo live view, with its own switch | [Doc](docs/photo-zebra.md) |
 | `wifi-5ghz` | Requests the US/-1 country code on every valid wireless profile to unlock 5 GHz connections | See note¹ |
 | `date-stamp` | Film-style date stamp in the lower right of JPEGs: five formats, four colors, optional glow, follows portrait orientation | [Doc](docs/date-stamp.md) |
+| `film-grain` | Film grain on in-camera JPEGs: FUJI400 / HP5 styles, strength 1–6, ported from Wonder Lantern Z5; off by default in the camera menu | [Doc (Chinese)](docs/film-grain.md), confirmed on a camera |
 | `portrait-ui` | Photo live-view info and the i menu turn to a portrait layout when the camera is held upright and fill in on their own after a turn; off by default; touch follows the portrait layout and i-menu setting pages show upright at 2/3; the shutter, aperture and ISO slider pages turn upright too; the histogram pages show an upright histogram | [Doc](docs/portrait-ui.md) |
 | `nef-menu` | Choose the NEF compression type (lossless / compressed / uncompressed) in the extension menu, saved to `WL-NEF.CFG` | [Doc](docs/nef-compression.md), all three choices confirmed on a camera in 12-bit and 14-bit |
 | `gyro-evr` | Gyro e-VR: in-body gyro stabilization while recording with electronic VR on; yaw, pitch and roll, cooperates with lens VR; Extensions menu: Standard / Enhanced / Native crop / OFF | [Doc](docs/gyro-evr.md) |
@@ -108,7 +109,7 @@ python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0
 ```
 
 - `.[sound]` installs the Keystone assembler.
-- Without presets the builder shows a multi-select menu: entries 1–19 are `full`, the sixteen features above and the two optional presets; press Enter for `full`. Separate several presets with spaces; repeated features are applied once.
+- Without presets the builder shows a multi-select menu: entries 1–21 are `full`, the seventeen features above and the three optional presets; press Enter for `full`. Separate several presets with spaces; repeated features are applied once.
 - Card files from the GUI packaging program always have the eighth tab. Even when no selected feature has a menu page, the tab holds the Status page.
 - `tools/build_card.py` does the same with a few extra options, such as `--menu-tab` (the extension menu as an eighth tab on the left of the menu; the GUI always turns it on) and `--no-banner` (no live-view ready banner).
 - **macOS:** if you see `fail to load the dynamic library` after installation, run this in the Python environment used for building:

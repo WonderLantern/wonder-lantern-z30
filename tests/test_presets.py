@@ -52,14 +52,14 @@ class PresetTests(unittest.TestCase):
         selected, features = resolve_presets(['shutter-sound', 'full', 'm900', 'full'])
         self.assertEqual(selected, ['shutter-sound', 'full', 'm900'])
         self.assertEqual(features, ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
-                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length',
+                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'film-grain', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length',
                           'nef-menu'])
         self.assertEqual(resolve_presets(['modular', 'full'])[1], features)
 
     def test_full_enables_all_features_and_modular_keeps_its_scope(self):
         self.assertEqual(resolve_presets('full')[1],
                          ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
-                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length',
+                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'film-grain', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length',
                           'nef-menu'])
         self.assertEqual(resolve_presets('modular')[1],
                          ['liveview-dual', 'm900', 'shutter-sound'])
@@ -71,7 +71,7 @@ class PresetTests(unittest.TestCase):
                          ['liveview-dual', 'm900'])
         self.assertEqual(resolve_presets(['mtp-fast', 'full'])[1],
                          ['liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
-                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length',
+                          'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'film-grain', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length',
                           'nef-menu'])
 
     def test_portrait_ui_is_in_full_and_brings_the_menu_framework(self):
