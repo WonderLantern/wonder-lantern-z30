@@ -2,7 +2,7 @@ import importlib.util
 import struct
 import unittest
 
-from z30_extensions.features import nef_ui as nu
+from z30_extensions.features.nef import ui as nu
 
 
 class FakePlan:
@@ -173,8 +173,12 @@ class NefPageTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_page_indices_are_unique_across_coexisting_pages(self):
-        from z30_extensions.features import (aspect_ui, bitrate_ui, date_stamp_ui, module_host,
-                                             portrait_menu, sound_layout, zebra_ui)
+        from z30_extensions.features.aspect import ui as aspect_ui
+        from z30_extensions.features.video import bitrate_ui
+        from z30_extensions.features.photo import date_stamp_ui, zebra_ui
+        from z30_extensions.features.modules import host as module_host
+        from z30_extensions.features.portrait import menu as portrait_menu
+        from z30_extensions.features.menu import layout as sound_layout
         indices = [sound_layout.PAGE_INDEX, sound_layout.FILES_INDEX, sound_layout.SWITCH_INDEX,
                    sound_layout.POPUP_INDEX, sound_layout.SOUND_GROUP_INDEX, module_host.PAGE_INDEX,
                    bitrate_ui.PAGE_INDEX, aspect_ui.PAGE_INDEX, zebra_ui.PAGE_INDEX,

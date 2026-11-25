@@ -22,7 +22,7 @@ def main():
     a = p.parse_args()
     sys.path.insert(0, str(a.deps.resolve()))
     from z30_extensions.container import extract_eg
-    from z30_extensions.features.aspect_border import rectangles
+    from z30_extensions.features.aspect.border import rectangles
     from verify_sound_settings import Fixture
     from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_INVALID, UC_HOOK_MEM_WRITE
     from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2

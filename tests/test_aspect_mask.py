@@ -1,6 +1,6 @@
 import unittest
 
-from z30_extensions.features.aspect_mask import display_regions, grid_regions, regions
+from z30_extensions.features.aspect.mask import display_regions, grid_regions, regions
 
 
 class MaskRegions(unittest.TestCase):
@@ -79,13 +79,13 @@ class DisplayEdgeCoverage(unittest.TestCase):
 
 class InteriorGridOnly(unittest.TestCase):
     def test_selected_thirds_and_quarters_keep_their_original_internal_positions(self):
-        from z30_extensions.features.aspect_frame import axis
+        from z30_extensions.features.aspect.frame import axis
         for divisions,want in ((3,[240,478]),(4,[182,360,538])):
             _,_,first,step,count=axis(0,720,0,720,divisions,include_borders=False)
             self.assertEqual([first+i*step for i in range(count)],want)
 
     def test_hidden_border_is_not_removed_twice(self):
-        from z30_extensions.features.aspect_frame import axis
+        from z30_extensions.features.aspect.frame import axis
         self.assertEqual(axis(-40,760,0,720,3,include_borders=False),
                          axis(-40,760,0,720,3))
 

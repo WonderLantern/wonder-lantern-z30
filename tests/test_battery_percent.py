@@ -42,7 +42,7 @@ class BatteryPercentTests(unittest.TestCase):
         from native_runtime import Context, RAM, STACK, STOP
         from unicorn import UC_HOOK_CODE
         from unicorn.arm_const import UC_ARM_REG_SP, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_LR
-        from z30_extensions.features import battery_percent as bp
+        from z30_extensions.features.photo import battery_percent as bp
         cx = Context(self.stock, self.image)
         u = cx.u
         cx.map(0xC236CE00, 0x100)
@@ -134,7 +134,7 @@ class BatteryPercentTests(unittest.TestCase):
         return out
 
     def test_curve_is_descending_and_ends_at_zero(self):
-        from z30_extensions.features import battery_percent as bp
+        from z30_extensions.features.photo import battery_percent as bp
         volts = [v for v, _ in bp.CURVE]
         percents = [p for _, p in bp.CURVE]
         self.assertEqual(volts, sorted(volts, reverse=True))

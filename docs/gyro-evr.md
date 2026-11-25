@@ -85,11 +85,11 @@
 ## 源码和构建
 
 - C 源码：`modules/gyro_evr/gyro_evr.c`。同一份源码也能编成 SD 研究模块；产品版的菜单和 IMU 归属都在 `#ifdef EVR_PRODUCT` 里。
-- 内置版是 `-DEVR_PRODUCT` 编译的位置无关代码（14776 字节，SHA-256 `f64d2d15…`）。它从 EG 里直接复制到内存，不经过 SD 模块加载器，所以上限是 `evr_builtin.BUILTIN_MAX` = 32 KB；SD 研究模块仍然是 16 KB。预编译结果存放在 `src/z30_extensions/features/gyro_evr_payload.py`。普通构建不需要 C 编译器。
+- 内置版是 `-DEVR_PRODUCT` 编译的位置无关代码（14776 字节，SHA-256 `f64d2d15…`）。它从 EG 里直接复制到内存，不经过 SD 模块加载器，所以上限是 `evr_builtin.BUILTIN_MAX` = 32 KB；SD 研究模块仍然是 16 KB。预编译结果存放在 `src/z30_extensions/features/gyro/payload.py`。普通构建不需要 C 编译器。
 - 修改 C 源码后运行 `python3 tools/build_gyro_evr.py`（需要 `arm-none-eabi-gcc`）；用 `--check` 可以核对两者是否一致。
-- **编译器版本**：提交的内置代码用 **arm-none-eabi-gcc 13.2.1**（Arm GNU Toolchain 13.2.Rel1；Debian / Ubuntu 的 `gcc-arm-none-eabi` 软件包 `15:13.2.rel1-2`，`arm-none-eabi-gcc --version` 显示 `13.2.1 20231009`）编译。别的版本生成的代码不同（审查时用 Arm GNU Toolchain 12.2.1 重编得到 14912 字节，前 0x140 字节相同），`--check` 只有用同一版本才会一致；不一致时它会报出当前编译器的版本。生成的 `gyro_evr_payload.py` 第一行也记着版本。改 C 源码后请用 13.2.1 重新生成，或者在 PR 里写明换了版本。
-- 固件特性：`features/gyro_evr.py`，组合了 `evr_hook`（请求模式）、`evr_builtin`（自动启动和菜单属性转接）和 `imu_hook`。
-- 菜单页：`features/gyro_ui.py`（页面 967；965 是上游的竖拍菜单页，966 是 NEF 压缩菜单页）。现在 4 行（标准 / 增强 / 原厂裁切 / 关闭），用文字槽 41–51 共 11 个（标题、根页行、4 个选项、4 个标记、当前值）；`menu_slots.py` 给它保留的是 41–53（13 个，五行时的大小），52–53 空着。`WL-GYRO.CFG` 记录标识 `WYG3`（`WYG1` / `WYG2` 是旧的行顺序，会被忽略）。槽号历史：原来的 178–188 后面紧接原厂的 190，所以先移到 200–212；2026-11-13 上游的竖拍显示占用了 200–210，移植时再移到 41–53：这是剩下唯一一段连续 13 个、原厂没用立即数写过的槽，和 200 段一样只能用 QEMU 查已访问的页面，静态上排除不了约 288 处算出来的槽号。
+- **编译器版本**：提交的内置代码用 **arm-none-eabi-gcc 13.2.1**（Arm GNU Toolchain 13.2.Rel1；Debian / Ubuntu 的 `gcc-arm-none-eabi` 软件包 `15:13.2.rel1-2`，`arm-none-eabi-gcc --version` 显示 `13.2.1 20231009`）编译。别的版本生成的代码不同（审查时用 Arm GNU Toolchain 12.2.1 重编得到 14912 字节，前 0x140 字节相同），`--check` 只有用同一版本才会一致；不一致时它会报出当前编译器的版本。生成的 `features/gyro/payload.py` 第一行也记着版本。改 C 源码后请用 13.2.1 重新生成，或者在 PR 里写明换了版本。
+- 固件特性：`features/gyro/evr.py`，组合了 `evr_hook`（请求模式）、`evr_builtin`（自动启动和菜单属性转接）和 `imu_hook`。
+- 菜单页：`features/gyro/ui.py`（页面 967；965 是上游的竖拍菜单页，966 是 NEF 压缩菜单页）。现在 4 行（标准 / 增强 / 原厂裁切 / 关闭），用文字槽 41–51 共 11 个（标题、根页行、4 个选项、4 个标记、当前值）；`features/menu/slots.py` 给它保留的是 41–53（13 个，五行时的大小），52–53 空着。`WL-GYRO.CFG` 记录标识 `WYG3`（`WYG1` / `WYG2` 是旧的行顺序，会被忽略）。槽号历史：原来的 178–188 后面紧接原厂的 190，所以先移到 200–212；2026-11-13 上游的竖拍显示占用了 200–210，移植时再移到 41–53：这是剩下唯一一段连续 13 个、原厂没用立即数写过的槽，和 200 段一样只能用 QEMU 查已访问的页面，静态上排除不了约 288 处算出来的槽号。
 - 模拟验证：`research/evr/emulate_builtin.py EG.bin CHOICE_FN`。它用真实固件镜像在 Unicorn 里跑：逃生通道、自动启动、菜单的各个选择、稳像和边界、标准在 50 mm / 200 mm 的裁切且保持 100 Hz（v33 去掉 RS 后改为这一项）、没有 e-VR 帧时空闲、开机即为关闭时不启动、全程不碰文件系统。`tests/test_gyro_evr.py` 在有固件时会自动运行。
 - QEMU：
   - `tools/verify_firmware_update_qemu.py`（固件版本页）；

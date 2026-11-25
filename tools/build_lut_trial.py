@@ -13,7 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.container import extract_eg
 from z30_extensions.plan import Plan
-from z30_extensions.features import lut_retouch, shutter_sound
+from z30_extensions.features.lut import retouch as lut_retouch
+from z30_extensions.features.sound import shutter_sound
 
 
 def build(stock, cube_text=None, size=17, sd=False):

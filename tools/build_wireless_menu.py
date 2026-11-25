@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from z30_extensions.container import extract_eg
 from z30_extensions.plan import Plan
-from z30_extensions.features.shutter_sound import add
+from z30_extensions.features.sound.shutter_sound import add
 from build_wireless_region_trial import ENTRY, BEFORE
 
 

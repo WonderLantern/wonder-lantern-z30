@@ -37,7 +37,7 @@
 
 ## 固件版本页上的项目名和版权
 
-常驻 EG 在 Setup → Firmware version 页的版本行和“完成”之间显示两行（`features/firmware_banner.py`，无卡也显示）：
+常驻 EG 在 Setup → Firmware version 页的版本行和“完成”之间显示两行（`features/card/firmware_banner.py`，无卡也显示）：
 
 ```
 Wonder Lantern Z30

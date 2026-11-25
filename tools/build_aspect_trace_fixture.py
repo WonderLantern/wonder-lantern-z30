@@ -13,7 +13,7 @@ def main():
     a=p.parse_args()
     if a.deps:sys.path.insert(0,str(a.deps.resolve()))
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-    from z30_extensions.assembly import assemble,constant as c,invoke as n
+    from z30_extensions.assembly import assemble, constant as c, invoke as n
     fixture=json.loads(a.base.read_text())
     fixture['trace_address']=0xc6008000
     for service in fixture['services']:

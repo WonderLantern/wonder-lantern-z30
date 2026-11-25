@@ -33,7 +33,7 @@ v40 恢复取景遮幅后，用户复测仍发现旧照片普通回放受当前�
 
 清除仍受颜色、矩形和当前表面身份约束，原厂改写像素保留；不解引用已替换的旧表面，不清零整屏或上层 UI，不调用文件服务。锁忙立即跳过，后续提交可继续清除。记录版也会保存这条提前清除路径的状态，补齐 v41 的采样盲区。
 
-源码：`aspect_mask.py`、`aspect_mask_trace.py`、`aspect_ui.py`。报告 `soft_mask.version=12`，`allowed_ui_service_phases=[1,2]`，`retire_before_descriptor_filter=true`。配置文件格式不变。
+源码：`features/aspect/mask.py`、`features/aspect/mask_trace.py`、`features/aspect/ui.py`。报告 `soft_mask.version=12`，`allowed_ui_service_phases=[1,2]`，`retire_before_descriptor_filter=true`。配置文件格式不变。
 
 ## 验证及边界
 

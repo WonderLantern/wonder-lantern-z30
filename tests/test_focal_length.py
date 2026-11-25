@@ -26,7 +26,7 @@ class FocalLengthTests(unittest.TestCase):
     def run_hook(self, element_value):
         from native_runtime import Context, STACK
         from unicorn.arm_const import UC_ARM_REG_SP, UC_ARM_REG_PC, UC_ARM_REG_R0
-        from z30_extensions.features import focal_length as fl
+        from z30_extensions.features.photo import focal_length as fl
         cx = Context(self.stock, self.image)
         u = cx.u
         descriptor = struct.unpack('<I', cx.stock.read(fl.TABLE + fl.WIDGET * 4, 4))[0]

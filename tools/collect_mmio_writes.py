@@ -16,7 +16,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions.features.ptp_read import MMIO_WINDOWS
+from z30_extensions.features.research.ptp_read import MMIO_WINDOWS
 
 LINE = re.compile(rb'Z30_MMIO W (0x[0-9a-f]{8}) size=4 value=(0x[0-9a-f]+) pc=(0x[0-9a-f]+)')
 

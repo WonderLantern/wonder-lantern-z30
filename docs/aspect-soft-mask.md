@@ -21,7 +21,7 @@
 
 遮幅已经接入真实构建并跑通 QEMU 端到端生命周期；尚未写相机验证。
 
-- 实现位置：`src/z30_extensions/features/aspect_mask.py`（新增固件钩子）+ `aspect_ui.py` 的 mask 段 + `tools/build_aspect_mask_trial.py` 构建入口。
+- 实现位置：`src/z30_extensions/features/aspect/mask.py`（新增固件钩子）+ `features/aspect/ui.py` 的 mask 段 + `tools/build_aspect_mask_trial.py` 构建入口。
 - **绘制层**：填充原厂取景 RGBA 图像表面（image surface，运行时地址取自显示状态槽 `0xC18200C0`，QEMU 中为 `0xd0959600`），而不是 UI 画布。显示管线每周期先把该表面合成到 overlay，再叠加 UI 画布，因此状态图标、对焦括号与内部网格保持在遮幅之上。填充发生在 GPU submit 边界（`0x1055D112` 入口钩子），紧贴 overlay 合成；在 UI renderer 时点或 UI 画布内填充均已被实验否决（前者会被后续显示管线擦掉，后者会破坏图标/括号）。
 - **幂等**：每周期用 SRC 语义写入预乘黑字（黑 + alpha），每个矩形先比较首/末字，相同则跳过，所以重复提交不会越叠越黑，停用后只需一次清零填充即可回到基线。
 - **v25 trial 构建**（静态 2.35:1 样条，alpha 48）：

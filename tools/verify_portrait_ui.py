@@ -27,8 +27,8 @@ from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE  # noqa: E402
 from unicorn.arm_const import *  # noqa: E402,F403
 from z30_extensions.build import build  # noqa: E402
 from z30_extensions.container import extract_eg  # noqa: E402
-from z30_extensions.features import portrait_ui as pu  # noqa: E402
-from z30_extensions.features.sound_layout import MAGIC, STATE_ANCHOR  # noqa: E402
+from z30_extensions.features.portrait import layout as pu  # noqa: E402
+from z30_extensions.features.menu.layout import MAGIC, STATE_ANCHOR  # noqa: E402
 from z30_extensions.platform.z30_120 import BASE, SCATTER, StockImage  # noqa: E402
 
 STACK, STACK_TOP = 0x60000000, 0x600F0000

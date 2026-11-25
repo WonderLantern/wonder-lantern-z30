@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(ROOT / 'tools'))
 from z30_extensions.container import extract_eg
-from z30_extensions.features.aspect_geometry import PROFILES, build_trial, raw_plane
+from z30_extensions.features.aspect.geometry import PROFILES, build_trial, raw_plane
 from z30_extensions.platform.z30_120 import sha256
 
 # Descriptor u16 layout (0x101D5B36): 0-1 full DX plane, 2-3 area RAW plane,

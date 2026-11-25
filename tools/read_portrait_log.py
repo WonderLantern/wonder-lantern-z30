@@ -14,8 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
-from z30_extensions.features import portrait_menu as pm  # noqa: E402
-from z30_extensions.features import portrait_ui as pu  # noqa: E402
+from z30_extensions.features.portrait import menu as pm  # noqa: E402
+from z30_extensions.features.portrait import layout as pu  # noqa: E402
 
 KIND_NAMES = {v: k for k, v in pu.KINDS.items()}
 

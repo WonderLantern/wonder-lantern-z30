@@ -12,7 +12,7 @@ except ImportError:  # optional research dependencies
     Uc = None
 
 from z30_extensions import card
-from z30_extensions.features import card_loader as cl
+from z30_extensions.features.card import loader as cl
 from z30_extensions.platform.z30_120 import BASE, SCATTER, CAPACITY
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -159,7 +159,7 @@ def synthetic_feature(result=1):
     records its arguments (tail base, INFO table, tail size) at MARK."""
     from unittest import mock
     from z30_extensions.assembly import assemble, constant
-    from z30_extensions.features import focal_length
+    from z30_extensions.features.photo import focal_length
     stock_add = focal_length.add
 
     def add(plan):
@@ -232,7 +232,7 @@ class CardLoaderTests(unittest.TestCase):
         self.assertEqual(cam.cell(), state)
 
     def test_ready_banner_is_armed(self):
-        from z30_extensions.features import ready_banner
+        from z30_extensions.features.card import ready_banner
         patch, report = card.build_card(self.stock, 'full', self.resident)
         self.assertEqual(report['card']['init_functions'], 1)
         cam = self.camera(card.pack(patch))
@@ -254,7 +254,7 @@ class CardLoaderTests(unittest.TestCase):
     def test_ready_banner_repaint_trigger(self):
         """The widget recorder and the UI tick marking widgets dirty (portrait-ui calls them)."""
         from unicorn.arm_const import UC_ARM_REG_SP, UC_ARM_REG_LR, UC_ARM_REG_R0, UC_ARM_REG_R1
-        from z30_extensions.features import ready_banner as rb
+        from z30_extensions.features.card import ready_banner as rb
         patch, report = card.build_card(self.stock, 'full', self.resident)
         cam = self.camera(card.pack(patch))
         cam.services[rb.GET_PROPERTY] = lambda: rb.SIMPLIFIED
@@ -339,8 +339,8 @@ class CardLoaderTests(unittest.TestCase):
         self.assertEqual(struct.unpack('<I', cam.read_mem(RAM_SLOT, 4))[0], (base + patch.init[0]) | 1)
 
     def test_menu_tab_card(self):
-        from z30_extensions.features import menu_tab
-        from z30_extensions.features.sound_layout import SETUP_META_SOURCE
+        from z30_extensions.features.menu import tab as menu_tab
+        from z30_extensions.features.menu.layout import SETUP_META_SOURCE
         patch, _ = card.build_card(self.stock, 'full', self.resident, menu_tab=True)
         cam, _ = self.loaded(card.pack(patch))
         rows = lambda address: struct.unpack('<I', cam.read_mem(address, 4))[0] & 0xFFFF

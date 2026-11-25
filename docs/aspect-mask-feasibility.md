@@ -27,12 +27,12 @@
 
 | 能力 | 依据 | 证明范围 |
 |---|---|---|
-| 修改实时取景控件显示条件 | [liveview_dual.py](../src/z30_extensions/features/liveview_dual.py)，`1044FF70` / `1036E8B4`，直方图描述符 `C1826714` | 当前代码存在版本校验和原厂条件保留；不能直接提供通用遮幅画布 |
+| 修改实时取景控件显示条件 | [features/liveview/dual.py](../src/z30_extensions/features/liveview/dual.py)，`1044FF70` / `1036E8B4`，直方图描述符 `C1826714` | 当前代码存在版本校验和原厂条件保留；不能直接提供通用遮幅画布 |
 | 取景坐标生成与请求 | `104BE422 → 104BE204 → 10454D46 → bank → 10453FAC` | 历史原生执行报告覆盖 18 个合成视口/样式/模式组合；未证明物理坐标映射 |
 | 网格打包与驱动 | `103C04EA → 1028102A → 1028925A → 1029D1E0` | 历史报告执行原厂代码到七个寄存器字段；设备句柄和状态由模型提供 |
 | 请求消费与回收 | 网格对象绑定、刷新消息、原厂任务循环、归还对象池 | 历史报告包含 24 个连续案例；刷新生产端由工具显式调用，真实帧调度未恢复 |
 | 原厂图形接口 | `vgDrawPath` 偶数入口 `1050ACF6`、`vgClear` `1050AAD6`，以及菜单 GPU 绘制路径 | 固件有入口；菜单绘制成功不能推出实时取景回调可直接调用 |
-| 配置菜单和保存 | [sound_ui.py](../src/z30_extensions/features/sound_ui.py)、[sound_settings.py](../src/z30_extensions/features/sound_settings.py)、[bitrate_ui.py](../src/z30_extensions/features/bitrate_ui.py) | 可参考界面和持久化模式；遮幅仍需独立状态与记录 |
+| 配置菜单和保存 | [features/sound/ui.py](../src/z30_extensions/features/sound/ui.py)、[features/sound/settings.py](../src/z30_extensions/features/sound/settings.py)、[features/video/bitrate_ui.py](../src/z30_extensions/features/video/bitrate_ui.py) | 可参考界面和持久化模式；遮幅仍需独立状态与记录 |
 | 现有 SD 模块 ABI | [z30_module_api.h](../examples/modules/z30_module_api.h) | ABI 2 仅提供属性读取、短文字和同步 run 注册，没有取景绘制或异步回调接口 |
 
 本次重新核对三个历史网格报告的 `source_bindings`：全部匹配当前旁目录文件。没有重跑这些执行案例；历史结果保留其模型边界。`104BE204`、`104BE422`、`104B9348`、`10454D46`、`10282A78` 和上述两个图形入口已从本地原始 EG 重新读取指令窗口。

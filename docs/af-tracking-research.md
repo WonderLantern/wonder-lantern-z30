@@ -200,7 +200,7 @@ Load → Run（显示 `Handover armed, Run=save`），回到拍照取景，对�
 4. 半按快门时也要能触发。
 
 实现：
-- 新的研究钩子 `features/face_hook.py`（`build(..., module_host=True, face_hook=True)`）：
+- 新的研究钩子 `features/modules/face_hook.py`（`build(..., module_host=True, face_hook=True)`）：
   - 把 `0x101944B0` 开头 8 个字节（`push {r4-r6,lr}; mov r5,r1; mov r4,r2; movs r2,#0xF0`，不依赖 PC）搬进一段桩代码；
   - 只有 `FACE_CELL`（`0xC1832D40`，原来录像钩子用的位置，记录 `0xC1832D24` 的 +0x1C）不为 0 时，才先调用 `cb(检测结果, xy, wh)`，再执行原厂这 8 个字节，然后跳回 `0x101944B8`；
   - 回调发生在原厂复制之前：内存里还是上一次的检测结果，参数里是这一次的。

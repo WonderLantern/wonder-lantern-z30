@@ -2,7 +2,7 @@ import importlib.util
 import struct
 import unittest
 from unittest.mock import patch
-from z30_extensions.features.ui_text import TRANSLATIONS, utf16_label, prepare, configure_entry, row_code
+from z30_extensions.features.menu.text import TRANSLATIONS, utf16_label, prepare, configure_entry, row_code
 
 
 class LabelTests(unittest.TestCase):
@@ -41,7 +41,7 @@ class TextExecutionTests(unittest.TestCase):
                 self.tail[off:off+len(raw)] = raw
         plan, functions = Plan(), {}
         # The stub image has no font table; cjk_fonts has its own tests.
-        with patch('z30_extensions.features.ui_text.cjk_fonts.add'):
+        with patch('z30_extensions.features.menu.text.cjk_fonts.add'):
             resources = prepare(plan, functions)
         record = resources.alloc('Enabled')
         entry_offset = 38*28

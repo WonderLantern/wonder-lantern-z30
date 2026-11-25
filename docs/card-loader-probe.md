@@ -19,7 +19,7 @@
 
 ## 探测模块
 
-`src/z30_extensions/mmu_probe.py` 生成 `CORE.ZMOD`，由现有 SD 模块宿主加载（ABI 2）。每按一次 Run 显示一行（不超过 24 个字符，中文界面也能完整显示）：
+`src/z30_extensions/features/research/mmu_probe.py` 生成 `CORE.ZMOD`，由现有 SD 模块宿主加载（ABI 2）。每按一次 Run 显示一行（不超过 24 个字符，中文界面也能完整显示）：
 
 | 行 | 内容 | 预期 |
 | --- | --- | --- |

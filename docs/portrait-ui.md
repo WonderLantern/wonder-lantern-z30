@@ -388,7 +388,7 @@ v4 不再挂 `0x1032431C`，原厂刷新请求恢复为逐字节原样。转动�
 
 ## USB 实时读取（研究构建）
 
-`tools/build_portrait_live.py` 构建 `full` + `portrait-ui`，并加上只读的 USB PTP 操作 `0x9FF1 ReadMemory`（`features/ptp_read.py`）。这个操作在 CMOS 研究里已经实机用过：2026-11-04 连续读 120 秒，没有丢失。
+`tools/build_portrait_live.py` 构建 `full` + `portrait-ui`，并加上只读的 USB PTP 操作 `0x9FF1 ReadMemory`（`features/research/ptp_read.py`）。这个操作在 CMOS 研究里已经实机用过：2026-11-04 连续读 120 秒，没有丢失。
 
 相机用 USB 连电脑，开机后先进一次自定义菜单（建立状态块），然后运行：
 
@@ -445,4 +445,4 @@ python tools/portrait_layout_from_log.py build/research/portrait-live.jsonl
 8. **其他功能：** 打开照片画幅遮幅时竖拿，遮幅和网格应保持在画面上；回放旧照片应不受影响。
 9. **切换功能：** 关闭开关后回到取景页，应完全回到原厂。
 
-如果出现异常，请拍下背屏照片，并注明当时手柄朝上还是朝下、在哪个 DISP 页。布局的分区参数（顶栏、底栏、左右栏的边界和平移量）在 `portrait_ui.py` 开头，可以按照片调整。
+如果出现异常，请拍下背屏照片，并注明当时手柄朝上还是朝下、在哪个 DISP 页。布局的分区参数（顶栏、底栏、左右栏的边界和平移量）在 `features/portrait/layout.py` 开头，可以按照片调整。

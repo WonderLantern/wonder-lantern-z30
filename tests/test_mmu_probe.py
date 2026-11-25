@@ -10,7 +10,7 @@ try:
 except ImportError:  # optional research dependencies
     Uc = None
 
-from z30_extensions.modules import parse, ABI, API_BYTES
+from z30_extensions.features.modules.files import parse, ABI, API_BYTES
 
 TABLE = 0x00000000      # TTBR0 resets to 0 in Unicorn, so the L1 table lives here
 API = 0x00200000        # host API table; its L1 slot is TABLE + 8
@@ -26,7 +26,7 @@ class MmuProbeTests(unittest.TestCase):
     VERSION = 1
 
     def setUp(self):
-        from z30_extensions.mmu_probe import build
+        from z30_extensions.features.research.mmu_probe import build
         module = parse(build(self.VERSION))
         uc = self.uc = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
         uc.mem_map(0, 0x700000)

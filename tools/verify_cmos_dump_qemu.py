@@ -24,7 +24,7 @@ HEADER = 0x190
 def overlays():
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
     from z30_extensions.assembly import constant as c, invoke as n, assemble, jump
-    from z30_extensions.features.sound_layout import SUCCESS
+    from z30_extensions.features.menu.layout import SUCCESS
     sources = {
         0x103382A2: f'movs r3,#7;str r3,[r0,#8];{c("r0", SUCCESS)}bx lr;',
         0x1033832E: f'mvn r1,#0;str r1,[r0,#8];{c("r0", SUCCESS)}bx lr;',

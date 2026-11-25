@@ -11,12 +11,12 @@ import sys
 from pathlib import Path
 
 sys.path[:0] = [str(Path(__file__).resolve().parents[1] / 'src'), str(Path(__file__).resolve().parent)]
-from z30_extensions import lut
+from z30_extensions.host import lut
 from z30_extensions.assembly import assemble, invoke
 from z30_extensions.container import extract_eg
 from z30_extensions.platform.z30_120 import sha256
-from z30_extensions.features import lut_core, lut_sdload, lut_session, lut_ui
-from z30_extensions.features.sound_layout import SUCCESS
+from z30_extensions.features.lut import core as lut_core, sdload as lut_sdload, session as lut_session, ui as lut_ui
+from z30_extensions.features.menu.layout import SUCCESS
 from native_runtime import Context, RAM
 from trace_lut_retouch import word, put, returning
 from trace_lut_buffers import registers
@@ -176,7 +176,7 @@ def verify(stock, image, report):
     assert f.action(0) == 0
     active = word(f.u, f.state + 4)
     assert word(f.u, f.state) == lut_core.LUT_FLAG
-    from z30_extensions.features.sound_layout import STATE_ANCHOR
+    from z30_extensions.features.menu.layout import STATE_ANCHOR
     assert word(f.u, STATE_ANCHOR + 16) == f.host  # the gate's getter anchor
     assert len(f.live) == 2 and not f.file_live
     assert f.labels[lut_ui.CURRENT_SLOT] == 'SD LUT ready'

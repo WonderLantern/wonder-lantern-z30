@@ -22,7 +22,7 @@ RAM_SLOT = 0xC5000000      # heap address the synthetic feature patches
 def synthetic_feature():
     """focal-length plus, in card builds, a RAM edit and a load-time function."""
     from z30_extensions.assembly import assemble, constant
-    from z30_extensions.features import focal_length
+    from z30_extensions.features.photo import focal_length
     stock_add = focal_length.add
 
     def add(plan):

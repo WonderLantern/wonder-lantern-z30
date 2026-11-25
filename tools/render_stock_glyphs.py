@@ -13,8 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.container import extract_eg
-from z30_extensions.platform.fonts import (HANS_FONT, HANT_FONT, character_map, decode_glyph,
-                                           default_advances, glyph_addresses)
+from z30_extensions.platform.fonts import HANS_FONT, HANT_FONT, character_map, decode_glyph, default_advances, glyph_addresses
 from z30_extensions.platform.z30_120 import StockImage
 
 EM, ASCENT, STEPS = 2048, 1760, 8

@@ -35,7 +35,7 @@ class Frame:
         from native_runtime import Context
         from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
         from unicorn.arm_const import UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1
-        from z30_extensions.features import date_stamp as feature
+        from z30_extensions.features.photo import date_stamp as feature
         self.feature = feature
         self.context = Context(stock, image)
         self.u = u = self.context.u
@@ -121,7 +121,7 @@ class Frame:
                 bytes(self.u.mem_read(C_BASE, self.stride * self.height)))
 
     def expected(self, date, mode, style=0, orientation=0):
-        from z30_extensions import date_stamp as host
+        from z30_extensions.host import date_stamp as host
         y_plane = bytearray(background_y(self.stride, self.height))
         c_plane = bytearray(bytes((BACKGROUND_C,)) * (self.stride * self.height))
         drawn = host.stamp_frame(y_plane, c_plane, self.width, self.height, self.stride, self.stride,
@@ -130,7 +130,7 @@ class Frame:
 
 
 def _glow_branches(frame, y_plane, style):
-    from z30_extensions import date_stamp as host
+    from z30_extensions.host import date_stamp as host
     before = background_y(frame.stride, frame.height)
     glow = {triple[0] for triple in host.PASS_COLORS[style % host.GLOW_FLAG][:-1]}
     raised = any(new in glow and new > old for new, old in zip(y_plane, before))
@@ -139,7 +139,7 @@ def _glow_branches(frame, y_plane, style):
 
 
 def check_frame_cases(frame):
-    from z30_extensions import date_stamp as host
+    from z30_extensions.host import date_stamp as host
     feature = frame.feature
     cases = []
     for width, height, stride, image_format in SIZES:
@@ -195,7 +195,7 @@ def check_frame_cases(frame):
 
 
 def check_passthrough_cases(frame):
-    from z30_extensions import date_stamp as host
+    from z30_extensions.host import date_stamp as host
     feature = frame.feature
     cases = []
     good = (1280, 720, 1296, 1)
@@ -256,7 +256,7 @@ def check_menu_cases(stock, image, report):
     from verify_sound_settings import Fixture
     from unicorn import UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R1
-    from z30_extensions.features.date_stamp_ui import MAGIC
+    from z30_extensions.features.photo.date_stamp_ui import MAGIC
     control = report['features']['date_stamp_control']
     offset, color_offset = control['state_offset'], control['color_offset']
     functions = {key: int(value, 16) for key, value in control['functions'].items()}

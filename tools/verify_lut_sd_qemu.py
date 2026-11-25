@@ -20,9 +20,9 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions import lut
-from z30_extensions.features import lut_core, lut_session
-from z30_extensions.features.sound_layout import STATE_ANCHOR
+from z30_extensions.host import lut
+from z30_extensions.features.lut import core as lut_core, session as lut_session
+from z30_extensions.features.menu.layout import STATE_ANCHOR
 
 BYTE_OFFSET_BASE = 0x10020000
 GET_MAGIC = 0x5A33534E

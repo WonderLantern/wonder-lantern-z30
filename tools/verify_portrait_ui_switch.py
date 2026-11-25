@@ -5,7 +5,7 @@ import struct
 from pathlib import Path
 from verify_sound_settings import Fixture
 from z30_extensions.container import extract_eg
-from z30_extensions.features.portrait_menu import LABEL_SLOT, MAGIC, SETTINGS_FILE, TEXT_A, TEXT_B
+from z30_extensions.features.portrait.menu import LABEL_SLOT, MAGIC, SETTINGS_FILE, TEXT_A, TEXT_B
 from unicorn import UC_HOOK_CODE
 from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R1
 
@@ -77,7 +77,7 @@ def verify(stock, image, report):
         cases.append(dict(open_writes_no_file=True))
     if diagnostics:
         # Export: the whole block reaches the card and recording resumes afterwards.
-        from z30_extensions.features.portrait_menu import LOG, LOG_FILE, STATE_SIZE
+        from z30_extensions.features.portrait.menu import LOG, LOG_FILE, STATE_SIZE
         files = {}
         b = Fixture(stock, image, report, files, properties={})
         pattern = bytes((i * 7) & 255 for i in range(STATE_SIZE - LOG))

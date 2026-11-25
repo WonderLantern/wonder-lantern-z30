@@ -118,7 +118,7 @@ def main():
         frame('05-color-start')
         color_row,glow_row,glow=stamp['color_row'],stamp['glow_row'],stamp['glow_flag']
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-        from z30_extensions.features.ui_text import TRANSLATIONS
+        from z30_extensions.features.menu.text import TRANSLATIONS
         def shown(slot):
             length,ptr,_=struct.unpack('<3I',s.remote.memory(0xc2013368+slot*12,12))
             data=s.remote.memory(ptr,length*(2 if lang in (26,27) else 1)) if length else b''

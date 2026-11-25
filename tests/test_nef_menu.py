@@ -2,7 +2,7 @@ import importlib.util
 import struct
 import unittest
 
-from z30_extensions.features.nef_menu import SITES, cave_source
+from z30_extensions.features.nef.menu import SITES, cave_source
 
 
 @unittest.skipUnless(importlib.util.find_spec('unicorn') and importlib.util.find_spec('keystone'),
@@ -142,7 +142,7 @@ class NefMenuHookTests(unittest.TestCase):
             self.assertEqual(site['resume'], site['address'] + len(site['expected']))
 
     def test_every_site_of_the_fixed_presets_has_a_menu_hook(self):
-        from z30_extensions.features.nef_compression import SITES as FIXED
+        from z30_extensions.features.nef.compression import SITES as FIXED
         fixed = {address for address, _, _, _, _ in FIXED}
         hooked = {site['address'] for site in SITES}
         self.assertTrue({0x101E77B8, 0x101536A0, 0x10153A06, 0x1015F956} <= hooked)

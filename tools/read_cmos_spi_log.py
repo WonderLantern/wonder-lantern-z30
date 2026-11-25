@@ -16,7 +16,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions.features import cmos_spi as cs
+from z30_extensions.features.research import cmos_spi as cs
 
 
 def parse(data):

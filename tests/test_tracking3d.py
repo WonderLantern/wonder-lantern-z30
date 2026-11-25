@@ -23,8 +23,8 @@ class Tracking3dPresetTest(unittest.TestCase):
         self.assertEqual(resolve_presets('3d-tracking')[1], ['3d-tracking'])
 
     def test_page_is_a_native_photo_row_and_in_the_focus_category(self):
-        from z30_extensions.features.menu_framework import CATEGORIES
-        from z30_extensions.features.sound_layout import NATIVE_MENUS
+        from z30_extensions.features.menu.framework import CATEGORIES
+        from z30_extensions.features.menu.layout import NATIVE_MENUS
         self.assertIn('trk3d', dict((key, members) for key, _, members in CATEGORIES)['focus'])
         self.assertIn('trk3d', dict((m[0], m[3]) for m in NATIVE_MENUS)['photo'])
 
@@ -45,10 +45,7 @@ class Tracking3dCaveTest(unittest.TestCase):
 
     def run_site(self, choice, tracking=1, live=0x10007, flag=0, subjects=0, face=(29, 19, 2, 3), box=(2508, 1580),
                  af=0, shown=0, armed=0, result=None, area=6, detect=1, select=1):
-        from z30_extensions.features.tracking3d import (SITE, RETURN, TRACKING, TRACKER_LIVE, TOUCH_FLAG,
-                                                         SUBJECTS, AF_WORKING, BOX_SHOWN,
-                                                         ARMED_OFFSET, ENTER_TRACKING_MODE, AREA_MODE,
-                                                         DETECT_SELECT, GET_SETTING)
+        from z30_extensions.features.tracking3d.tracking import SITE, RETURN, TRACKING, TRACKER_LIVE, TOUCH_FLAG, SUBJECTS, AF_WORKING, BOX_SHOWN, ARMED_OFFSET, ENTER_TRACKING_MODE, AREA_MODE, DETECT_SELECT, GET_SETTING
         BOX0, BOX1 = 0xC237D59C, 0xC237D5A0   # tracking box (no longer read by the cave)
         from z30_extensions.platform.z30_120 import BASE
         image, report = self.image, self.report
@@ -115,7 +112,7 @@ class Tracking3dCaveTest(unittest.TestCase):
         return struct.unpack('<I', u.mem_read(TOUCH_FLAG, 4))[0], writes
 
     def test_enable_sets_the_flag_for_any_detected_subject(self):
-        from z30_extensions.features.tracking3d import TOUCH_FLAG
+        from z30_extensions.features.tracking3d.tracking import TOUCH_FLAG
         flag, writes = self.run_site(1, subjects=1)
         self.assertEqual((flag, writes), (1, [TOUCH_FLAG]))
         self.assertEqual(self.run_site(1, subjects=0)[0], 0)                       # no subject
@@ -124,7 +121,7 @@ class Tracking3dCaveTest(unittest.TestCase):
         self.assertEqual(self.run_site(1, subjects=1, face=(2, 2, 2, 3))[0], 1)
 
     def test_only_with_auto_area_people_or_animals(self):
-        from z30_extensions.features.tracking3d import TOUCH_FLAG
+        from z30_extensions.features.tracking3d.tracking import TOUCH_FLAG
         for detect in (1, 2):                                        # people, animals
             r = {}
             flag, writes = self.run_site(1, subjects=1, detect=detect, result=r)
@@ -147,7 +144,7 @@ class Tracking3dCaveTest(unittest.TestCase):
         # PR 36 second review: revision 6 read 0xC3C / 0x58B, the wide-area L sub-modes.
         # The stock area setters store base * 100 + sub: base 4 -> 0xC3C / 0x58B, base 6 -> 0xC3D / 0x58C,
         # and the stock menu reads 0xC3D for base 6 (0 plain, 1 people, 2 animals).
-        from z30_extensions.features.tracking3d import DETECT_KEYS
+        from z30_extensions.features.tracking3d.tracking import DETECT_KEYS
         from z30_extensions.platform.z30_120 import BASE
         def at(a, n=4): return self.stock[a - BASE:a - BASE + n]
         movw_r0 = lambda k: (0xF2400000 | ((k >> 12) << 16) | (((k >> 11) & 1) << 26)

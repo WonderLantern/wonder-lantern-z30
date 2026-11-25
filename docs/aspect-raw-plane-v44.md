@@ -65,7 +65,7 @@ python tools/verify_aspect_raw_plane.py --deps ../tools/vendor --source Z_30_012
 
 结论：Adobe 只接受原厂 RAW 平面，裁切需要写在内嵌 XMP 的 `crs:` 设置中。相机本身已在该包写入 `crd:`（Camera Raw 默认值）段，由 `0x101B862E` 生成到一个有界缓冲区 `{cursor, remaining, overflow}`；溢出时原厂会丢弃整个 `crd:` 段。
 
-`aspect_xmp_crop.py` 在该函数写出结尾 `</rdf:Description>`（`0x101B86B4`）后，按当前画幅追加一个 `crs:` 段（`HasCrop`、四边坐标、`CropAngle 0`、`CropConstrainToWarp 0`，固定 372 字节）。条件：已选自定义画幅、原厂区域为 16:9、缓冲区未溢出且剩余空间足够；否则保持原厂文本不变。
+`features/aspect/xmp_crop.py` 在该函数写出结尾 `</rdf:Description>`（`0x101B86B4`）后，按当前画幅追加一个 `crs:` 段（`HasCrop`、四边坐标、`CropAngle 0`、`CropConstrainToWarp 0`，固定 372 字节）。条件：已选自定义画幅、原厂区域为 16:9、缓冲区未溢出且剩余空间足够；否则保持原厂文本不变。
 
 裁切坐标按 Adobe 对原厂 RAW 的默认裁切归一化，假定 DX 为 5568×3712、16:9 为 5568×3128（相机自身 CropArea 尺寸）：
 

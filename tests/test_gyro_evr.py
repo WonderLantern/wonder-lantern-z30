@@ -17,9 +17,9 @@ except ImportError:  # pragma: no cover
 
 class GyroEvrPayloadTest(unittest.TestCase):
     def test_payload_integrity_and_presets(self):
-        from z30_extensions.features.gyro_evr_payload import CODE, SHA256, SIZE
+        from z30_extensions.features.gyro.payload import CODE, SHA256, SIZE
         from z30_extensions.build import PRESETS, resolve_presets
-        from z30_extensions.features.evr_builtin import BUILTIN_MAX
+        from z30_extensions.features.gyro.builtin import BUILTIN_MAX
         self.assertEqual(len(CODE), SIZE)
         self.assertEqual(hashlib.sha256(CODE).hexdigest(), SHA256)
         self.assertTrue(0 < SIZE <= BUILTIN_MAX and SIZE % 4 == 0)
@@ -52,11 +52,12 @@ class GyroEvrFirmwareTest(unittest.TestCase):
         cls.image, cls.report = build(cls.stock, 'gyro-evr')
 
     def test_dormant_cells_and_report(self):
-        from z30_extensions.features import evr_hook, imu_hook, evr_builtin
+        from z30_extensions.features.modules import evr_hook, imu_hook
+        from z30_extensions.features.gyro import builtin as evr_builtin
         from z30_extensions.platform.z30_120 import BASE
         self.assertIn('gyro-evr', self.report['enabled_features'])
         self.assertNotIn('rec_hook', self.report['features'])
-        from z30_extensions.features import gyro_ui
+        from z30_extensions.features.gyro import ui as gyro_ui
         for name in ('gyro_evr', 'evr_builtin', 'evr_hook', 'imu_hook', 'gyro_evr_control'):
             self.assertIn(name, self.report['features'])
         control = self.report['features']['gyro_evr_control']

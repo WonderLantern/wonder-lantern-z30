@@ -27,7 +27,7 @@ class FaceHookTest(unittest.TestCase):
         cls.image, cls.report = build(cls.stock, [f for f in features if f not in ('nef-menu', '3d-tracking')], module_host=True, face_hook=True)
 
     def run_site(self, image, cell=0):
-        from z30_extensions.features.face_hook import SITE, RETURN, FACE_CELL
+        from z30_extensions.features.modules.face_hook import SITE, RETURN, FACE_CELL
         from z30_extensions.platform.z30_120 import BASE
         u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
         u.mem_map(BASE, (len(image) + 0xFFFF) & ~0xFFFF)
@@ -65,7 +65,7 @@ class FaceHookTest(unittest.TestCase):
         stock = self.run_site(self.stock)
         hooked = self.run_site(self.image)
         self.assertEqual(stock, hooked)
-        from z30_extensions.features.face_hook import RETURN
+        from z30_extensions.features.modules.face_hook import RETURN
         self.assertEqual(stock[0], [RETURN])
         # stock state at 0x101944B8: r5 = xy, r4 = wh, r2 = 0xF0, frame r4,r5,r6,lr
         self.assertEqual(stock[1], (0x20001000, 0x20002000, 0xF0, 0x20003000, 0x20002000, 0x20008000 - 16))

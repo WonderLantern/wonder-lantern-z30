@@ -30,7 +30,7 @@ def main():
     sys.path.insert(0, str(a.qemu_root.resolve() / 'tools'))
     from display_session import Session
     from liveview_session import start, DEVICE_ENV
-    from z30_extensions.features import tracking3d_boxes as tb
+    from z30_extensions.features.tracking3d import boxes as tb
     report = json.loads(a.report.read_text())
     image = a.image.read_bytes()
     control = report['features']['tracking3d_control']

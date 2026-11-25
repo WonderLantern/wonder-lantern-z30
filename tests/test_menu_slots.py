@@ -1,7 +1,10 @@
 import unittest
 
-from z30_extensions.features import date_stamp_ui, menu_slots, module_host, portrait_menu, sound_layout, zebra_ui
-from z30_extensions.features.menu_slots import BLOCKS, STOCK_SLOTS, page_slots
+from z30_extensions.features.photo import date_stamp_ui, zebra_ui
+from z30_extensions.features.menu import slots as menu_slots, layout as sound_layout
+from z30_extensions.features.modules import host as module_host
+from z30_extensions.features.portrait import menu as portrait_menu
+from z30_extensions.features.menu.slots import BLOCKS, STOCK_SLOTS, page_slots
 
 
 class MenuSlotTests(unittest.TestCase):

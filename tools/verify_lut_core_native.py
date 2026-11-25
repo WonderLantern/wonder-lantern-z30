@@ -1,6 +1,6 @@
 """Unicorn parity proof: ARM LUT core vs the host integer reference.
 
-Runs the assembled gate + lut_core + lut_lookup from lut_core.py over synthetic
+Runs the assembled gate + lut_core + lut_lookup from features/lut/core.py over synthetic
 format-1 image descriptors and compares every output byte against
 lut.apply_frame_int. The stock cache services are replaced with recorders and
 the params object mirrors 0xC295BE94. No firmware is produced here.
@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions import lut
+from z30_extensions.host import lut
 from z30_extensions.container import extract_eg
-from z30_extensions.features import lut_core
+from z30_extensions.features.lut import core as lut_core
 from z30_extensions.platform.z30_120 import StockImage, sha256
 from native_runtime import Context, RAM, STACK, STOP
 from trace_lut_retouch import put, returning

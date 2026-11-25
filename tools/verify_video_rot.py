@@ -11,9 +11,7 @@ from pathlib import Path
 
 from z30_extensions.build import build, resolve_presets
 from z30_extensions.container import extract_eg
-from z30_extensions.features.video_rot import (
-    MATRIX_ADDRESS, EXPECTED_MATRIX, CONFIGURE, VIDEO_MATRIX_COPY,
-    CONFIGURE_PREFIX, VIDEO_COPY_PREFIX)
+from z30_extensions.features.video.rotation import MATRIX_ADDRESS, EXPECTED_MATRIX, CONFIGURE, VIDEO_MATRIX_COPY, CONFIGURE_PREFIX, VIDEO_COPY_PREFIX
 from z30_extensions.patch import Edit, apply_patch
 from z30_extensions.platform.z30_120 import BASE, CAPACITY, STOCK_SHA256, sha256
 

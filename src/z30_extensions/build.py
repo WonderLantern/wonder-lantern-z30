@@ -1,7 +1,7 @@
 """Compose stock-relative firmware features."""
 from .plan import Plan
 from .patch import Edit
-from .features.liveview_dual import build as build_dual, VIDEO_STOCK_WINDOWS
+from .features.liveview.dual import build as build_dual, VIDEO_STOCK_WINDOWS
 from .platform.z30_120 import BASE
 
 
@@ -102,7 +102,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
     plan = Plan(source, tail_base=tail_base, card=card, resident=resident)
     if 'gyro-evr' in features:
         # The SD host (research builds) drives the built-in copy from its Run row.
-        from .features.gyro_evr import layout
+        from .features.gyro.evr import layout
         plan.evr_builtin_layout = layout()
     if 'liveview-dual' in features:
         dual, report = build_dual(source, plan.tail_base)
@@ -112,20 +112,20 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         plan.features['liveview_dual'] = {key: report[key] for key in
                                         ('hooks', 'mask_rom_address', 'full_info_disp', 'full_info_hooks')}
     if 'm900' in features:
-        from .features.long_exposure import add
+        from .features.photo.long_exposure import add
         add(plan)
     # The menu framework keeps the place the shutter sound had in FEATURE_ORDER.
-    from .features.ready_banner import REPAINT_TRIGGER
+    from .features.card.ready_banner import REPAINT_TRIGGER
     if card and ready_banner and REPAINT_TRIGGER and 'portrait-ui' in features:
         # The banner's repaint trigger runs from portrait-ui's UI hooks (built later).
-        from .features.ready_banner import prepare_hooks
+        from .features.card.ready_banner import prepare_hooks
         plan.banner_hooks = prepare_hooks(plan)
     if card and ready_banner and banner_debug:
         # Diagnostic readout of the ready banner in the status page's version row.
-        from .features.ready_banner import prepare_debug
+        from .features.card.ready_banner import prepare_debug
         plan.banner_debug = prepare_debug(plan)
     if module_host or 'shutter-sound' in features or any(name in features for name in MENU_FEATURES):
-        from .features.menu_framework import add
+        from .features.menu.framework import add
         add(plan, sound='shutter-sound' in features, menu_tab=menu_tab, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
             nef='nef-menu' in features,
@@ -135,64 +135,64 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
             aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial,
             build_tag=build_tag, resident_id=resident_id, feature_count=len(features))
     if 'mtp-fast' in features:
-        from .features.mtp_fast import add
+        from .features.connect.mtp_fast import add
         add(plan)
     if 'video-rot' in features:
-        from .features.video_rot import add
+        from .features.video.rotation import add
         add(plan)
     if 'bitrate-slowmo-uncap' in features:
-        from .features.bitrate_slowmo_uncap import add
+        from .features.video.bitrate import add
         add(plan)
     if 'photo-zebra' in features:
-        from .features.photo_zebra import add
+        from .features.photo.zebra import add
         add(plan)
     if 'wifi-5ghz' in features:
-        from .features.wifi_5ghz import add
+        from .features.connect.wifi_5ghz import add
         add(plan)
     if 'date-stamp' in features:
-        from .features.date_stamp import add
+        from .features.photo.date_stamp import add
         add(plan)
     if 'portrait-ui' in features:
-        from .features.portrait_ui import add
+        from .features.portrait.layout import add
         add(plan)
     for name in NEF_FIXED_FEATURES:
         if name in features:
-            from .features.nef_compression import add
+            from .features.nef.compression import add
             add(plan, name)
     if 'nef-menu' in features:
-        from .features.nef_menu import add
+        from .features.nef.menu import add
         add(plan)
     if 'gyro-evr' in features:
-        from .features.gyro_evr import add
+        from .features.gyro.evr import add
         add(plan)
     if '3d-tracking' in features:
-        from .features.tracking3d import add
+        from .features.tracking3d.tracking import add
         add(plan)
     if 'af-frame-colour' in features:
-        from .features.af_frame_colour import add
+        from .features.photo.af_frame_colour import add
         add(plan)
     if 'focal-length' in features:
-        from .features.focal_length import add
+        from .features.photo.focal_length import add
         add(plan)
     if 'battery-percent' in features:
-        from .features.battery_percent import add
+        from .features.photo.battery_percent import add
         add(plan)
     if (card and ready_banner) or ready_banner == 'qemu-test':
         # Card builds: "Wonder Lantern ready · N features" on the live view after loading.
-        from .features.ready_banner import add
+        from .features.card.ready_banner import add
         add(plan, len(features), qemu_test=not card, debug=getattr(plan, 'banner_debug', None))
     if ptp_read:
         # Research only: read-only USB PTP 0x9FF1 ReadMemory for live readouts.
-        from .features.ptp_read import add
+        from .features.research.ptp_read import add
         add(plan)
     if evr_hook:
-        from .features.evr_hook import add
+        from .features.modules.evr_hook import add
         add(plan)
     if imu_hook:
-        from .features.imu_hook import add
+        from .features.modules.imu_hook import add
         add(plan)
     if face_hook:
-        from .features.face_hook import add
+        from .features.modules.face_hook import add
         add(plan)
     if card:
         for address, expected in VIDEO_STOCK_WINDOWS:

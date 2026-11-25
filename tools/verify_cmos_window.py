@@ -18,8 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from z30_extensions.container import extract_eg
-from z30_extensions.features import cmos_window as cw
-from z30_extensions.features.sound_layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC
+from z30_extensions.features.research import cmos_window as cw
+from z30_extensions.features.menu.layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC
 from build_cmos_dump import build
 from decode_cmos_modes import COMMANDS, TYPES
 from verify_cmos_spi import Machine
@@ -217,7 +217,7 @@ def main():
 
     menu = MenuFixture(stock, image, dict(functions=dict(cmos_export=feature['functions']['window_cycle'])))
     from verify_cmos_dump import BLOB
-    from z30_extensions.features import cmos_dump as cdump
+    from z30_extensions.features.research import cmos_dump as cdump
     menu.reset(); menu.u.mem_write(STATE, bytes(cw.STATE_BYTES))
     heights = [BLOB + off for off in cw.HEIGHT_OFFSETS]
     for h in heights:

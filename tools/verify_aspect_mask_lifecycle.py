@@ -20,9 +20,8 @@ def main():
         p.add_argument('--'+key,type=Path,required=True)
     a=p.parse_args();sys.path.insert(0,str(a.deps.resolve()))
     from z30_extensions.container import extract_eg
-    from z30_extensions.features.aspect_mask_trace import FIELDS,decode
-    from z30_extensions.features.aspect_mask import (UI_SERVICE_PHASE,IMAGE_SLOT,SUBMIT_SITE,
-        SUBMIT_CONTINUE,HISTORY_OFFSET,STATE_LOCK,SNAPSHOT,SOURCE_WINDOW,VIEW_KIND,PHOTO_BACKEND,OVERLAY_BUSY)
+    from z30_extensions.features.aspect.mask_trace import FIELDS, decode
+    from z30_extensions.features.aspect.mask import UI_SERVICE_PHASE, IMAGE_SLOT, SUBMIT_SITE, SUBMIT_CONTINUE, HISTORY_OFFSET, STATE_LOCK, SNAPSHOT, SOURCE_WINDOW, VIEW_KIND, PHOTO_BACKEND, OVERLAY_BUSY
     from verify_sound_settings import Fixture
     from unicorn import UC_HOOK_CODE,UC_PROT_READ,UC_PROT_EXEC
     from unicorn.arm_const import (UC_ARM_REG_R0,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,

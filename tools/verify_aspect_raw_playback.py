@@ -18,7 +18,7 @@ from unicorn import UC_HOOK_CODE, UC_PROT_READ, UC_PROT_EXEC
 from unicorn.arm_const import (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2,
                               UC_ARM_REG_R3, UC_ARM_REG_R4, UC_ARM_REG_PC,
                               UC_ARM_REG_LR, UC_ARM_REG_SP)
-from z30_extensions.features.aspect_raw_playback import DIMENSION_SITES, PACK_CALLERS
+from z30_extensions.features.aspect.raw_playback import DIMENSION_SITES, PACK_CALLERS
 
 
 OBJ, INFO, META, DESC, OUT = 0x50080000, 0x50081000, 0x50082000, 0x50083000, 0x50084000

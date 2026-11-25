@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions import lut
+from z30_extensions.host import lut
 from z30_extensions.container import extract_eg
-from z30_extensions.features import lut_core, lut_session as session
+from z30_extensions.features.lut import core as lut_core, session
 from z30_extensions.platform.z30_120 import StockImage, sha256
 from native_runtime import Context, RAM
 from trace_lut_retouch import put, word, returning

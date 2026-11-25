@@ -6,11 +6,8 @@ import importlib.util
 from unittest.mock import patch
 
 from z30_extensions.build import build
-from z30_extensions.features.liveview_dual import VIDEO_STOCK_WINDOWS
-from z30_extensions.features.video_rot import (
-    MATRIX_ADDRESS, EXPECTED_MATRIX, ROT90_MATRIX, POSE_MATRICES, POSE_DEGREES,
-    CONFIGURE, CONFIGURE_PREFIX, VIDEO_MATRIX_COPY, VIDEO_COPY_PREFIX,
-    GET_ORIENTATION, ORIENTATION_PREFIX)
+from z30_extensions.features.liveview.dual import VIDEO_STOCK_WINDOWS
+from z30_extensions.features.video.rotation import MATRIX_ADDRESS, EXPECTED_MATRIX, ROT90_MATRIX, POSE_MATRICES, POSE_DEGREES, CONFIGURE, CONFIGURE_PREFIX, VIDEO_MATRIX_COPY, VIDEO_COPY_PREFIX, GET_ORIENTATION, ORIENTATION_PREFIX
 from z30_extensions.platform.z30_120 import BASE, SCATTER, sha256
 
 

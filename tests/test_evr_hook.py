@@ -25,7 +25,7 @@ class EvrHookTest(unittest.TestCase):
         cls.image, cls.report = build(cls.stock, 'shutter-sound', module_host=True, evr_hook=True)
 
     def run_site(self, image, cell_value, callback=None):
-        from z30_extensions.features.evr_hook import SITE, RETURN, HOOK_CELL
+        from z30_extensions.features.modules.evr_hook import SITE, RETURN, HOOK_CELL
         from z30_extensions.platform.z30_120 import BASE
         u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
         size = (len(image) + 0xFFFF) & ~0xFFFF
@@ -58,7 +58,7 @@ class EvrHookTest(unittest.TestCase):
         self.assertEqual(sorted(names), ['evr-result-hook', 'evr-result-hook-path2'])
 
     def run_path2(self, image, cell_value, callback=None, channel=2):
-        from z30_extensions.features.evr_hook import SITE2, RETURN2, HOOK_CELL, LOGGER
+        from z30_extensions.features.modules.evr_hook import SITE2, RETURN2, HOOK_CELL, LOGGER
         from z30_extensions.platform.z30_120 import BASE
         u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
         u.mem_map(BASE, (len(image) + 0xFFFF) & ~0xFFFF)

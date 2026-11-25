@@ -6,12 +6,12 @@
 
 | 文件 | 内容 |
 | --- | --- |
-| `features/menu_framework.py` | 设定菜单入口行、根页、错误弹窗、照片和视频菜单的直达行、状态块、各页注册与路由钩子（row / getter / route） |
-| `features/menu_ui.py` | 框架函数的代码：`get`、`cas`、`open`、`ensure`、`labels`、`render`、`action`、`getter`、`route`、`show_error`、`page_return`、`dismiss_error` |
-| `features/menu_tab.py` | 可选：扩展菜单作为菜单左侧第 8 个标签（见下文） |
-| `features/shutter_sound.py` | 可选的声音部分：函数槽、文字、文件页和开关页、`WL-SOUND.CFG`、声音钩子（shot / config / data） |
-| `features/sound_ui.py` | 声音页的代码片段，由框架在 `sound=True` 时拼入 |
-| `features/sound_audio.py` | WAV 读取与校验、播放钩子 |
+| `features/menu/framework.py` | 设定菜单入口行、根页、错误弹窗、照片和视频菜单的直达行、状态块、各页注册与路由钩子（row / getter / route） |
+| `features/menu/ui.py` | 框架函数的代码：`get`、`cas`、`open`、`ensure`、`labels`、`render`、`action`、`getter`、`route`、`show_error`、`page_return`、`dismiss_error` |
+| `features/menu/tab.py` | 可选：扩展菜单作为菜单左侧第 8 个标签（见下文） |
+| `features/sound/shutter_sound.py` | 可选的声音部分：函数槽、文字、文件页和开关页、`WL-SOUND.CFG`、声音钩子（shot / config / data） |
+| `features/sound/ui.py` | 声音页的代码片段，由框架在 `sound=True` 时拼入 |
+| `features/sound/audio.py` | WAV 读取与校验、播放钩子 |
 
 - `build.py` 的 `MENU_FEATURES` 列出有菜单页的功能。选了其中任何一个，或选了 `shutter-sound`，就会带上框架；声音只在选了 `shutter-sound` 时才有。
 - `shutter_sound.add(plan, ...)` 保留为旧入口，等于 `menu_framework.add(plan, sound=True, ...)`，研究工具仍可直接调用。
@@ -88,7 +88,7 @@
 
 用户反馈扩展功能的入口太杂、不好找，所以把扩展菜单做成菜单左侧标签栏的第 8 个标签。目前是选项：`build(..., menu_tab=True)`，卡文件用 `tools/build_card.py --menu-tab`。默认关闭，默认构建与以前逐字节相同。实机：2026-11-24、11-25 两次上机发现的按键和色条问题已修正（见下文）；2026-11-25 在 `output/card-banner-v1-categories` 上确认第 8 个标签能进入根页和分类页（见[根页分类](#根页分类2026-11-25)）。研究过程见 [menu-tab-research.md](menu-tab-research.md)。
 
-| 部分 | 做法（`features/menu_tab.py`） |
+| 部分 | 做法（`features/menu/tab.py`） |
 | --- | --- |
 | 标签 | 标签栏（原厂页 1）的页面描述改为 8 行，每格 64×52；加第 8 个控件、第 8 张事件表（复制设定标签的），"标签 → 页号"表加入 955 |
 | 按键 | 设定标签的事件表里有 4 个事件进入设定页：右键 `0x256`、确定 `0x25B`、`0x26F`、`0x27E`（按键到事件的表在 `0x1073B400`：上 `0x253`、下 `0x254`、左 `0x255`、右 `0x256`、确定 `0x25B`）。原厂导航进不了页 955（焦点留在标签栏），所以这 4 个都改为调用框架的 `open`（和以前设定菜单那一行一样），目标 `0x3BB` 表示原地不动。触摸标签走别的路径，不经过这张表 |

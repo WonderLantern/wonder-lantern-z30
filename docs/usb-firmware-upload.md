@@ -17,7 +17,7 @@
 
 ## 总体方案
 
-沿用 `0x9FF1 ReadMemory`（[features/ptp_read.py](../src/z30_extensions/features/ptp_read.py)）的接入方式：在原厂 PTP 操作记录查找 `0x102F8C74` 的包装函数里，为下面几个新操作码返回自有记录，其余操作码仍走原厂查找。
+沿用 `0x9FF1 ReadMemory`（[features/research/ptp_read.py](../src/z30_extensions/features/research/ptp_read.py)）的接入方式：在原厂 PTP 操作记录查找 `0x102F8C74` 的包装函数里，为下面几个新操作码返回自有记录，其余操作码仍走原厂查找。
 
 | 操作码 | 名称 | 参数 | 数据阶段 | 作用 |
 | --- | --- | --- | --- | --- |
@@ -114,8 +114,8 @@ Commit 进入“删除旧文件”之前，状态块先记下 RENAMING。如果�
 
 ## 相机端实现要点
 
-- 新模块 `features/fw_upload.py`，结构参考 `ptp_read.py`：自有操作记录 + 查找包装 + 每个操作码的回调。与 `ptp_read` 同时启用时共用一个查找包装，不能重复替换 `0x102F8C74` 的序言；需要先把包装改成“操作码 → 记录”的小表。
-- 文件操作使用已在实机上用过的路径：`0x1033829E` 设路径、`0x103382A2` 打开（创建/截断用 `0x301`，读取用 `0`）、`0x102C8A6A` 写入、`0x10338414` 读取、`0x1033832E` 关闭（[cmos_dump.py](../src/z30_extensions/features/cmos_dump.py)、[sound_settings.py](../src/z30_extensions/features/sound_settings.py)）。删除和改名用上面提到的 `0x10338460`、`0x103384F6`。
+- 新模块 `features/fw_upload.py`，结构参考 `features/research/ptp_read.py`：自有操作记录 + 查找包装 + 每个操作码的回调。与 `ptp_read` 同时启用时共用一个查找包装，不能重复替换 `0x102F8C74` 的序言；需要先把包装改成“操作码 → 记录”的小表。
+- 文件操作使用已在实机上用过的路径：`0x1033829E` 设路径、`0x103382A2` 打开（创建/截断用 `0x301`，读取用 `0`）、`0x102C8A6A` 写入、`0x10338414` 读取、`0x1033832E` 关闭（[features/research/cmos_dump.py](../src/z30_extensions/features/research/cmos_dump.py)、[features/sound/settings.py](../src/z30_extensions/features/sound/settings.py)）。删除和改名用上面提到的 `0x10338460`、`0x103384F6`。
 - 写入前对缓冲区做 d-cache clean（SD 经 DMA 读取，见 cmos_dump v1 的教训）；回读后在 CPU 读之前做 invalidate 或用新分配的缓冲。
 - CRC-32（IEEE 802.3，反射多项式 `0xEDB88320`）用 1 KiB 查找表，表在构建时生成并放进补丁区。
 - Chunk 的数据阶段：块大小上限取原厂数据缓冲容量（`0x1045AD50` 返回值）以内，电脑端默认 1 MiB。原厂接收数据阶段的回调顺序和长度获取方式需要先在 Unicorn 里逐项确认，再定代码；这一步是**目前最大的不确定点**。

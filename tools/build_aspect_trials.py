@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from z30_extensions.container import extract_eg
-from z30_extensions.features.aspect_geometry import PROFILES, DX, dimensions, build_trial
+from z30_extensions.features.aspect.geometry import PROFILES, DX, dimensions, build_trial
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

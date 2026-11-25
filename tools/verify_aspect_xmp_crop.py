@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
 from z30_extensions.container import extract_eg
-from z30_extensions.features.aspect_geometry import PROFILES
+from z30_extensions.features.aspect.geometry import PROFILES
 from z30_extensions.platform.z30_120 import sha256
 
 WRITER = 0x101B862E

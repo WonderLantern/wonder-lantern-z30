@@ -28,7 +28,7 @@
 | FAT32 卡 | 1 个文件，最大 4 GB | 与 120p/100p 相同，最多 8 个文件 |
 | exFAT 卡 | 1 个文件，最大 4 GB | 与其他模式相同，单个大文件 |
 
-要自定义高质量档，在 `src/z30_extensions/features/bitrate_slowmo_uncap.py` 的 `BITRATES_MBPS` 中修改或添加行后重新构建；均衡档定义在 `bitrate_ui.py` 的 `BALANCED_MBPS`。每行是模式的最大、平均码率，模式名见 `STOCK_MBPS`。构建要求 0 < 平均 ≤ 最大 ≤ 400 Mbps：编码器以 16 位保存“最大 kbit / 8”，约 536 Mbps 溢出，取 400 留出余量。报告 `features.bitrate_slowmo_uncap` 记录默认高质量修改和慢动作上限，`features.bitrate_profiles` 记录运行时函数、档位、菜单及配置文件。
+要自定义高质量档，在 `src/z30_extensions/features/video/bitrate.py` 的 `BITRATES_MBPS` 中修改或添加行后重新构建；均衡档定义在 `features/video/bitrate_ui.py` 的 `BALANCED_MBPS`。每行是模式的最大、平均码率，模式名见 `STOCK_MBPS`。构建要求 0 < 平均 ≤ 最大 ≤ 400 Mbps：编码器以 16 位保存“最大 kbit / 8”，约 536 Mbps 溢出，取 400 留出余量。报告 `features.bitrate_slowmo_uncap` 记录默认高质量修改和慢动作上限，`features.bitrate_profiles` 记录运行时函数、档位、菜单及配置文件。
 
 ## 实现证据
 

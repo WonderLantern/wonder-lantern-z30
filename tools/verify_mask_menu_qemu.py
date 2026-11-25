@@ -286,7 +286,7 @@ def main():
             if a.stock_submit_control:expected=[]
             (s.out/f'04-live-{profile}.png').write_bytes(png_from_ppm(raw))
             if a.observe_ui:
-                from z30_extensions.features.aspect_mask import SUBMIT_SITE,SUBMIT_EXPECTED
+                from z30_extensions.features.aspect.mask import SUBMIT_SITE, SUBMIT_EXPECTED
                 patched=s.remote.memory(SUBMIT_SITE,10)
                 for mode in ('active','stock-submit','restored'):
                     write(SUBMIT_SITE,bytes.fromhex(SUBMIT_EXPECTED) if mode=='stock-submit' else patched)

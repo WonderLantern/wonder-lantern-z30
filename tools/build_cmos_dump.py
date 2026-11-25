@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.container import extract_eg
 from z30_extensions.plan import Plan
-from z30_extensions.features.shutter_sound import add
+from z30_extensions.features.sound.shutter_sound import add
 
 
 def build(stock, trace=False, spi=False, ptp=False, window=False):
@@ -33,7 +33,7 @@ def build(stock, trace=False, spi=False, ptp=False, window=False):
     else:
         add(plan, cmos_dump=True)
     if ptp:
-        from z30_extensions.features.ptp_read import add as add_ptp_read
+        from z30_extensions.features.research.ptp_read import add as add_ptp_read
         add_ptp_read(plan)
     image, report = plan.finish()
     report.update(preset='cmos-window-research' if window else 'cmos-ptp-research' if ptp else 'cmos-spi-research' if spi else 'cmos-trace-research' if trace else 'cmos-dump-research',

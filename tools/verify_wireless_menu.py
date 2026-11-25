@@ -6,7 +6,7 @@ from pathlib import Path
 from verify_sound_settings import Fixture
 from probe_wireless_send import probe_options, probe_host_dispatch
 from z30_extensions.container import extract_eg
-from z30_extensions.features.wireless_ui import MAGIC,SOURCE,DESTINATION,LENGTH,BUFFER_SITE
+from z30_extensions.features.research.wireless_ui import MAGIC, SOURCE, DESTINATION, LENGTH, BUFFER_SITE
 from z30_extensions.platform.z30_120 import BASE
 
 PATH='A:\\WL-WIFI.CFG'

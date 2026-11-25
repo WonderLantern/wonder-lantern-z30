@@ -19,8 +19,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from z30_extensions.container import extract_eg
-from z30_extensions.features import cmos_dump as cd
-from z30_extensions.features.sound_layout import SUCCESS
+from z30_extensions.features.research import cmos_dump as cd
+from z30_extensions.features.menu.layout import SUCCESS
 from native_runtime import Context, RAM
 from build_cmos_dump import build
 from unicorn import UC_HOOK_CODE

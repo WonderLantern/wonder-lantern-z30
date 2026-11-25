@@ -1,6 +1,6 @@
 import struct
 import unittest
-from z30_extensions.modules import pack, parse, MAX_CODE
+from z30_extensions.features.modules.files import pack, parse, MAX_CODE
 
 
 class ModuleFormatTests(unittest.TestCase):

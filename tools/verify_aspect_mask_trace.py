@@ -20,8 +20,8 @@ def main():
         p.add_argument('--'+key,type=Path,required=True)
     a=p.parse_args();sys.path.insert(0,str(a.deps.resolve()))
     from z30_extensions.container import extract_eg
-    from z30_extensions.features.aspect_mask_trace import FIELDS,TRACE_OFFSET,TRACE_BYTES,decode
-    from z30_extensions.features.aspect_mask import HISTORY_OFFSET,STATE_LOCK
+    from z30_extensions.features.aspect.mask_trace import FIELDS, TRACE_OFFSET, TRACE_BYTES, decode
+    from z30_extensions.features.aspect.mask import HISTORY_OFFSET, STATE_LOCK
     from verify_sound_settings import Fixture
     stock=extract_eg(a.source.read_bytes());image=a.image.read_bytes()
     report=json.loads(a.report.read_text());feature=report['features']['aspect_profiles']

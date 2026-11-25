@@ -19,7 +19,7 @@ sys.path[:0]=[str(ROOT/'src'),str(ROOT/'tools')]
 
 def verify(stock,image,report):
     from verify_sound_settings import Fixture
-    from z30_extensions.features.sound_layout import PAGE_INDEX,FILES_INDEX,SWITCH_INDEX,POPUP_INDEX
+    from z30_extensions.features.menu.layout import PAGE_INDEX, FILES_INDEX, SWITCH_INDEX, POPUP_INDEX
     from unicorn import UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1
     sound=report['features']['menu_framework'];functions={k:int(v,16) for k,v in sound['functions'].items()}
@@ -50,7 +50,7 @@ def verify(stock,image,report):
     for index,pointer in pages.items():
         assert fixture.call(functions['getter'],(2,index))==pointer
         assert int.from_bytes(fixture.u.mem_read(pointer+2,2),'little')==index
-    from z30_extensions.features.menu_framework import root_layout
+    from z30_extensions.features.menu.framework import root_layout
     paths=sound['menu_paths']
     status=sound.get('status_page')
     rows,_=root_layout(set(paths)-{'status'}) if status else ([],[])

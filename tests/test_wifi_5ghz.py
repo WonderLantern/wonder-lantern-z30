@@ -2,9 +2,7 @@ import struct
 import unittest
 from types import SimpleNamespace
 
-from z30_extensions.features.wifi_5ghz import (
-    EXPECTED_TABLE, RECORD_SIZE, RESERVED_PROFILES, SLOT_COUNT, TABLE_BASE, VALID_PROFILES, add,
-)
+from z30_extensions.features.connect.wifi_5ghz import EXPECTED_TABLE, RECORD_SIZE, RESERVED_PROFILES, SLOT_COUNT, TABLE_BASE, VALID_PROFILES, add
 
 
 class FakePlan:

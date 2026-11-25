@@ -19,8 +19,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from z30_extensions.container import extract_eg
-from z30_extensions.features import cmos_dump as cd, cmos_spi as cs
-from z30_extensions.features.sound_layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC
+from z30_extensions.features.research import cmos_dump as cd, cmos_spi as cs
+from z30_extensions.features.menu.layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC
 from native_runtime import Context
 from build_cmos_dump import build
 from decode_cmos_modes import SELECTOR, COMMANDS, TYPES

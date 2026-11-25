@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
-from z30_extensions.features import portrait_ui as pu  # noqa: E402
+from z30_extensions.features.portrait import layout as pu  # noqa: E402
 from portrait_live import Live  # noqa: E402
 
 POSE_BYTE = 0xC1D41318 + 0x90

@@ -2,7 +2,7 @@
 
 ## 菜单注册与原厂菜单直达行（2026-11-03）
 
-**新增页面**：在 [shutter_sound.py](../src/z30_extensions/features/shutter_sound.py) 调用一次 `register()`，并在 [menu_slots.py](../src/z30_extensions/features/menu_slots.py) 的 `BLOCKS` 里预留文字槽。状态块、控件 ID、首页行和原生路由都由注册表生成。超过 8 行的页面会让构建失败，因为第 9 行已超出 480 像素高的屏幕，且自有页面的绘制循环不支持滚动。要出现在原厂菜单里，把页面加入 `NATIVE_MENUS`。
+**新增页面**：在 [features/sound/shutter_sound.py](../src/z30_extensions/features/sound/shutter_sound.py) 调用一次 `register()`，并在 [features/menu/slots.py](../src/z30_extensions/features/menu/slots.py) 的 `BLOCKS` 里预留文字槽。状态块、控件 ID、首页行和原生路由都由注册表生成。超过 8 行的页面会让构建失败，因为第 9 行已超出 480 像素高的屏幕，且自有页面的绘制循环不支持滚动。要出现在原厂菜单里，把页面加入 `NATIVE_MENUS`。
 
 **文字槽**：原厂表共 300 个槽，每个 51 字节（QEMU 读取确认）。旧编号有 29 个与原厂按立即数写入的槽重合，现已全部移开，`STOCK_SLOTS` 在导入时检查。另有约 288 处原厂调用的槽号是算出来的，静态上无法排除，只在一次 QEMU 会话访问到的页面里确认过没有写入新范围，所以这不是完整证明。旧重合是否真的造成过可见错误也没有证实。
 
@@ -153,7 +153,7 @@ python tools/font_coverage.py --firmware Z_30_0120.bin --check          # 核对
 
 ### 补字接入构建
 
-只要构建用到中文标签（`ui_text.prepare`），`features/cjk_fonts.py` 就用 `extend_font` 重建字体 0、2，与复制的字体指针表和大小表一起放在镜像尾部，并把字面量 `0x104530F4`、`0x104530F8` 改为指向新表（报告中 `features.cjk_fonts`）。原厂字体数据不变。
+只要构建用到中文标签（`ui_text.prepare`），`features/menu/cjk_fonts.py` 就用 `extend_font` 重建字体 0、2，与复制的字体指针表和大小表一起放在镜像尾部，并把字面量 `0x104530F4`、`0x104530F8` 改为指向新表（报告中 `features.cjk_fonts`）。原厂字体数据不变。
 
 启动代码 `0x10452F34` 交给字体引擎两张表：`0x109F62E4` 处是 25 个字体指针（0–24），紧跟其后的 `0x109F6348` 处是这 25 个字体的大小，二者分别由字面量 `0x104530F4`、`0x104530F8` 引用。第一版补字固件（`output/cjk-glyphs-v1`）只复制了 24 个指针、没有复制大小表，用户实机打开“语言”界面时卡死。在 QEMU 中复现：原厂固件正常，v1 固件打开语言页后另一个核跳进 RAM 执行（PC `0xC2B1065C`）。`probe_language_page_qemu.py --observe-fonts` 显示语言页会请求字体 24，而 v1 副本的第 24 项是其他数据。v2 复制全部 25 个指针和 25 个大小，并更新字体 0、2 的大小。补上的字形来自 `platform/z30_120_extra_glyphs.json`，由 `tools/build_cjk_glyphs.py` 从 Noto 字体生成，构建本身不需要 fontTools 或 Noto 文件。
 

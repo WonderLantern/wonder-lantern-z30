@@ -12,8 +12,8 @@ WAV=0x12101000
 
 def prepare(target):
  sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
- from z30_extensions.assembly import constant as c,invoke as n,assemble,jump
- from z30_extensions.features.sound_layout import CONFIG_MAGIC,SUCCESS
+ from z30_extensions.assembly import constant as c, invoke as n, assemble, jump
+ from z30_extensions.features.menu.layout import CONFIG_MAGIC, SUCCESS
  w=io.BytesIO()
  with wave.open(w,'wb') as a:a.setnchannels(1);a.setsampwidth(2);a.setframerate(8000);a.writeframes(b'\x01\x00'*80)
  wav=w.getvalue()

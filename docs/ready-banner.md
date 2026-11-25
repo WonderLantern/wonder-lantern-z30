@@ -9,7 +9,7 @@
 - 画在屏幕层，不会进照片和视频。
 - 只在卡文件构建里有。`tools/build_card.py --no-banner` 可以去掉。
 
-代码：`features/ready_banner.py`（运行时）、`features/ready_banner_image.py`（构建时生成图）。
+代码：`features/card/ready_banner.py`（运行时）、`features/card/ready_banner_image.py`（构建时生成图）。
 
 ## 做法
 
@@ -47,7 +47,7 @@
 
 几版卡文件里提示的绘制次数（诊断读数 D）都有两百次左右，但只有一版在屏幕上看得到。画提示用到的描述符、像素、代码都一样，唯一不同的是像素数据的地址：看得到的那版碰巧在 128 字节边界上，看不到的几版在 64 字节边界之外 8、28、40 字节处。相机的图形处理器不接受没对齐的图像数据（QEMU 不检查，所以 QEMU 里一直正常）。
 
-现在三张图都放在 256 字节边界上（`PIXEL_ALIGN`）。加载器总是把 tail 放在 64 KB 边界上（`card_loader.py`：`(块地址 + 0x10007) & ~0xFFFF`），所以 tail 里的偏移对齐即可。`tests/test_ready_banner.py` 检查三个链接基址下都对齐。
+现在三张图都放在 256 字节边界上（`PIXEL_ALIGN`）。加载器总是把 tail 放在 64 KB 边界上（`features/card/loader.py`：`(块地址 + 0x10007) & ~0xFFFF`），所以 tail 里的偏移对齐即可。`tests/test_ready_banner.py` 检查三个链接基址下都对齐。
 
 实机（`output/card-banner-v1-repaint5`，对齐后）：不碰按键，提示自己出现、自己消失；半按后信息层照常更新。读数 `P4M0W07K1AD52R00U0X0`：画了 82 次，下面的重绘触发一次也没标记（`M0`），出现靠的是加载完成后相机自己的几次重画。之前"要半按才出现""半按也不出现"，主要是没对齐造成的。
 

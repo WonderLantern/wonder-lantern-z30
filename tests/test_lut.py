@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions import lut
+from z30_extensions.host import lut
 
 
 def cube_text(size=3, rows=None, domain=None, header=('TITLE t', 'LUT_3D_SIZE 3')):

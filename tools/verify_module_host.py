@@ -15,9 +15,9 @@ from unicorn import UC_HOOK_CODE
 from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3, UC_ARM_REG_PC, UC_ARM_REG_LR
 from z30_extensions.build import build
 from z30_extensions.container import extract_eg
-from z30_extensions.modules import example, pack, MAX_TEXT
+from z30_extensions.features.modules.files import example, pack, MAX_TEXT
 from z30_extensions.assembly import assemble
-from z30_extensions.features import module_host as mh
+from z30_extensions.features.modules import host as mh
 
 
 class Fixture(Context):

@@ -20,7 +20,7 @@ def main():
         p.add_argument('--'+key,type=Path,required=True)
     a=p.parse_args();sys.path.insert(0,str(a.deps.resolve()))
     from z30_extensions.container import extract_eg
-    from z30_extensions.features.aspect_border import DIAGNOSTIC_NAMES,DIAGNOSTIC_MAGIC
+    from z30_extensions.features.aspect.border import DIAGNOSTIC_NAMES, DIAGNOSTIC_MAGIC
     from verify_sound_settings import Fixture
     from read_aspect_trace import decode
     from unicorn import UC_HOOK_CODE,UC_HOOK_MEM_INVALID

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
-from z30_extensions.features.ui_text import TRANSLATIONS
+from z30_extensions.features.menu.text import TRANSLATIONS
 
 TAB = 0xc1832d50
 TAB_X, PHOTO_TAB_Y = 32, 90

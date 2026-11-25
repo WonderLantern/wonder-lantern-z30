@@ -25,7 +25,7 @@ class ImuHookTest(unittest.TestCase):
                                       evr_hook=True, imu_hook=True)
 
     def run_site(self, image, stock_result, cell=0):
-        from z30_extensions.features.imu_hook import SITE, SUCCESS, FAILURE, ACCEL_READ, IMU_CELL
+        from z30_extensions.features.modules.imu_hook import SITE, SUCCESS, FAILURE, ACCEL_READ, IMU_CELL
         from z30_extensions.platform.z30_120 import BASE
         u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
         u.mem_map(BASE, (len(image) + 0xFFFF) & ~0xFFFF)
@@ -67,7 +67,7 @@ class ImuHookTest(unittest.TestCase):
             self.assertEqual(len(hooked[0]), 1)
 
     def test_armed_keeps_stock_result_and_branch(self):
-        from z30_extensions.features.imu_hook import SUCCESS, FAILURE
+        from z30_extensions.features.modules.imu_hook import SUCCESS, FAILURE
         for result, target in ((1, SUCCESS), (0, FAILURE)):
             stops, regs, calls = self.run_site(self.image, result, 0x30000001)
             self.assertEqual(stops, [target])

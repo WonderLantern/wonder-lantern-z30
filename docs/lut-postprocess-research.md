@@ -444,11 +444,11 @@ python tools/probe_lut_decode_chain.py
 
 ### 颜色合同的静态边界与决策（阶段 B）
 
-对解码输出平面颜色合同的静态追查到硬件边界为止：解码消息处理器 `0x10219634` 只做消息转发，颜色约定固化在 JPEG 硬件 codec 内部；ROM 中不存在软件 YCbCr→RGB 例程（BT.601 定点常数全 ROM 扫描无命中）；调试转储 `YCbCrFormat = %d`（`0x100BA470`）与回放缓存名 `mip%05d.ycc`（`0x100BA984`）证明 `.ycc` 平面格式是一等公民但枚举语义未打开。据此决策：**转换常数全部集中在 `z30_extensions.lut` 一处**（默认 JFIF/BT.601 有限范围、Y 16–235、C 16–240 中心 128），真机用受控色卡验证后只调一个模块；交错对内 Cb/Cr 字节顺序同样挂起真机验证。缓存维护直接调用原厂 `0x10204B48/0x10204B0C`（整帧长度走 SVC 特权路径），输入读前 invalidate、输出写后 clean。
+对解码输出平面颜色合同的静态追查到硬件边界为止：解码消息处理器 `0x10219634` 只做消息转发，颜色约定固化在 JPEG 硬件 codec 内部；ROM 中不存在软件 YCbCr→RGB 例程（BT.601 定点常数全 ROM 扫描无命中）；调试转储 `YCbCrFormat = %d`（`0x100BA470`）与回放缓存名 `mip%05d.ycc`（`0x100BA984`）证明 `.ycc` 平面格式是一等公民但枚举语义未打开。据此决策：**转换常数全部集中在 `z30_extensions.host.lut` 一处**（默认 JFIF/BT.601 有限范围、Y 16–235、C 16–240 中心 128），真机用受控色卡验证后只调一个模块；交错对内 Cb/Cr 字节顺序同样挂起真机验证。缓存维护直接调用原厂 `0x10204B48/0x10204B0C`（整帧长度走 SVC 特权路径），输入读前 invalidate、输出写后 clean。
 
 ### LUT 核心（阶段 C）
 
-`z30_extensions.lut` 提供主机端完整实现与相机二进制合同：
+`z30_extensions.host.lut` 提供主机端完整实现与相机二进制合同：
 
 - `.cube` 解析子集：3D 表（2..65）、共享 DOMAIN_MIN/MAX、红通道最快的数据顺序；1D 表、未知指令、行数不符、域反转、值越域全部拒绝。21 个单元测试覆盖解析、插值钳制、中点、通道交换、二进制往返与 YCbCr 往返。
 - 相机二进制 `WL3L` v1：22 字节头（magic/版本/尺寸/域六端点，0..65535 刻度）+ size³×3×u16。
@@ -458,7 +458,7 @@ python tools/probe_lut_decode_chain.py
 
 操作初始化表 `0x115CD6CC` 按 `op*8` 索引、op 0x20 结束、0x21 起是系数数据——不加新操作号。**钩子点选定为 index-6 处理函数入口 `0x1025FB8E`**（worker `0x100CC910` 经描述符 `+0x14` 调用它，参数对象为静态 `0xC295BE94`：+4 输入描述符、+0x10 输出描述符、+0x14 结果 0/1；模式/强度在 +0xC/+0xD）。gate 复制被位移的 `cmp/push/beq/mov/bl` 五条指令，标志字非零走 LUT 核心、为零原样落回 stock（远调用经 r12——追加区距 stock 代码 31.6 MB，超出 Thumb BL ±16 MB，直接 BL 会被 Keystone 静默编码错误，这是本轮踩过的坑）。
 
-`z30_extensions.features.lut_core` 生成 Thumb-2 核心：验证描述符（格式 1、宽高一致、x0 偶数）→ 原厂 invalidate 输入平面 → 逐像素 BT.601 有限范围转换 → 打包三线性查表（u16.16 权重、逐项 `>>16` 累加）→ 反向转换 → 色度对平均（4:2:2）→ 原厂 clean 输出平面 → 返回 1/0。`lut_lookup` 独立成函数（r7=块指针），坐标先钳制进域再无符号 `udiv`。
+`z30_extensions.features.lut.core` 生成 Thumb-2 核心：验证描述符（格式 1、宽高一致、x0 偶数）→ 原厂 invalidate 输入平面 → 逐像素 BT.601 有限范围转换 → 打包三线性查表（u16.16 权重、逐项 `>>16` 累加）→ 反向转换 → 色度对平均（4:2:2）→ 原厂 clean 输出平面 → 返回 1/0。`lut_lookup` 独立成函数（r7=块指针），坐标先钳制进域再无符号 `udiv`。
 
 ### 验证与试验固件（阶段 E 第一档）
 
@@ -470,7 +470,7 @@ python tools/probe_lut_decode_chain.py
 
 ## 第九轮：SD 加载器组件与活动表指针（2026-10-29）
 
-本轮以最新交接报告第 10 节为入口，重写未接入的 `features/lut_sdload.py`，新增 `tools/verify_lut_sdload.py`。**组件已通过离线执行，尚未装入固件或在真实 worker 中调用。** 第八轮所谓阶段 A–E 的里程碑仅指分段研究和内嵌 LUT 试验构建，不能作为最终阶段 E 真机验收完成的证据。
+本轮以最新交接报告第 10 节为入口，重写未接入的 `features/lut/sdload.py`，新增 `tools/verify_lut_sdload.py`。**组件已通过离线执行，尚未装入固件或在真实 worker 中调用。** 第八轮所谓阶段 A–E 的里程碑仅指分段研究和内嵌 LUT 试验构建，不能作为最终阶段 E 真机验收完成的证据。
 
 ### 接口与内存
 
@@ -507,7 +507,7 @@ python tools/verify_lut_trial_image.py
 
 ## 第十轮：动态内存会话、处理互斥与失败资源保留（2026-10-29）
 
-新增 `features/lut_session.py` 和 `tools/verify_lut_session.py`，把单独的加载器推进为有资源归属和处理互斥的组件。**尚未装入固件菜单或真实任务。** 此轮解决的是动态内存与失败保留的离线合同，实际加载入口、运行时可用堆空间和物理 SD 调用仍未验证。
+新增 `features/lut/session.py` 和 `tools/verify_lut_session.py`，把单独的加载器推进为有资源归属和处理互斥的组件。**尚未装入固件菜单或真实任务。** 此轮解决的是动态内存与失败保留的离线合同，实际加载入口、运行时可用堆空间和物理 SD 调用仍未验证。
 
 ### 原厂堆接口的证据
 
@@ -563,7 +563,7 @@ python tools/verify_lut_trial_image.py
 
 ### 菜单页与会话归属
 
-`features/lut_ui.py` 在 Settings Extensions 第 960 页建立“照片 LUT”页（页偏移 224,964，状态区 225,008），复用 `shutter_sound` 已拥有的 Extensions 页面槽、文本和渲染回调。加载动作不在 effect worker 内执行堆分配或文件 I/O；48 字节会话放在 Extensions 主机 RAM，关机前固定，默认关闭。
+`features/lut/ui.py` 在 Settings Extensions 第 960 页建立“照片 LUT”页（页偏移 224,964，状态区 225,008），复用 `shutter_sound` 已拥有的 Extensions 页面槽、文本和渲染回调。加载动作不在 effect worker 内执行堆分配或文件 I/O；48 字节会话放在 Extensions 主机 RAM，关机前固定，默认关闭。
 
 | 索引 | 动作 | 行为 |
 |---|---|---|
@@ -572,11 +572,11 @@ python tools/verify_lut_trial_image.py
 | 2 | 关闭并释放 | 管理器 +4 恢复 fallback，清 LUT 使能标志 |
 | 3 | 状态 | 只刷新显示，不触发加载或分配 |
 
-最近一次动作结果写在状态区 +48，状态区共 52 字节；菜单按会话 +0 标志和 +16 活动分配区分“已关闭 / 内置 / SD 已就绪”。忙、分配失败、清理待重试等状态直接映射为界面文本。`features/ui_text.py` 增加了对应中英文串。关闭并释放只回收 LUT 会话资源，不释放 Extensions 宿主状态。
+最近一次动作结果写在状态区 +48，状态区共 52 字节；菜单按会话 +0 标志和 +16 活动分配区分“已关闭 / 内置 / SD 已就绪”。忙、分配失败、清理待重试等状态直接映射为界面文本。`features/menu/text.py` 增加了对应中英文串。关闭并释放只回收 LUT 会话资源，不释放 Extensions 宿主状态。
 
 ### 同步失败传播
 
-`features/lut_failure.py` 在 `0x100A5552` 安装结果桩。桩把效果返回写入 `0x472C`，只处理效果索引 6。结果为 0、结果对象为空、对象 +0 为 0，或对象 +0x14 为 0 时判失败；对象 +0 非零或 +0x14 非零表示异步尚未就绪，保持 stock。失败时写 `job+4=1`、清 `0x472C`，再恢复现场返回原流程。save 的 phase-4 表（节点 `0xC1888EB4`，8 步）和 preview 表（节点 `0xC18872A8`，2 步）被复制并给每个非空步骤加 guard：`job+4` 非零时跳过该步骤。
+`features/lut/failure.py` 在 `0x100A5552` 安装结果桩。桩把效果返回写入 `0x472C`，只处理效果索引 6。结果为 0、结果对象为空、对象 +0 为 0，或对象 +0x14 为 0 时判失败；对象 +0 非零或 +0x14 非零表示异步尚未就绪，保持 stock。失败时写 `job+4=1`、清 `0x472C`，再恢复现场返回原流程。save 的 phase-4 表（节点 `0xC1888EB4`，8 步）和 preview 表（节点 `0xC18872A8`，2 步）被复制并给每个非空步骤加 guard：`job+4` 非零时跳过该步骤。
 
 已执行验证 6 类：正常同步结果、异步尚未完成、其他效果索引、提交被拒、核心格式失败、处理锁忙。失败路径表现为 `job+4=1`、最终原厂回调发送 `0x200` 失败事件、后续 phase-4 图像处理/编码/写入被跳过、stock 主图引用保持；正常路径不受影响。**边界**：外层对象释放、卡上回滚和上层错误展示没有执行验证，不能把“跳过后续阶段”等同于完整事务回滚。
 
@@ -681,14 +681,14 @@ v5 加载 132,684 字节的 `WL-LUT.CUBE` 成功（状态行「SD LUT 已就绪�
 
 ### 定位
 
-- 钩子本来就在处理器入口：`src/z30_extensions/features/lut_retouch.py:16` 的 `GATE = (0x1025FB8E, ..., 'Index-6 effect processing entry (retouch ops 5/6/7)')`。该函数的参数对象是 `+4` 输入描述符、`+0x10` 输出描述符、`+0x14` 结果。
+- 钩子本来就在处理器入口：`src/z30_extensions/features/lut/retouch.py:16` 的 `GATE = (0x1025FB8E, ..., 'Index-6 effect processing entry (retouch ops 5/6/7)')`。该函数的参数对象是 `+4` 输入描述符、`+0x10` 输出描述符、`+0x14` 结果。
 - 操作表 `0x115CD6CC` 按 `op*8` 索引、`op 0x20` 结束、`0x21` 起是系数数据：操作 5/6/7 构造内部索引 6（单色／棕褐／青色族），操作 1 构造内部索引 0（D-Lighting）。索引表 `0x11F926F0`–`0x11F92708` 的第 6 项是 `0x1025FB8F`，全镜像只有这一处字面引用。
 - 结论：点 D-Lighting 时我们的钩子根本不在调用路径上，现象自洽；单色打开后的三个变体都走索引 6。
 
 ### 修改
 
-- `src/z30_extensions/features/lut_core.py` 新增 `_cell_gate_source`，`build_lut_core(..., cell=None)` 在给定单元时用它：从固定单元读会话指针 → 校验 `[session] != 0` → 锁 `session+24` → 把会话放进 r1 调核心；`dynamic` 统一控制核心是否保存 r1。
-- `src/z30_extensions/features/lut_ui.py` 新增 `ACTIVATION_CELL = STATE_ANCHOR + 24`（`0xC1832D3C`，未使用的 page-0 描述符：`+16` 是块锚点、`+20` 是打开锁、`+24` 空着）。`bitrate_action` 在提交成功后写入会话指针、禁用时清零；`bitrate_restore` 在页面初始化时清零，避免旧指针悬挂。
+- `src/z30_extensions/features/lut/core.py` 新增 `_cell_gate_source`，`build_lut_core(..., cell=None)` 在给定单元时用它：从固定单元读会话指针 → 校验 `[session] != 0` → 锁 `session+24` → 把会话放进 r1 调核心；`dynamic` 统一控制核心是否保存 r1。
+- `src/z30_extensions/features/lut/ui.py` 新增 `ACTIVATION_CELL = STATE_ANCHOR + 24`（`0xC1832D3C`，未使用的 page-0 描述符：`+16` 是块锚点、`+20` 是打开锁、`+24` 空着）。`bitrate_action` 在提交成功后写入会话指针、禁用时清零；`bitrate_restore` 在页面初始化时清零，避免旧指针悬挂。
 - 门控不再调用 `bitrate_get`，因此与菜单页是否还开着无关。
 
 ### 验证
@@ -709,7 +709,7 @@ v6 镜像上「使用内置 LUT 后走单色路径卡死、强制关机」。反
 
 ### NEON 查表内核
 
-`features/lut_core.py` 新增 `simd=True` 构建：保留标量骨架（门控/描述符校验/缓存/行循环/色度前奏/正向/反向转换），每像素查表段换成 `lut_pix`——标量轴映射（udiv）之后，NEON 完成 `VMULL.U16` 角点权重、`VLD3.16` lane 聚合（8 个角点的 RGB 三元组按 6 字节步长取回）、`VMULL.U16`+`VPADD` 三线性累加。`lut_lookup` 不再装入 SIMD 镜像。实测 257.9 条/像素（2.54 倍），全尺寸约 53 亿条。固件静态扫描确认 stock 大量使用 NEON（8,123+ 条 SIMD 指令）、QEMU 机型为双核 Cortex-A15，任务上下文可执行 NEON。
+`features/lut/core.py` 新增 `simd=True` 构建：保留标量骨架（门控/描述符校验/缓存/行循环/色度前奏/正向/反向转换），每像素查表段换成 `lut_pix`——标量轴映射（udiv）之后，NEON 完成 `VMULL.U16` 角点权重、`VLD3.16` lane 聚合（8 个角点的 RGB 三元组按 6 字节步长取回）、`VMULL.U16`+`VPADD` 三线性累加。`lut_lookup` 不再装入 SIMD 镜像。实测 257.9 条/像素（2.54 倍），全尺寸约 53 亿条。固件静态扫描确认 stock 大量使用 NEON（8,123+ 条 SIMD 指令）、QEMU 机型为双核 Cortex-A15，任务上下文可执行 NEON。
 
 两个连带修正（主机合同与 ARM 同步改）：
 
@@ -724,7 +724,7 @@ v6 镜像上「使用内置 LUT 后走单色路径卡死、强制关机」。反
 
 ### v7 镜像与激活回退
 
-`lut_ui.py`：核心换 `simd=True` + `block_getter=f['bitrate_get']`（v5 getter 方案）；删除 `ACTIVATION_CELL`。复核确认框架 `get()` 只读 `STATE_ANCHOR+16`（host 块锚点，关机前有效）加魔数校验，与菜单页开关无关，音频回调同样使用——v5 担心的「菜单关闭后锚点失效」不成立，v6 的固定单元写入（原厂 page-0 描述符 +24，无法证明空闲）撤销后，加载回归风险面归零，加载路径与真机状态 0 的 v5 一致。
+`features/lut/ui.py`：核心换 `simd=True` + `block_getter=f['bitrate_get']`（v5 getter 方案）；删除 `ACTIVATION_CELL`。复核确认框架 `get()` 只读 `STATE_ANCHOR+16`（host 块锚点，关机前有效）加魔数校验，与菜单页开关无关，音频回调同样使用——v5 担心的「菜单关闭后锚点失效」不成立，v6 的固定单元写入（原厂 page-0 描述符 +24，无法证明空闲）撤销后，加载回归风险面归零，加载路径与真机状态 0 的 v5 一致。
 
 镜像 `output/lut-sd-menu-v7/EG209020.BIN`：33,998,750 字节，SHA-256 `5924E5D257D380BF440918FDD35D56C36AAF752E711EADE330C93BC9E74A6ECB`，追加块 59,236 字节（核心 2,232 + 管理器 2,580），13 处原地改写，`crc_residue=0`，`camera_verified=false`。**未上机**——本轮为离线静态处置：卡死根因消除（时长 ×2.54 + 逐位一致证明）、v6 回归风险面消除、全部遗留问题在无法上机的约束下处理完毕。剩余的实机验收（色彩合同、耗时、另存事务）见交接文档第 9 节。
 

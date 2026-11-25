@@ -6,9 +6,9 @@ from pathlib import Path
 
 from z30_extensions.build import build
 from z30_extensions.container import extract_eg
-from z30_extensions.features.liveview_dual import SNAPSHOT
-from z30_extensions.features.liveview_full_info import HISTOGRAM_MASK
-from z30_extensions.features.liveview_full_info_windows import WINDOWS, PREFIXES
+from z30_extensions.features.liveview.dual import SNAPSHOT
+from z30_extensions.features.liveview.full_info import HISTOGRAM_MASK
+from z30_extensions.features.liveview.full_info_windows import WINDOWS, PREFIXES
 from z30_extensions.platform.z30_120 import BASE
 
 

@@ -32,12 +32,13 @@ python -m pip install -e '.[sound,verify]'
 | `src/z30_extensions/container.py` | Verifies and decodes `Z_30_0120.bin`, extracts the EG module |
 | `src/z30_extensions/plan.py`, `patch.py` | Patch plan (tail allocation, original-byte checks), patch application, CRC rebuild, report |
 | `src/z30_extensions/card.py` | SD card loading: resident EG, links at several bases and relocations, the `WL.PATCH` format, reference loader |
-| `src/z30_extensions/features/card_loader.py` | Resident loader (Thumb, triggered from the IMU task) |
-| `src/z30_extensions/mmu_probe.py` | Research ZMOD: reads the MMU setup and tests whether code memory can be written |
+| `src/z30_extensions/features/card/loader.py` | Resident loader (Thumb, triggered from the IMU task) |
+| `src/z30_extensions/features/research/mmu_probe.py` | Research ZMOD: reads the MMU setup and tests whether code memory can be written |
 | `src/z30_extensions/assembly.py` | Keystone assembly, pre-assembled cache, common instruction snippets |
 | `src/z30_extensions/platform/z30_120.py` | Stock module identity and address mapping (`StockImage`) |
 | `src/z30_extensions/platform/fonts.py` | Stock font format: character maps, glyph index, outline codec, font rebuild |
-| `src/z30_extensions/features/` | Feature implementations; `menu_framework.py`/`menu_ui.py` are the extension menu framework, `shutter_sound.py`/`sound_*.py` the optional shutter sound part, `ui_text.py` handles menu text, `cjk_fonts.py` the added glyphs, `menu_tab.py` the optional eighth menu tab (it adds its icon as image IDs from `0x15E6`; further images go after it), `ready_banner.py`/`ready_banner_image.py` the card-file ready banner, `firmware_banner.py` the project name on the resident EG's firmware version page |
+| `src/z30_extensions/features/` | Feature implementations, one subpackage per subsystem: `menu/` (the extension menu framework `framework.py`/`ui.py`, labels `text.py`, extra glyphs `cjk_fonts.py`, page and state layout `layout.py`, text slots `slots.py`; `tab.py` is the optional eighth tab of the stock menu, whose icons start at image ID `0x15E6`, so add further images after them), `card/` (resident loader `loader.py`, project name on the firmware version page `firmware_banner.py`, the card build's live-view ready banner `ready_banner*.py`), `sound/` (the optional shutter sound), `photo/`, `video/`, `liveview/`, `connect/`, `aspect/`, `portrait/`, `nef/`, `gyro/`, `tracking3d/` (features and their menu pages), `modules/` (research SD module host and hooks), `lut/` and `research/` (research pages and probes) |
+| `src/z30_extensions/host/` | Host-side reference models of camera code (date-stamp pixels, 3D LUT) |
 | `tests/` | Unit tests (`unittest`) |
 | `tools/` | Research and verification tools: `inspect_*` and `probe_*` analyze, `verify_*` check, `build_*` generate data and releases |
 | `docs/` | Design, evidence and verification records per feature (mostly Chinese) |
@@ -47,7 +48,7 @@ python -m pip install -e '.[sound,verify]'
 
 ## Writing a patch
 
-Each feature is a module under `features/` exposing `add(plan, ...)`. `Plan` wraps the stock image and the "tail" appended to the end of the module:
+Each feature is a module in a subpackage of `features/` exposing `add(plan, ...)`. `Plan` wraps the stock image and the "tail" appended to the end of the module:
 
 ```python
 from ..assembly import assemble, constant, invoke
@@ -65,7 +66,7 @@ def add(plan):
 
 - **Addresses:** all addresses are runtime addresses. ROM starts at `0x10020000`; initialized data is mapped from `0xC1800000`, and `StockImage` converts to file offsets. Read stock content with `plan.image.read(address, size)` and `plan.image.words(address, count)`.
 - **Hooks:** to hook stock code, build long jumps with `assembly.jump(site, target, length)`. The patch must re-execute the displaced instructions and then jump back.
-- **Stock tables:** never edit them in place. Copy the table into the tail and point the literals that reference it at the copy. Find every reference first. `features/cjk_fonts.py` is the example: the font pointer table and the size table are two tables, and copying only one of them hung the stock Language page.
+- **Stock tables:** never edit them in place. Copy the table into the tail and point the literals that reference it at the copy. Find every reference first. `features/menu/cjk_fonts.py` is the example: the font pointer table and the size table are two tables, and copying only one of them hung the stock Language page.
 - **Assembly cache:** `assemble()` checks `asm_cache.gz` first and only calls Keystone on a miss. The Windows release no longer uses the cache; it bundles Keystone.
 - **Align your own image data to 256 bytes.** If a pixel buffer handed to the stock renderer is not aligned, the camera draws nothing, while QEMU does not check and shows it anyway. A card file's tail always starts on a 64 KiB boundary, so aligning offsets inside the tail is enough (see the [ready banner notes](docs/ready-banner.md), Chinese).
 
@@ -74,16 +75,16 @@ def add(plan):
 `card.build_card` links the tail with `Plan(card=True, tail_base=…)` at three bases starting with `0x20000000`, derives relocations by comparing them, and the loader places the tail in RAM ([details](docs/card-loader.md), Chinese). Feature code must also:
 
 - **Depend on the tail base only linearly.** Addresses from `plan.alloc`, `constant()` (MOVW/MOVT) and 32-bit literals are fine; shifting or truncating a tail address makes the build fail with "address dependence is neither ABS32 nor MOVT". Never hard-code tail addresses or assume the tail directly follows the stock image (`liveview_dual` and `liveview_full_info` take `tail_base` for this).
-- **Edit only writable memory.** On the camera only EG `0x10000000..0x106FFFFF` is a DRAM copy, and the scatter data is RAM at `0xC1800000..` after boot; tables, menu records and anything else from `0x10700000` on cannot be written, and `card.runtime_address` rejects such edits. For such a table, add a `getattr(plan, 'card', False)` branch that uses `plan.copy_table` for an edited copy and changes the pointer to it in writable memory. Examples: `wifi_5ghz.py`, `bitrate_slowmo_uncap.py`, `shutter_sound.seed_record`. Full builds skip that branch and stay byte-identical.
+- **Edit only writable memory.** On the camera only EG `0x10000000..0x106FFFFF` is a DRAM copy, and the scatter data is RAM at `0xC1800000..` after boot; tables, menu records and anything else from `0x10700000` on cannot be written, and `card.runtime_address` rejects such edits. For such a table, add a `getattr(plan, 'card', False)` branch that uses `plan.copy_table` for an edited copy and changes the pointer to it in writable memory. Examples: `features/connect/wifi_5ghz.py`, `features/video/bitrate.py`, `shutter_sound.seed_record`. Full builds skip that branch and stay byte-identical.
 - **Keep data read at boot in the resident EG.** The loader runs about 3 s after power-on; the CJK font tables, for example, live in the resident EG (`cjk_fonts.add(..., common=True)`) and card builds reach them through `plan.resident`.
 - **Main RAM and load-time setup.** `plan.ram_edit(address, replacement, expected, name)` changes main RAM `0xC1800000..0xC79FFFFF` (scatter, bss, heap) after the loader checks `expected`. `plan.on_load(function)` registers a function called once after loading as `f(info, tail_base, tail_size)`, returning 1 on success. Both exist only in card builds; see the [interface notes](docs/card-loader.md) (Chinese).
-- **Do not rely on the newest loader.** Card files are built for the resident EG already on the camera (`--patch-only`), and its `capabilities` decide which sections and ranges a patch may use. For a new capability, add a section type in `card_loader.py` and mark it REQUIRED so older loaders refuse the file (`S=0D`) instead of half-loading it; use optional sections for extra information only.
+- **Do not rely on the newest loader.** Card files are built for the resident EG already on the camera (`--patch-only`), and its `capabilities` decide which sections and ranges a patch may use. For a new capability, add a section type in `features/card/loader.py` and mark it REQUIRED so older loaders refuse the file (`S=0D`) instead of half-loading it; use optional sections for extra information only.
 - `tests/test_card.py` and `tests/test_card_loader.py` cover the `full` card build, so a new feature in `full` is checked automatically.
 
 ## Adding a feature or preset
 
-1. Implement it under `src/z30_extensions/features/` and call it in order from `build()` in `build.py`.
-2. Public preset: add it to both `PRESETS` and `FEATURE_ORDER`. `FULL_FEATURES` currently equals `FEATURE_ORDER`, so a new feature joins `full` automatically. To make an opt-in preset outside `full`, turn `FULL_FEATURES` into an explicit list; the GUI shows only `full` and what it contains, so presets outside `full` are command-line only. A feature with a menu page also goes into `MENU_FEATURES` in `build.py`, which brings the menu framework (`features/menu_framework.py`).
+1. Implement it in the matching subpackage of `src/z30_extensions/features/` and call it in order from `build()` in `build.py`.
+2. Public preset: add it to both `PRESETS` and `FEATURE_ORDER`. `FULL_FEATURES` currently equals `FEATURE_ORDER`, so a new feature joins `full` automatically. To make an opt-in preset outside `full`, turn `FULL_FEATURES` into an explicit list; the GUI shows only `full` and what it contains, so presets outside `full` are command-line only. A feature with a menu page also goes into `MENU_FEATURES` in `build.py`, which brings the menu framework (`features/menu/framework.py`).
 3. The command-line menu and GUI read `PRESETS` directly, but update the numbering and combination expectations in `tests/test_presets.py`.
 4. Write unit tests for new code. Where patch code can run under Unicorn, execute it (see `tests/test_ui_text.py`).
 5. Write a topic document in `docs/` covering hooks, evidence and what is unverified, and update the feature tables in both READMEs.

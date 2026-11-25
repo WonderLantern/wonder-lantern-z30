@@ -32,12 +32,13 @@ python -m pip install -e '.[sound,verify]'
 | `src/z30_extensions/container.py` | 校验并解码 `Z_30_0120.bin`，提取 EG 模块 |
 | `src/z30_extensions/plan.py`、`patch.py` | 补丁计划（尾部分配、原字节校验）与应用、CRC 重建、报告 |
 | `src/z30_extensions/card.py` | SD 卡加载：常驻 EG、多基址链接与重定位、`WL.PATCH` 格式、参考加载器 |
-| `src/z30_extensions/features/card_loader.py` | 常驻加载器（Thumb，IMU 任务触发） |
-| `src/z30_extensions/mmu_probe.py` | 研究用 ZMOD：读取 MMU 设置并测试代码区能否写入 |
+| `src/z30_extensions/features/card/loader.py` | 常驻加载器（Thumb，IMU 任务触发） |
+| `src/z30_extensions/features/research/mmu_probe.py` | 研究用 ZMOD：读取 MMU 设置并测试代码区能否写入 |
 | `src/z30_extensions/assembly.py` | Keystone 汇编、预汇编缓存和常用指令片段 |
 | `src/z30_extensions/platform/z30_120.py` | 原厂模块身份、地址映射（`StockImage`） |
 | `src/z30_extensions/platform/fonts.py` | 原厂字体格式：字符表、字形索引、轮廓编解码、字体重建 |
-| `src/z30_extensions/features/` | 各功能实现；`menu_framework.py`/`menu_ui.py` 是扩展菜单框架，`shutter_sound.py`/`sound_*.py` 是可选的快门声音部分，`ui_text.py` 管菜单文字，`cjk_fonts.py` 管补字，`menu_tab.py` 是可选的菜单左侧第 8 个标签（它从图像 ID `0x15E6` 起加了自己的图标，再加图像请接在后面），`ready_banner.py`/`ready_banner_image.py` 是卡文件的取景就绪提示，`firmware_banner.py` 是常驻 EG 固件版本页上的项目名 |
+| `src/z30_extensions/features/` | 各功能实现，按子系统分包：`menu/`（扩展菜单框架 `framework.py`/`ui.py`、文字 `text.py`、补字 `cjk_fonts.py`、页面与状态布局 `layout.py`、文字槽 `slots.py`；`tab.py` 是可选的菜单左侧第 8 个标签，它从图像 ID `0x15E6` 起加了自己的图标，再加图像请接在后面）、`card/`（常驻加载器 `loader.py`、固件版本页项目名 `firmware_banner.py`、卡文件的取景就绪提示 `ready_banner*.py`）、`sound/`（可选的快门声音）、`photo/`、`video/`、`liveview/`、`connect/`、`aspect/`、`portrait/`、`nef/`、`gyro/`、`tracking3d/`（各项功能及其菜单页）、`modules/`（研究用 SD 模块宿主与钩子）、`lut/` 和 `research/`（研究页面与探针） |
+| `src/z30_extensions/host/` | 相机代码的主机参考实现（日期水印像素、3D LUT） |
 | `tests/` | 单元测试（`unittest`） |
 | `tools/` | 研究与验证工具：`inspect_*`、`probe_*` 用于分析，`verify_*` 用于检查，`build_*` 用于生成数据和发布 |
 | `docs/` | 各功能的设计、证据与验证记录（以中文为主） |
@@ -47,7 +48,7 @@ python -m pip install -e '.[sound,verify]'
 
 ## 补丁是怎么写的
 
-每个功能是 `features/` 下的一个模块，提供 `add(plan, ...)`。`Plan` 封装了原厂镜像和追加在模块末尾的“尾部”：
+每个功能是 `features/` 某个子包里的一个模块，提供 `add(plan, ...)`。`Plan` 封装了原厂镜像和追加在模块末尾的“尾部”：
 
 ```python
 from ..assembly import assemble, constant, invoke
@@ -65,7 +66,7 @@ def add(plan):
 
 - **地址：** 都是运行时地址。ROM 从 `0x10020000` 开始；初始化数据区映射在 `0xC1800000` 起，`StockImage` 会换算到文件偏移。读原厂内容用 `plan.image.read(address, size)` 和 `plan.image.words(address, count)`。
 - **跳转：** 挂钩原厂代码时用 `assembly.jump(site, target, length)` 生成长跳转。被覆盖的指令要在补丁里重新执行，再跳回原处。
-- **原厂数据表：** 不要直接改。先复制到尾部，再把引用它的字面量改过去。改之前要找全所有引用，例子见 `features/cjk_fonts.py`：字体指针表和大小表是两张表，只复制一张会让原厂语言页卡死。
+- **原厂数据表：** 不要直接改。先复制到尾部，再把引用它的字面量改过去。改之前要找全所有引用，例子见 `features/menu/cjk_fonts.py`：字体指针表和大小表是两张表，只复制一张会让原厂语言页卡死。
 - **汇编缓存：** `assemble()` 先查 `asm_cache.gz`，没命中才调用 Keystone。Windows 发布包已改为内置 Keystone，不再使用缓存。
 - **自己的图像数据要 256 字节对齐。** 交给原厂渲染器的像素缓冲没对齐时，相机上什么也画不出来，但 QEMU 不检查、照常显示。卡文件的 tail 总在 64 KiB 边界上，所以 tail 内偏移对齐即可（见[取景就绪提示](docs/ready-banner.md#图像要对齐2026-11-25实机确认)）。
 
@@ -74,16 +75,16 @@ def add(plan):
 `card.build_card` 用 `Plan(card=True, tail_base=…)` 把尾部链接到 `0x20000000` 等三个基址，相互比对后推导重定位，再由加载器放进 RAM（[说明](docs/card-loader.md)）。功能代码要同时满足：
 
 - **地址只能线性依赖尾部基址。** 用 `plan.alloc` 返回的地址、`constant()`（MOVW/MOVT）和 32 位字面量都可以；对尾部地址做移位、截断等非线性运算时，构建会报“address dependence is neither ABS32 nor MOVT”。不要写死尾部地址，也不要假设尾部紧跟在原厂镜像之后（`liveview_dual` 和 `liveview_full_info` 为此接受 `tail_base`）。
-- **edits 只能落在可写区。** 相机上只有 EG 的 `0x10000000..0x106FFFFF` 是 DRAM 副本，另外 scatter 数据开机后在 RAM `0xC1800000..`；`0x10700000` 之后的表、菜单记录等都写不进去，`card.runtime_address` 会拒绝。遇到这种表，在 `getattr(plan, 'card', False)` 分支里用 `plan.copy_table` 复制一份改好的副本，再改可写区里引用它的那个指针。例子：`wifi_5ghz.py`、`bitrate_slowmo_uncap.py`、`shutter_sound.seed_record`。普通整包构建不走这个分支，产物保持不变。
+- **edits 只能落在可写区。** 相机上只有 EG 的 `0x10000000..0x106FFFFF` 是 DRAM 副本，另外 scatter 数据开机后在 RAM `0xC1800000..`；`0x10700000` 之后的表、菜单记录等都写不进去，`card.runtime_address` 会拒绝。遇到这种表，在 `getattr(plan, 'card', False)` 分支里用 `plan.copy_table` 复制一份改好的副本，再改可写区里引用它的那个指针。例子：`features/connect/wifi_5ghz.py`、`features/video/bitrate.py`、`shutter_sound.seed_record`。普通整包构建不走这个分支，产物保持不变。
 - **开机就读的数据要放常驻 EG。** 加载器在开机约 3 秒后才运行，例如 CJK 字体表就在常驻 EG 里（`cjk_fonts.add(..., common=True)`），卡构建通过 `plan.resident` 引用它。
 - **主 RAM 与加载时初始化。** `plan.ram_edit(address, replacement, expected, name)` 可改 `0xC1800000..0xC79FFFFF` 的主 RAM（scatter、bss、堆），加载器先核对 `expected`。`plan.on_load(function)` 登记加载完成后调用一次的函数 `f(info, tail_base, tail_size)`，返回 1 表示成功。两者只用于卡构建，接口细节见[说明](docs/card-loader.md#功能代码可用的接口)。
-- **不要依赖最新加载器。** 卡文件按相机上已刷的常驻 EG 构建（`--patch-only`），它的 `capabilities` 决定能用哪些段和范围。需要新能力时，在 `card_loader.py` 加新的段类型并标为 REQUIRED，旧加载器会明确拒绝（`S=0D`），不会误加载；纯附加信息用可选段。
+- **不要依赖最新加载器。** 卡文件按相机上已刷的常驻 EG 构建（`--patch-only`），它的 `capabilities` 决定能用哪些段和范围。需要新能力时，在 `features/card/loader.py` 加新的段类型并标为 REQUIRED，旧加载器会明确拒绝（`S=0D`），不会误加载；纯附加信息用可选段。
 - `full` 的卡构建由 `tests/test_card.py` 和 `tests/test_card_loader.py` 覆盖；新功能进入 `full` 后自动受检。
 
 ## 新增功能或预设
 
-1. 在 `src/z30_extensions/features/` 写实现，并在 `build.py` 的 `build()` 里按顺序调用。
-2. 公开预设：同时加入 `PRESETS` 和 `FEATURE_ORDER`。`FULL_FEATURES` 目前就等于 `FEATURE_ORDER`，所以新功能会自动进入 `full`。如果要做成不在 `full` 里的可选预设，就把 `FULL_FEATURES` 改成显式列表；图形界面只显示 `full` 及其包含的功能，不在 `full` 里的预设只能用命令行。有菜单页的功能，要加入 `build.py` 的 `MENU_FEATURES`，构建时会自动带上菜单框架（`features/menu_framework.py`）。
+1. 在 `src/z30_extensions/features/` 下对应的子包里写实现，并在 `build.py` 的 `build()` 里按顺序调用。
+2. 公开预设：同时加入 `PRESETS` 和 `FEATURE_ORDER`。`FULL_FEATURES` 目前就等于 `FEATURE_ORDER`，所以新功能会自动进入 `full`。如果要做成不在 `full` 里的可选预设，就把 `FULL_FEATURES` 改成显式列表；图形界面只显示 `full` 及其包含的功能，不在 `full` 里的预设只能用命令行。有菜单页的功能，要加入 `build.py` 的 `MENU_FEATURES`，构建时会自动带上菜单框架（`features/menu/framework.py`）。
 3. 命令行菜单和图形界面直接读取 `PRESETS`，但 `tests/test_presets.py` 里的编号与组合预期要更新。
 4. 为新代码写单元测试。能用 Unicorn 执行的补丁代码，尽量执行一遍（参考 `tests/test_ui_text.py`）。
 5. 在 `docs/` 写专题文档，写明挂点、证据和未验证范围，并更新两份 README 的功能表。

@@ -31,7 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .build import build
-from .features import card_loader, cjk_fonts, firmware_banner
+from .features.card import loader as card_loader, firmware_banner
+from .features.menu import cjk_fonts
 from .plan import Plan
 from .platform.z30_120 import BASE, SCATTER
 

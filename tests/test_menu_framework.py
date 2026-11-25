@@ -12,7 +12,7 @@ except ImportError:  # optional build dependency
 
 class RootLayoutTests(unittest.TestCase):
     def layout(self, *present):
-        from z30_extensions.features.menu_framework import root_layout
+        from z30_extensions.features.menu.framework import root_layout
         rows, categories = root_layout(set(present))
         return rows, {cat['key']: list(cat['members']) for cat in categories}
 
@@ -32,8 +32,8 @@ class RootLayoutTests(unittest.TestCase):
         self.assertEqual(self.layout('zebra', 'sound'), (['zebra', 'sound'], {}))
 
     def test_category_pages_and_title_slots_are_fixed(self):
-        from z30_extensions.features.menu_framework import CATEGORY_PAGES, CATEGORY_TITLE_SLOTS
-        from z30_extensions.features.menu_slots import BLOCKS
+        from z30_extensions.features.menu.framework import CATEGORY_PAGES, CATEGORY_TITLE_SLOTS
+        from z30_extensions.features.menu.slots import BLOCKS
         self.assertEqual(CATEGORY_PAGES, {'photo': 970, 'focus': 971, 'video': 972, 'lab': 973})
         base, size = BLOCKS['category']
         self.assertEqual(sorted(CATEGORY_TITLE_SLOTS.values()), list(range(base, base + size)))
@@ -51,7 +51,7 @@ class MenuFrameworkTests(unittest.TestCase):
         return build(self.stock, preset)[1]
 
     def test_menu_feature_alone_has_no_sound(self):
-        from z30_extensions.features.sound_layout import NEW_SIZE, POPUP_INDEX, FILES_INDEX
+        from z30_extensions.features.menu.layout import NEW_SIZE, POPUP_INDEX, FILES_INDEX
         report = self.build('photo-zebra')
         features = report['features']
         self.assertNotIn('shutter_sound', features)
@@ -78,7 +78,7 @@ class MenuFrameworkTests(unittest.TestCase):
         self.assertEqual(sorted(menu['native_rows']), ['movie', 'photo'])
 
     def test_full_groups_every_page_into_categories(self):
-        from z30_extensions.features.sound_layout import MAX_ROWS
+        from z30_extensions.features.menu.layout import MAX_ROWS
         menu = self.build('full')['features']['menu_framework']
         self.assertEqual([c['key'] for c in menu['menu_categories']], ['status', 'photo', 'focus', 'video', 'sound'])
         self.assertEqual([c['page_index'] for c in menu['menu_categories']], [974, 970, 971, 972, 962])
@@ -110,8 +110,8 @@ class MenuFrameworkTests(unittest.TestCase):
         self.assertEqual([c['key'] for c in grouped['menu_categories']], ['status', 'zebra', 'sound'])
 
     def test_status_page_is_the_first_root_row(self):
-        from z30_extensions.features.menu_framework import STATUS_INDEX, STATUS_SLOTS
-        from z30_extensions.features.menu_slots import STOCK_SLOTS
+        from z30_extensions.features.menu.framework import STATUS_INDEX, STATUS_SLOTS
+        from z30_extensions.features.menu.slots import STOCK_SLOTS
         menu = self.build('full')['features']['menu_framework']
         status = menu['status_page']
         self.assertEqual(menu['menu_categories'][0], dict(key='status', row=0, control_id=menu['menu_categories'][0]['control_id'],
@@ -157,7 +157,7 @@ class MenuFrameworkTests(unittest.TestCase):
         self.assertFalse(report['features']['menu_framework']['pages']['955']['back_icon'])
 
     def test_menu_tab_icons(self):
-        from z30_extensions.features import menu_tab
+        from z30_extensions.features.menu import tab as menu_tab
         icons = menu_tab.icon_files()
         self.assertEqual(len(icons), menu_tab.STATES)
         for data in icons:
@@ -167,7 +167,7 @@ class MenuFrameworkTests(unittest.TestCase):
         self.assertEqual(strip[16:26], bytes.fromhex('00000003 000001e0 0103'))   # 3 x 480, 1-bit palette
 
     def test_framework_needs_a_page_or_the_sound(self):
-        from z30_extensions.features.menu_framework import add
+        from z30_extensions.features.menu.framework import add
         from z30_extensions.plan import Plan
         with self.assertRaises(ValueError):
             add(Plan(self.stock), sound=False)

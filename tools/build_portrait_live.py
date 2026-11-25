@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.build import build  # noqa: E402
 from z30_extensions.container import extract_eg  # noqa: E402
-from z30_extensions.features import portrait_menu  # noqa: E402
+from z30_extensions.features.portrait import menu as portrait_menu  # noqa: E402
 
 
 def main():

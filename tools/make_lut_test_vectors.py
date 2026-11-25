@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions import lut  # noqa: E402
+from z30_extensions.host import lut  # noqa: E402
 
 LUMA = (0.299, 0.587, 0.114)
 

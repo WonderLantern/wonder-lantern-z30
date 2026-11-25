@@ -16,7 +16,7 @@ def main():
     sys.path.insert(0,str(a.qemu_root.resolve()/'tools'))
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
     from display_session import Session,png_from_ppm
-    from z30_extensions.features.wireless_ui import MAGIC
+    from z30_extensions.features.research.wireless_ui import MAGIC
     report=json.loads(a.report.read_text());image=a.image.read_bytes();fixture=json.loads(a.fixture.read_text())
     feature=report['features']['wireless_buffer'];sound=report['features']['menu_framework']
     s=Session(str(a.output_dir.resolve()),fresh=True)

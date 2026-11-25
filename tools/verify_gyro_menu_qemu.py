@@ -25,8 +25,8 @@ def main():
     sys.path.insert(0, str(a.qemu_root.resolve() / 'tools'))
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
     from display_session import Session, png_from_ppm
-    from z30_extensions.features.ui_text import TRANSLATIONS
-    from z30_extensions.features import gyro_ui
+    from z30_extensions.features.menu.text import TRANSLATIONS
+    from z30_extensions.features.gyro import ui as gyro_ui
     report = json.loads(a.report.read_text()); image = a.image.read_bytes()
     fixture = json.loads(a.fixture.read_text())
     sound = report['features']['menu_framework']; gyro = report['features']['gyro_evr_control']

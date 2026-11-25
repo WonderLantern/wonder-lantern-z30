@@ -1,6 +1,6 @@
 """Build the MMU-probe research kit for the SD-card feature loader (step 0).
 
-Writes OUTDIR/Z30/CORE.ZMOD (src/z30_extensions/mmu_probe.py) and, unless
+Writes OUTDIR/Z30/CORE.ZMOD (src/z30_extensions/features/research/mmu_probe.py) and, unless
 --zmod-only, OUTDIR/EG209020.BIN + .json: `full` without gyro-evr plus the SD
 module host (the same EG as build_af_log.py --module log, minus the IMU hook).
 A camera that already runs any module-host EG only needs the ZMOD.
@@ -27,7 +27,7 @@ def main():
     a = p.parse_args()
     if not a.zmod_only and not a.source:
         p.error('--source is required unless --zmod-only')
-    from z30_extensions.mmu_probe import build as build_probe
+    from z30_extensions.features.research.mmu_probe import build as build_probe
     zmod = a.output / 'Z30' / 'CORE.ZMOD'
     outputs = [zmod]
     if not a.zmod_only:

@@ -5,7 +5,7 @@ import struct
 from pathlib import Path
 from verify_sound_settings import Fixture
 from z30_extensions.container import extract_eg
-from z30_extensions.features.zebra_ui import MAGIC
+from z30_extensions.features.photo.zebra_ui import MAGIC
 from unicorn import UC_HOOK_CODE
 from unicorn.arm_const import UC_ARM_REG_R1
 

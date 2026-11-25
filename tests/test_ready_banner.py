@@ -1,4 +1,4 @@
-"""The live-view ready banner of card builds (features/ready_banner.py)."""
+"""The live-view ready banner of card builds (features/card/ready_banner.py)."""
 import struct
 import unittest
 from pathlib import Path
@@ -21,7 +21,7 @@ class ReadyBannerTests(unittest.TestCase):
         cls.image = Plan(cls.stock).image
 
     def test_images_share_one_aligned_size(self):
-        from z30_extensions.features import ready_banner as rb
+        from z30_extensions.features.card import ready_banner as rb
         pictures = rb.images(self.image, 16)
         sizes = {(w, h) for w, h, _ in pictures.values()}
         self.assertEqual(len(sizes), 1)
@@ -36,7 +36,7 @@ class ReadyBannerTests(unittest.TestCase):
             self.assertGreater(pixels[middle + 3], 200)
 
     def test_descriptor_matches_the_stock_icon_layout(self):
-        from z30_extensions.features import ready_banner as rb
+        from z30_extensions.features.card import ready_banner as rb
         d = rb.descriptor(0x12345678, 480, 48, 120, 64)
         self.assertEqual(len(d), 0x5C)
         self.assertEqual(struct.unpack_from('<3I', d, 0), (1, 0, 0x12345678))
@@ -58,7 +58,7 @@ class ReadyBannerTests(unittest.TestCase):
     def test_pixels_are_aligned_in_card_builds(self):
         # The camera's GPU drew nothing from pixels at 8, 28 or 40 mod 64 (2026-11-25).
         from z30_extensions import card
-        from z30_extensions.features import ready_banner as rb
+        from z30_extensions.features.card import ready_banner as rb
         resident = card.build_resident(self.stock)
         for base in (card.LINK_BASE,) + card.CHECK_BASES:
             from z30_extensions.build import build

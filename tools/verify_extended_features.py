@@ -12,8 +12,8 @@ from native_runtime import Context, RAM
 from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R6
 from z30_extensions.container import extract_eg
 from z30_extensions.build import build
-from z30_extensions.features.long_exposure import GETTER, KEY
-from z30_extensions.features.sound_layout import MAX_DATA
+from z30_extensions.features.photo.long_exposure import GETTER, KEY
+from z30_extensions.features.menu.layout import MAX_DATA
 
 
 def verify_m900(stock, image):

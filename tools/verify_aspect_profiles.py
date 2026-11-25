@@ -12,9 +12,9 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from z30_extensions.container import extract_eg
-from z30_extensions.features.aspect_geometry import PROFILES,build_trial
-from z30_extensions.features.aspect_ui import MAGIC, PREVIEW_CALLERS
-from z30_extensions.platform.z30_120 import BASE,sha256
+from z30_extensions.features.aspect.geometry import PROFILES, build_trial
+from z30_extensions.features.aspect.ui import MAGIC, PREVIEW_CALLERS
+from z30_extensions.platform.z30_120 import BASE, sha256
 from verify_aspect_trials import measure
 
 

@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from z30_extensions.container import extract_eg
 from z30_extensions.platform.z30_120 import BASE
-from z30_extensions.features import ptp_read as pr
+from z30_extensions.features.research import ptp_read as pr
 from native_runtime import Context, RAM
 from build_cmos_dump import build
 from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED

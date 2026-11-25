@@ -23,11 +23,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from z30_extensions.container import extract_eg
-from z30_extensions.features.ui_text import TRANSLATIONS
-from z30_extensions.platform.font_source import (FULL_WIDTH, HALF_WIDTH, OutlineSource,
-                                                 fit_placement)
-from z30_extensions.platform.fonts import (EXTRA_GLYPHS, HANS_FONT, HANT_FONT, character_map,
-                                           decode_glyph, encode_glyph, glyph_addresses)
+from z30_extensions.features.menu.text import TRANSLATIONS
+from z30_extensions.platform.font_source import FULL_WIDTH, HALF_WIDTH, OutlineSource, fit_placement
+from z30_extensions.platform.fonts import EXTRA_GLYPHS, HANS_FONT, HANT_FONT, character_map, decode_glyph, encode_glyph, glyph_addresses
 from z30_extensions.platform.z30_120 import StockImage
 
 ASCII = ''.join(map(chr, range(0x20, 0x7F)))

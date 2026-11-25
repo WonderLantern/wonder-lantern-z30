@@ -1,9 +1,7 @@
 """Synthetic mux objects and pose RAM, executing native C1.20 helpers unchanged."""
 import struct
 RAM = 0x50000000
-from z30_extensions.features.video_rot import (
-    CONFIGURE, VIDEO_MATRIX_OFFSET, ORIENTATION_ROOT, ORIENTATION_STATE,
-    GET_ORIENTATION, POSE_MATRICES, EXPECTED_MATRIX)
+from z30_extensions.features.video.rotation import CONFIGURE, VIDEO_MATRIX_OFFSET, ORIENTATION_ROOT, ORIENTATION_STATE, GET_ORIENTATION, POSE_MATRICES, EXPECTED_MATRIX
 
 VIDEO_CONSTRUCTOR = 0x102EE814
 MOVIE_CONSTRUCTOR = 0x102EEF44

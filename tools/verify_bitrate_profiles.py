@@ -10,8 +10,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from z30_extensions.container import extract_eg
-from z30_extensions.features.bitrate_ui import MAGIC, BALANCED_MBPS
-from z30_extensions.features.bitrate_slowmo_uncap import MODE_TABLE, RECORD, RATES, RECORDS, BITRATES_MBPS, rates
+from z30_extensions.features.video.bitrate_ui import MAGIC, BALANCED_MBPS
+from z30_extensions.features.video.bitrate import MODE_TABLE, RECORD, RATES, RECORDS, BITRATES_MBPS, rates
 
 PATH='A:\\WL-VIDEO.CFG'
 MODE,DEST=0x50090000,0x50090100

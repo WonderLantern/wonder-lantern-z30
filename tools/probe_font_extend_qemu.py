@@ -18,10 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from z30_extensions.container import extract_eg
-from z30_extensions.platform.fonts import (CJK_FONTS, FONT_COUNT, FONT_SIZES, FONT_TABLE, FONT_TABLE_LITERAL,
-                                           HANS_FONT, Glyph,
-                                           character_map, decode_glyph, extend_font, font_blob,
-                                           glyph_addresses)
+from z30_extensions.platform.fonts import CJK_FONTS, FONT_COUNT, FONT_SIZES, FONT_TABLE, FONT_TABLE_LITERAL, HANS_FONT, Glyph, character_map, decode_glyph, extend_font, font_blob, glyph_addresses
 from z30_extensions.platform.z30_120 import BASE, StockImage
 
 FONTS = FONT_COUNT

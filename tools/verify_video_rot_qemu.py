@@ -18,9 +18,7 @@ from keystone import Ks, KS_ARCH_ARM, KS_MODE_ARM
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.build import build
 from z30_extensions.platform.z30_120 import BASE, SCATTER, sha256
-from z30_extensions.features.video_rot import (
-    CONFIGURE, ORIENTATION_ROOT, ORIENTATION_STATE, VIDEO_MATRIX_OFFSET,
-    POSE_MATRICES, EXPECTED_MATRIX)
+from z30_extensions.features.video.rotation import CONFIGURE, ORIENTATION_ROOT, ORIENTATION_STATE, VIDEO_MATRIX_OFFSET, POSE_MATRICES, EXPECTED_MATRIX
 from video_rot_fixture import parameters, object_bytes, OBJECT_SIZE, VIDEO_CONSTRUCTOR
 
 STACK, OBJECT, PARAM, RETURN = 0xC7A08000, 0xC7A10000, 0xC7A40000, BASE + 0xAC

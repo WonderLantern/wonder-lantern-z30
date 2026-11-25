@@ -15,10 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.container import extract_eg
 from z30_extensions.platform.z30_120 import StockImage, sha256
-from z30_extensions.precapture import (
-    build_core, CONTEXT_SIZE, OK, BAD_STATE, BAD_FRAME, TOO_LARGE,
-    STALE, EMPTY, BAD_ARGUMENT, WRITE_FAILED,
-)
+from z30_extensions.features.research.precapture_core import build_core, CONTEXT_SIZE, OK, BAD_STATE, BAD_FRAME, TOO_LARGE, STALE, EMPTY, BAD_ARGUMENT, WRITE_FAILED
 from probe_precapture_writer import WriterFixture, RAM, PAYLOAD, COPY
 
 CODE, CTX, REQUEST, OUTPUT = 0x51000000, RAM + 0x9000, RAM + 0x9100, RAM + 0x9200

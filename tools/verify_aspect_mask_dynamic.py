@@ -20,7 +20,7 @@ def main():
         p.add_argument('--'+name,type=Path,required=True)
     a=p.parse_args();sys.path.insert(0,str(a.deps.resolve()))
     from z30_extensions.container import extract_eg
-    from z30_extensions.features.aspect_mask import SNAPSHOT,SOURCE_WINDOW,IMAGE_SLOT,SUBMIT_SITE,SUBMIT_CONTINUE,VIEW_KIND,OVERLAY_BUSY,PHOTO_BACKEND,HISTORY_OFFSET,STATE_LOCK,UI_SERVICE_PHASE,display_regions
+    from z30_extensions.features.aspect.mask import SNAPSHOT, SOURCE_WINDOW, IMAGE_SLOT, SUBMIT_SITE, SUBMIT_CONTINUE, VIEW_KIND, OVERLAY_BUSY, PHOTO_BACKEND, HISTORY_OFFSET, STATE_LOCK, UI_SERVICE_PHASE, display_regions
     from verify_sound_settings import Fixture
     from unicorn import UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_SP,UC_ARM_REG_PC
@@ -32,7 +32,7 @@ def main():
     c=Fixture(stock,image,report,{})
     c.map(UI_SERVICE_PHASE,1);c.u.mem_write(UI_SERVICE_PHASE,b'\x01')
     if (aspect.get('diagnostic_trace') or {}).get('format')=='WMD1':
-        from z30_extensions.features.aspect_mask_trace import FIELDS
+        from z30_extensions.features.aspect.mask_trace import FIELDS
         for _,address,width in FIELDS:
             c.map(address,width)
     page_bytes={name:bytes(c.u.mem_read(c.state+offset,44))

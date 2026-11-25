@@ -32,7 +32,7 @@ class SubjectBoxesTest(unittest.TestCase):
 
     def run_drawer(self, built=None, on=1, shown=1, tracking=0, phase=2, subjects=(), eyes=(), frame=None, history=(), raw_hist=None):
         from z30_extensions.platform.z30_120 import BASE
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         image, report = built or self.full
         control = report['features']['tracking3d_control']
         u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
@@ -94,7 +94,7 @@ class SubjectBoxesTest(unittest.TestCase):
 
     @staticmethod
     def box(x, y, size, eye=False):
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         cx, cy = ((x * tb.X_MUL) >> 8) + tb.X_ADD, ((y * tb.Y_MUL) >> 8) + tb.Y_ADD
         h = tb.EYE_HALF if eye else ((size * tb.FACE_HALF_MUL) >> 8) + tb.FACE_HALF_ADD
         return cx - h, cy - h, cx + h, cy + h
@@ -105,7 +105,7 @@ class SubjectBoxesTest(unittest.TestCase):
         return [(a, 480 - d, c - a, d - b, colour, 0, 0) for a, b, c, d in rects]
 
     def test_draws_four_bars_per_subject_and_restores_the_renderer_state(self):
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         for built in (self.full, self.alone):
             log = self.run_drawer(built, subjects=[(200, 140, 24, 24), (100, 60, 20, 20)])
             expect = self.bars(*self.box(200, 140, 24), tb.GREY) + self.bars(*self.box(100, 60, 20), tb.GREY)
@@ -121,7 +121,7 @@ class SubjectBoxesTest(unittest.TestCase):
             self.assertEqual((log['fills'], log['calls']), ([], []), case)
 
     def test_previous_boxes_are_erased_then_redrawn_and_remembered(self):
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         old = (50, 60, 110, 120)
         log = self.run_drawer(subjects=[(200, 140, 24, 24)], history=[old])
         new = self.box(200, 140, 24)
@@ -147,7 +147,7 @@ class SubjectBoxesTest(unittest.TestCase):
         self.assertEqual((log['fills'], log['hist']), ([], (0, 0)))
 
     def test_a_stale_count_never_writes_past_the_record(self):
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         many = [(40 + 40 * i, 60 + 20 * (i % 3), 20, 20) for i in range(tb.MAX_BOXES)]
         # the state a build without the fix left behind: no boxes flagged, but a count kept
         for stale in (6, tb.MAX_BOXES, tb.MAX_BOXES + 5, 0xFFFFFFFF):
@@ -158,7 +158,7 @@ class SubjectBoxesTest(unittest.TestCase):
             self.assertEqual(len(log['fills']), 4 * tb.MAX_BOXES, stale)
 
     def test_screen_1_menu_round_trips_keep_the_record_bounded(self):
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         many = [(40 + 40 * i, 60 + 20 * (i % 3), 20, 20) for i in range(tb.MAX_BOXES)]
         hist = None
         for k in range(4):                                       # screen 1, menu, screen 1, menu ...
@@ -169,7 +169,7 @@ class SubjectBoxesTest(unittest.TestCase):
             hist = log['hist']
 
     def test_eye_first_and_white_only_on_the_focused_eye(self):
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         t = lambda v: v * 135 // 10 + 140
         frame = (t(194) - 55, t(136) - 55, t(194) + 55, t(136) + 55)
         log = self.run_drawer(subjects=[(200, 140, 24, 24), (100, 60, 20, 20)], eyes=[(194, 136, 5, 5)], frame=frame)
@@ -185,7 +185,7 @@ class SubjectBoxesTest(unittest.TestCase):
             self.assertTrue(0 <= x and x + w <= 720 and 0 <= y and y + h <= 480, (x, y, w, h))
 
     def test_renderer_hook_runs_the_displaced_instructions(self):
-        from z30_extensions.features import tracking3d_boxes as tb
+        from z30_extensions.features.tracking3d import boxes as tb
         image, report = self.full
         edits = [e for e in report['edits'] if 0x10020000 + int(e['offset'], 16) == tb.RENDER_SITE]
         self.assertEqual(len(edits), 1)

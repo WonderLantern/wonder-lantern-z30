@@ -1,6 +1,6 @@
 import unittest
 
-from z30_extensions import date_stamp as stamp
+from z30_extensions.host import date_stamp as stamp
 
 DATE = (2026, 11, 2, 14, 5, 9)
 

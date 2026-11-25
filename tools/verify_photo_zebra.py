@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.build import build, resolve_presets
 from z30_extensions.container import extract_eg
-from z30_extensions.features.photo_zebra import GATES
+from z30_extensions.features.photo.zebra import GATES
 from z30_extensions.platform.z30_120 import BASE, SCATTER, StockImage, sha256
 
 
@@ -167,7 +167,7 @@ def main():
     original, patched = Context(bytes(baseline)), Context(candidate)
     control = metadata['features']['photo_zebra_control']
     def switch(value):
-        from z30_extensions.features.sound_layout import STATE_ANCHOR, MAGIC
+        from z30_extensions.features.menu.layout import STATE_ANCHOR, MAGIC
         state = 0xC1840000
         patched.u.mem_write(STATE_ANCHOR+16, struct.pack('<I',state))
         patched.u.mem_write(state+56, struct.pack('<I',MAGIC))

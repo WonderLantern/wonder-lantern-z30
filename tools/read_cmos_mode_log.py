@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions.features import cmos_trace as ct
+from z30_extensions.features.research import cmos_trace as ct
 
 
 def parse(data):

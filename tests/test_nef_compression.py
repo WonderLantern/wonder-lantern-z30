@@ -4,9 +4,8 @@ import unittest
 from unittest.mock import patch
 
 from z30_extensions.build import PRESETS, build, resolve_presets
-from z30_extensions.features.liveview_dual import VIDEO_STOCK_WINDOWS
-from z30_extensions.features.nef_compression import (
-    MODE_COMPRESSED, MODE_UNCOMPRESSED, SITES, add, load_immediate, small_immediate)
+from z30_extensions.features.liveview.dual import VIDEO_STOCK_WINDOWS
+from z30_extensions.features.nef.compression import MODE_COMPRESSED, MODE_UNCOMPRESSED, SITES, add, load_immediate, small_immediate
 from z30_extensions.platform.z30_120 import BASE, SCATTER, sha256
 
 

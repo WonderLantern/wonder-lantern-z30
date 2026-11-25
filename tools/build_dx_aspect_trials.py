@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from z30_extensions.container import extract_eg
-from z30_extensions.features.aspect_geometry import dimensions
+from z30_extensions.features.aspect.geometry import dimensions
 from z30_extensions.plan import Plan
 from z30_extensions.platform.z30_120 import BASE
 

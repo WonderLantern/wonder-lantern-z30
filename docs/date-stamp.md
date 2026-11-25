@@ -41,9 +41,9 @@ python patch.py full date-stamp --source Z_30_0120.bin --output output/EG209020-
 
 | 文件 | 作用 |
 |---|---|
-| `src/z30_extensions/date_stamp.py` | 主机参考：字形、布局、像素合同 |
-| `src/z30_extensions/features/date_stamp.py` | 门控与 Thumb-2 绘制核心 |
-| `src/z30_extensions/features/date_stamp_ui.py` | 菜单页与 `WL-STAMP.CFG` 持久化 |
+| `src/z30_extensions/host/date_stamp.py` | 主机参考：字形、布局、像素合同 |
+| `src/z30_extensions/features/photo/date_stamp.py` | 门控与 Thumb-2 绘制核心 |
+| `src/z30_extensions/features/photo/date_stamp_ui.py` | 菜单页与 `WL-STAMP.CFG` 持久化 |
 | `tools/verify_date_stamp.py` | Unicorn 验证 |
 | `tools/verify_date_stamp_menu_qemu.py` | QEMU 原生菜单验证 |
 
@@ -68,7 +68,7 @@ python tools/verify_date_stamp.py --source Z_30_0120.bin --preset full date-stam
 
 1. **真实拍摄是否走这条路径。** 依据：画幅功能经实机确认的裁切路径（`0x100A4E20`）同样使用拍摄上下文的 `+0x30C`、`+0x3A4`，而选表函数 `0x1021E2C8` 默认选中的表使用该步骤族。这是强静态证据，不是实拍证据。另有一族 `0x1009EF88` 由作业类型 `+0xD` 选表，用途未确定，目前直接放行。如果部分拍摄模式走那一族，这些照片不会有水印，但也不会受损。
 2. **`+0x2624` 在编码时是否已填好。** `0x101D5C54` 在拍摄流程中写入，时序是静态推断。如果未填好，校验会跳过绘制，表现为没有水印。
-3. **Cb/Cr 字节顺序。** 与 LUT 相同，仍按 Cb 在前假设。如果橙色水印显示为蓝色，说明顺序相反，在 `date_stamp.py` 的 `_ycbcr()` 中交换 Cb 与 Cr 即可，数字和光晕的颜色都由它算出。白色几乎不含色度，不能用来判断。
+3. **Cb/Cr 字节顺序。** 与 LUT 相同，仍按 Cb 在前假设。如果橙色水印显示为蓝色，说明顺序相反，在 `host/date_stamp.py` 的 `_ycbcr()` 中交换 Cb 与 Cr 即可，数字和光晕的颜色都由它算出。白色几乎不含色度，不能用来判断。
 
 另有几点已知行为：
 

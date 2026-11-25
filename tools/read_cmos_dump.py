@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions.features import cmos_dump as cd
+from z30_extensions.features.research import cmos_dump as cd
 
 
 def ranges(first, second, granule=16):

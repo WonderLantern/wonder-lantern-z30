@@ -45,7 +45,7 @@ def main():
     from z30_extensions.platform.z30_120 import sha256
     from verify_aspect_capture_branch import run
     from verify_aspect_liveview_window import fixture
-    from z30_extensions.features.aspect_ui import LIVEVIEW_OUTPUT_CALLERS
+    from z30_extensions.features.aspect.ui import LIVEVIEW_OUTPUT_CALLERS
     stock = extract_eg(a.source.read_bytes())
     image, previous = a.image.read_bytes(), a.previous_image.read_bytes()
     report = json.loads(a.report.read_text('utf-8'))

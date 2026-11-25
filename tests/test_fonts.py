@@ -3,11 +3,8 @@ import struct
 import unittest
 from pathlib import Path
 
-from z30_extensions.platform.fonts import (FONT_TABLE, FONT_TABLE_LITERAL, HANS_FONT, HANT_FONT, Glyph,
-                                           character_map, coverage, decode_glyph, encode_glyph,
-                                           extend_font, font_blob, font_ranges,
-                                           extra_glyphs, glyph_addresses, missing_glyphs)
-from z30_extensions.features.ui_text import TRANSLATIONS, TextResources, check_glyphs
+from z30_extensions.platform.fonts import FONT_TABLE, FONT_TABLE_LITERAL, HANS_FONT, HANT_FONT, Glyph, character_map, coverage, decode_glyph, encode_glyph, extend_font, font_blob, font_ranges, extra_glyphs, glyph_addresses, missing_glyphs
+from z30_extensions.features.menu.text import TRANSLATIONS, TextResources, check_glyphs
 
 FIRMWARE = Path(__file__).resolve().parents[1] / 'Z_30_0120.bin'
 
@@ -98,7 +95,7 @@ class FontCoverageTests(unittest.TestCase):
         self.check_extended_fonts(common=True)
 
     def check_extended_fonts(self, common):
-        from z30_extensions.features import cjk_fonts
+        from z30_extensions.features.menu import cjk_fonts
         from z30_extensions.plan import Plan
         plan, functions = Plan(stock_image().data), {}
         table = cjk_fonts.add(plan, functions, common=common)

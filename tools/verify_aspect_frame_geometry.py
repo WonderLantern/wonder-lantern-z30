@@ -11,7 +11,7 @@ FORMAT = struct.Struct('<hhIHHhhIHHHHBBH')
 
 
 def expected(profile, crop, viewport, source, divisions, include_borders=True):
-    from z30_extensions.features.aspect_frame import axis
+    from z30_extensions.features.aspect.frame import axis
     x0,y0,x1,y1 = viewport
     vw,vh = x1-x0,y1-y0
     x,y,w,h = crop
@@ -46,7 +46,7 @@ def main():
     a=p.parse_args();sys.path.insert(0,str(a.deps.resolve()))
     from z30_extensions.container import extract_eg
     from z30_extensions.platform.z30_120 import sha256
-    from z30_extensions.features.aspect_frame import axis
+    from z30_extensions.features.aspect.frame import axis
     from verify_sound_settings import Fixture
     stock=extract_eg(a.source.read_bytes());image=a.image.read_bytes();report=json.loads(a.report.read_text('utf-8'))
     feature=report['features']['aspect_profiles'];f={k:int(v,16) for k,v in feature['functions'].items()}

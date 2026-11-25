@@ -27,8 +27,9 @@ import struct, sys
 sys.path.insert(0, __file__.rsplit('/', 3)[0] + '/src')
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE
 from unicorn.arm_const import *
-from z30_extensions.features import evr_hook, imu_hook, evr_builtin
-from z30_extensions.features.gyro_evr_payload import CODE
+from z30_extensions.features.modules import evr_hook, imu_hook
+from z30_extensions.features.gyro import builtin as evr_builtin
+from z30_extensions.features.gyro.payload import CODE
 
 BASE = 0x10020000
 STACK, POOL = 0x2000F000, 0xC4000000

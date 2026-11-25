@@ -1,6 +1,6 @@
 """Rebuild the built-in gyro e-VR payload from modules/gyro_evr (needs arm-none-eabi-gcc).
 
-Writes src/z30_extensions/features/gyro_evr_payload.py, so normal firmware builds
+Writes src/z30_extensions/features/gyro/payload.py, so normal firmware builds
 (CLI, GUI, the exe) never need a C compiler. --check only verifies that the
 committed payload matches a fresh build.
 
@@ -14,7 +14,7 @@ import argparse, hashlib, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'src' / 'z30_extensions' / 'features' / 'gyro_evr_payload.py'
+OUT = ROOT / 'src' / 'z30_extensions' / 'features' / 'gyro' / 'payload.py'
 FLAGS = ['-DEVR_PRODUCT']
 GCC_VERSION = '13.2.1'
 

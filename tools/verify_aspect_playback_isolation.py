@@ -18,7 +18,7 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
 def verify(stock, image, report, previous, previous_report):
     from native_runtime import Context
     from verify_sound_settings import Fixture
-    from z30_extensions.features.aspect_ui import FILE_GEOMETRY_CALLERS
+    from z30_extensions.features.aspect.ui import FILE_GEOMETRY_CALLERS
     from unicorn import UC_PROT_READ, UC_PROT_EXEC, UC_HOOK_CODE
     from unicorn.arm_const import UC_ARM_REG_R0
 

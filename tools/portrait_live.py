@@ -24,9 +24,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
-from z30_extensions.features import portrait_menu as pm  # noqa: E402
-from z30_extensions.features import portrait_ui as pu  # noqa: E402
-from z30_extensions.features.sound_layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC  # noqa: E402
+from z30_extensions.features.portrait import menu as pm  # noqa: E402
+from z30_extensions.features.portrait import layout as pu  # noqa: E402
+from z30_extensions.features.menu.layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC  # noqa: E402
 from read_portrait_log import KIND_NAMES, decode  # noqa: E402
 
 OPCODE = 0x9FF1

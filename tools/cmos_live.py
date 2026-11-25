@@ -22,8 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from z30_extensions.features import cmos_dump as cd, cmos_trace as ct, cmos_spi as cs
-from z30_extensions.features.sound_layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC
+from z30_extensions.features.research import cmos_dump as cd, cmos_trace as ct, cmos_spi as cs
+from z30_extensions.features.menu.layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC
 from ptp_wpd import Camera
 from read_cmos_spi_log import decode_ring
 
@@ -201,7 +201,7 @@ def main():
             args.out.write_bytes(data)
         print(f'{len(data)} bytes'); print(data[:512].hex(' '))
     elif args.action == 'regs':
-        from z30_extensions.features.ptp_read import MMIO_WINDOWS
+        from z30_extensions.features.research.ptp_read import MMIO_WINDOWS
         windows = [w for w in MMIO_WINDOWS if not args.window or w[0] in args.window]
         snapshot(live, json.loads(args.candidates.read_text(encoding='utf-8')), args.out, windows)
     else:

@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from z30_extensions.modules import example, pack
+from z30_extensions.features.modules.files import example, pack
 
 
 def main():
@@ -18,7 +18,7 @@ def main():
     if args.example and args.entry:
         parser.error('--entry is only used with --code')
     if args.example in ('mmu-probe', 'mmu-probe-v2'):
-        from z30_extensions.mmu_probe import build
+        from z30_extensions.features.research.mmu_probe import build
         payload = build(2 if args.example.endswith('v2') else 1)
     else:
         payload = example(args.example) if args.example else pack(args.code.read_bytes(), args.entry)

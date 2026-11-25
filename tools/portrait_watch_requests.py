@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
-from z30_extensions.features import portrait_menu as pm  # noqa: E402
+from z30_extensions.features.portrait import menu as pm  # noqa: E402
 from portrait_live import Live  # noqa: E402
 
 PERIODIC = 0x10324325

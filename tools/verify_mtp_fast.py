@@ -9,8 +9,7 @@ import json
 import struct
 from pathlib import Path
 
-from z30_extensions.features.mtp_fast import (BUILDER, EXPECTED_PREFIX, HANDLE_TO_FILE, ACQUIRE_RECORD,
-                                              RELEASE_RECORD, COUNT_ONLY, FOLDER_KIND, VIRTUAL_KIND)
+from z30_extensions.features.connect.mtp_fast import BUILDER, EXPECTED_PREFIX, HANDLE_TO_FILE, ACQUIRE_RECORD, RELEASE_RECORD, COUNT_ONLY, FOLDER_KIND, VIRTUAL_KIND
 from z30_extensions.build import build
 from z30_extensions.platform.z30_120 import BASE
 from z30_extensions.container import extract_eg

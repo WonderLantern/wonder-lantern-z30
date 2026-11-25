@@ -14,11 +14,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from z30_extensions.container import extract_eg
 from z30_extensions.plan import Plan
 from z30_extensions.platform.z30_120 import sha256
-from z30_extensions.features.shutter_sound import add
-from z30_extensions.features.precapture_probe import MAGIC, MAX_FRAME, STATE_BYTES, FILLER, MAX_PADDING
-from z30_extensions.features import precapture_capture as capture
+from z30_extensions.features.sound.shutter_sound import add
+from z30_extensions.features.research.precapture_probe import MAGIC, MAX_FRAME, STATE_BYTES, FILLER, MAX_PADDING
+from z30_extensions.features.research import precapture_capture as capture
 from z30_extensions.assembly import assemble, constant, invoke
-from z30_extensions.features.sound_layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC, SUCCESS
+from z30_extensions.features.menu.layout import STATE_ANCHOR, MAGIC as SOUND_MAGIC, SUCCESS
 from native_runtime import Context, RAM
 from probe_precapture_writer import (WriterFixture, OBJ, BANKS, HEADER, PAYLOAD,
                                     PRIMARY, SECONDARY, FILE_BOUNDARY)

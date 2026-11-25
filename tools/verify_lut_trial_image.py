@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from z30_extensions import lut
+from z30_extensions.host import lut
 from z30_extensions.container import extract_eg
 from native_runtime import Context, RAM, STOP
 from trace_lut_retouch import put, returning

@@ -13,7 +13,7 @@ MAGIC, CAPACITY, STRIDE, HEADER = 0x31444157, 64, 160, 24
 def border_payload(payload):
     magic,version=struct.unpack_from('<II',payload,64)
     if magic!=0x31444257 or version not in (1,2):return None
-    from z30_extensions.features.aspect_border import DIAGNOSTIC_NAMES
+    from z30_extensions.features.aspect.border import DIAGNOSTIC_NAMES
     result=dict(zip(DIAGNOSTIC_NAMES,struct.unpack_from('<16I',payload,72)))
     channel,grid=struct.unpack_from('<II',payload,136)
     result.update(rectangle_channel_enabled=channel&255,stock_grid_enabled=grid)
@@ -23,7 +23,7 @@ def border_payload(payload):
 
 def decode(data):
     if data[:4] == b'WMD1':
-        from z30_extensions.features.aspect_mask_trace import decode as decode_mask
+        from z30_extensions.features.aspect.mask_trace import decode as decode_mask
         return decode_mask(data)
     if len(data) < HEADER:
         raise ValueError('Incorrect trace length (possibly a short write)')

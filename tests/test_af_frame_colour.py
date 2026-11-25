@@ -5,7 +5,7 @@ import struct, unittest
 from pathlib import Path
 
 from z30_extensions.build import build, resolve_presets
-from z30_extensions.features import af_frame_colour as fc
+from z30_extensions.features.photo import af_frame_colour as fc
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'Z_30_0120.bin'
@@ -24,8 +24,8 @@ class PresetTest(unittest.TestCase):
         self.assertEqual(resolve_presets('af-frame-colour')[1], ['af-frame-colour'])
 
     def test_page_is_a_native_photo_row_and_in_the_focus_category(self):
-        from z30_extensions.features.menu_framework import CATEGORIES
-        from z30_extensions.features.sound_layout import NATIVE_MENUS
+        from z30_extensions.features.menu.framework import CATEGORIES
+        from z30_extensions.features.menu.layout import NATIVE_MENUS
         self.assertIn('afcol', dict((key, members) for key, _, members in CATEGORIES)['focus'])
         self.assertIn('afcol', dict((m[0], m[3]) for m in NATIVE_MENUS)['photo'])
 
@@ -44,14 +44,14 @@ class TableTest(unittest.TestCase):
 
     def test_lookup_literal_is_the_stock_table(self):
         import struct
-        from z30_extensions.features import af_frame_colour_ui as ui
+        from z30_extensions.features.photo import af_frame_colour_ui as ui
         from z30_extensions.platform.z30_120 import BASE
         self.assertEqual(ui.LOOKUP_LITERAL, 0x1039CD34)
         self.assertEqual(struct.unpack_from('<I', self.stock, ui.LOOKUP_LITERAL - BASE)[0], fc.TABLE)
 
     def test_prepare_refuses_a_lookup_that_loads_another_table(self):
         import struct
-        from z30_extensions.features import af_frame_colour_ui as ui
+        from z30_extensions.features.photo import af_frame_colour_ui as ui
         from z30_extensions.platform.z30_120 import BASE
 
         class Image:
@@ -127,7 +127,7 @@ class TableTest(unittest.TestCase):
     @unittest.skipUnless(Uc, 'needs Unicorn')
     def test_lookup_hook_switches_tables_and_keeps_the_stock_contract(self):
         from z30_extensions.platform.z30_120 import BASE
-        from z30_extensions.features import af_frame_colour_ui as ui
+        from z30_extensions.features.photo import af_frame_colour_ui as ui
         control = self.report['features']['af_frame_colour_control']
         choice = int(control['choice'], 16) & ~1
         for setting, table in ((ui.ENABLE, int(control['table'], 16)), (ui.DISABLE, fc.TABLE)):

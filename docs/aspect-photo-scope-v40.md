@@ -23,7 +23,7 @@
 4. 清除只处理同一当前表面、先前矩形内仍等于本版遮幅颜色的像素。原厂已改写的其他颜色和不透明黑色保留；表面指针更换后不解引用旧表面。没有整屏清零或擦除上层原厂 UI。该锁只约束自定义 CPU 回调，不能据此宣称物理 GPU/缓存并发合同已证明。
 5. 保留 alpha `128/255`、v36 外缘补缝与成片投影、网格独立性、分类菜单和 v37 文件几何查询隔离。成片几何表与 v37 逐字节相同。
 
-相关源码：`src/z30_extensions/features/aspect_mask.py`、`aspect_ui.py`。构建报告 `soft_mask.version=11`，包含条件字段、状态分配和清除策略。
+相关源码：`src/z30_extensions/features/aspect/mask.py`、`features/aspect/ui.py`。构建报告 `soft_mask.version=11`，包含条件字段、状态分配和清除策略。
 
 ## 本地验证
 
