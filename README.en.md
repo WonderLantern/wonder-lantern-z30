@@ -6,6 +6,10 @@ Wonder Lantern Z30 is the WonderLantern organization's firmware extension projec
 
 **New features load from a patch file on the memory card.** You flash the **loader firmware** into the camera once; after that, adding, removing or updating features only means replacing `Z30/WL.PATCH` on the card, with no further flashing. The loader itself needs flashing again only when it gets a low-level update, and the packaging tool tells you when.
 
+> [!TIP]
+> ### 📖 [GUI packaging tutorial (with screenshots) →](docs/gui-tutorial.en.md)
+> New here? Follow it step by step: download the packaging program → check the stock firmware → build and flash the loader → build the feature card file and put it on the card.
+
 > [!WARNING]
 > Modified firmware carries risk. Before flashing the loader:
 > - keep the unmodified `Z_30_0120.bin`;
@@ -75,6 +79,8 @@ You supply the firmware yourself; the repository contains neither stock firmware
 | SHA-256 | `1a5449ef505f1f347ed4e066a6a3f588ea542240680e83f4ebcae3b16da3434a` |
 
 ### Graphical app (Windows, recommended)
+
+Screenshots of every step and common problems are in the **[GUI packaging tutorial](docs/gui-tutorial.en.md)**.
 
 1. Download `WonderLanternZ30-windows-x64.zip` from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract the whole archive** before running it.
 2. Put `Z_30_0120.bin` into the extracted folder, or choose it in the program.
@@ -204,6 +210,7 @@ Offline checks and camera feedback are recorded separately. This table lists exi
 
 | Document | Contents |
 | --- | --- |
+| [GUI packaging tutorial](docs/gui-tutorial.en.md) | Illustrated walk-through: check the firmware, build and flash the loader, build the card file, troubleshooting |
 | [Offline build guide](PATCH_GUIDE.md) | GUI and command-line steps, common errors (Chinese) |
 | [Contributor guide](CONTRIBUTING.en.md) | Code layout, writing patches, tests and QEMU checks, commits and releases |
 | [Build notes](docs/build.md) | Input checks, decoding, preset composition, patch flow |

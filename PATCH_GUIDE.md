@@ -6,7 +6,7 @@
 
 ## 图形界面（推荐）
 
-Windows 用户不需要安装 Python：
+Windows 用户不需要安装 Python。带截图的完整步骤见 [图形界面打包教程](docs/gui-tutorial.md)，简要步骤如下：
 
 1. 从 [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) 下载 `WonderLanternZ30-windows-x64.zip`，完整解压。
 2. 把原版固件 **Z_30_0120.bin** 放进解压后的文件夹，程序会自动填入；也可以手动选择。

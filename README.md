@@ -6,6 +6,10 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的固件
 
 **新功能从存储卡上的补丁文件加载。** 相机里只需刷一次**加载器固件**；之后添加、去掉或更新功能，都只是换卡上的 `Z30/WL.PATCH`，不用再刷机。只有加载器本身有底层更新时，才需要再刷一次加载器（打包工具会明确提示）。
 
+> [!TIP]
+> ### 📖 [图形界面打包教程（图文）→](docs/gui-tutorial.md)
+> 第一次使用？跟着教程一步步完成：下载打包程序 → 校验原厂固件 → 打包并刷入加载器 → 打包功能卡文件并放到存储卡。
+
 > [!WARNING]
 > 修改固件有风险。刷入加载器前请确认：
 > - 保留未经修改的 `Z_30_0120.bin`；
@@ -75,6 +79,8 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的固件
 | SHA-256 | `1a5449ef505f1f347ed4e066a6a3f588ea542240680e83f4ebcae3b16da3434a` |
 
 ### 图形界面（Windows，推荐）
+
+每一步的截图和常见问题见 **[图形界面打包教程](docs/gui-tutorial.md)**。
 
 1. 从 [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) 下载 `WonderLanternZ30-windows-x64.zip`，**完整解压**后再运行。
 2. 把 `Z_30_0120.bin` 放进解压后的文件夹，或在程序里手动选择。
@@ -204,6 +210,7 @@ SD 卡根目录/
 
 | 文档 | 内容 |
 | --- | --- |
+| [图形界面打包教程](docs/gui-tutorial.md) | 图文演示：校验固件、打包并刷入加载器、打包卡文件、常见问题 |
 | [离线构建指引](PATCH_GUIDE.md) | 图形界面与命令行步骤、常见错误 |
 | [贡献者开发文档](CONTRIBUTING.md) | 代码结构、补丁写法、测试与 QEMU 检查、提交与发布流程 |
 | [构建说明](docs/build.md) | 输入校验、解码、预设组合与补丁流程 |

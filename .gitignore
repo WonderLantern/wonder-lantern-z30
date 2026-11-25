@@ -26,6 +26,8 @@
 # Build inputs drawn by tools/build_tab_icon.py.
 !/src/z30_extensions/platform/menu_tab_icon_*.png
 !/src/z30_extensions/platform/menu_tab_strip.png
+# Screenshots for the GUI packaging tutorial (docs/gui-tutorial.md).
+!/docs/images/gui-tutorial/*.png
 *.mp4
 
 # Inputs, build products, research dumps and vendor caches.
