@@ -1,4 +1,4 @@
-"""Parse an AF retarget log (A:\\Z30\\RTnnnnnn.BIN, modules/af_retarget, AFRTGT8 / AFRTGT9).
+"""Parse an AF retarget log (A:\\Z30\\RTnnnnnn.BIN, research/af/modules/af_retarget, AFRTGT8 / AFRTGT9).
 
 Usage: parse_afretarget.py RTnnnnnn.BIN [--all]
 Prints the hook counts, then one line per tracking update around each retarget

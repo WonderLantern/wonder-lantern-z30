@@ -1,7 +1,7 @@
 """Replay the af_handover rule on a camera log (AFLOG3 or AFHAND1-7) without the camera.
 
 Usage: replay_handover.py LOG.BIN
-replay() mirrors the v7 rule of modules/af_handover/af_handover.c (one log
+replay() mirrors the v7 rule of research/af/modules/af_handover/af_handover.c (one log
 tick stands for one detection update); replay_v5() the old distance rule
 (SCALE, HOLD, MISS, REARM, the reach and the detection test) (an AFHAND log holds only the tracking
 ticks: gaps are replayed as 50 ms ticks without tracking) (SCALE, HOLD, MISS, REARM, the reach

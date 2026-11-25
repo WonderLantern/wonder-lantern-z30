@@ -1,4 +1,4 @@
-"""Print an AF handover log (A:\\Z30\\HOnnnnnn.BIN from modules/af_handover).
+"""Print an AF handover log (A:\\Z30\\HOnnnnnn.BIN from research/af/modules/af_handover).
 
 Usage: parse_afhandover.py HOnnnnnn.BIN
 One line per logged tracking tick: time, subjects, face state, tracking box

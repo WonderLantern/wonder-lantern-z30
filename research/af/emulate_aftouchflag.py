@@ -1,4 +1,4 @@
-"""Unicorn: the AF touch-flag module (modules/af_touchflag) on a stubbed camera.
+"""Unicorn: the AF touch-flag module (research/af/modules/af_touchflag) on a stubbed camera.
 
 Usage: emulate_aftouchflag.py AF_TOUCHFLAG.bin [OUT.BIN]
 Three tracking sessions: the flag 0xC18C7240 is set 2 IMU ticks after each start

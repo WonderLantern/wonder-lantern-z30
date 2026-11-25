@@ -1,4 +1,4 @@
-"""Rank the words of an AF scan (A:\\Z30\\SCnnnnnn.BIN from modules/af_scan).
+"""Rank the words of an AF scan (A:\\Z30\\SCnnnnnn.BIN from research/af/modules/af_scan).
 
 Usage: parse_afscan.py SCnnnnnn.BIN [--all]
 A word is a tracking candidate when it changed in a good share of the tracking

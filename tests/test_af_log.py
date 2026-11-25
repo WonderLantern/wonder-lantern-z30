@@ -1,4 +1,4 @@
-"""The read-only AF log research kit (modules/af_log, tools/build_af_log.py)."""
+"""The read-only AF log research kit (research/af/modules/af_log, tools/build_af_log.py)."""
 import runpy
 import subprocess
 import tempfile
@@ -19,7 +19,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_module_logs_changes_and_saves(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw)], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw)], check=True)
             self.assertLess(raw.stat().st_size, 16384)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog')
             self.assertEqual(script['main'](str(raw)), (30, 40, 20, 30, 40))
@@ -28,7 +28,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log5_variant_writes_its_windows(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log5.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG5'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG5'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog5')
             self.assertEqual(script['main'](str(raw), True), 10)
 
@@ -36,7 +36,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log6_variant_writes_its_windows(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log6.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG6'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG6'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog6')
             self.assertEqual(script['main'](str(raw), False, True), 10)
 
@@ -44,7 +44,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log7_variant_writes_its_windows(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log7.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG7'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG7'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog7')
             self.assertEqual(script['main'](str(raw), False, False, True), 10)
 
@@ -52,7 +52,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log8_variant_writes_its_windows(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log8.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG8'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG8'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog8')
             self.assertEqual(script['main'](str(raw), False, False, False, True), 10)
 
@@ -61,7 +61,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log12_variant_writes_its_windows(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log12.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG12'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG12'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog12')
             self.assertEqual(script['main'](str(raw), *([False] * 7), True), 10)
 
@@ -69,7 +69,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log11_variant_reads_the_3d_tracking_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log11.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG11', '-DTRK3D_GET=0x12100101u'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG11', '-DTRK3D_GET=0x12100101u'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog11')
             self.assertEqual(script['main'](str(raw), False, False, False, False, False, False, True), 10)
 
@@ -77,7 +77,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log10_variant_writes_its_windows(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log10.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG10'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG10'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog10')
             self.assertEqual(script['main'](str(raw), False, False, False, False, False, True), 10)
 
@@ -85,7 +85,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_log9_variant_writes_its_windows(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_log9.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG9'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_log' / 'build.sh'), str(raw), '-DLOG9'], check=True)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aflog.py'), run_name='aflog9')
             self.assertEqual(script['main'](str(raw), False, False, False, False, True), 10)
 
@@ -93,7 +93,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_scan_module_finds_tracking_only_words(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_scan.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_scan' / 'build.sh'), str(raw)], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_scan' / 'build.sh'), str(raw)], check=True)
             self.assertLess(raw.stat().st_size, 16384)
             out = Path(tmp) / 'SC.BIN'
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_afscan.py'), run_name='afscan')
@@ -106,7 +106,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_box_scan_counts_the_shown_not_tracking_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_scan_box.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_scan' / 'build.sh'), str(raw), '-DSCAN_BOX'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_scan' / 'build.sh'), str(raw), '-DSCAN_BOX'], check=True)
             out = Path(tmp) / 'SCB.BIN'
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_afscan.py'), run_name='afscanbox')
             self.assertTrue(script['main'](str(raw), str(out), True))
@@ -122,7 +122,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_handover_module_presses_ok_once_per_session(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_handover.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_handover' / 'build.sh'), str(raw)], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_handover' / 'build.sh'), str(raw)], check=True)
             self.assertLess(raw.stat().st_size, 16384)
             script = runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_afhandover.py'), run_name='afhand')
             self.assertTrue(script['main'](str(raw)))
@@ -135,7 +135,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_retarget_module_moves_tracker_without_keys(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_retarget.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_retarget' / 'build.sh'), str(raw)], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_retarget' / 'build.sh'), str(raw)], check=True)
             self.assertLess(raw.stat().st_size, 16384)
             out = Path(tmp) / 'RT.BIN'
             runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_afretarget.py'), run_name='afrt')['main'](str(raw), str(out))
@@ -149,7 +149,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_snapshot_module_finds_the_start_method_word(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_snap.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_snap' / 'build.sh'), str(raw)], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_snap' / 'build.sh'), str(raw)], check=True)
             self.assertLess(raw.stat().st_size, 16384)
             out = Path(tmp) / 'SN.BIN'
             runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_afsnap.py'), run_name='afsnap')['main'](str(raw), str(out))
@@ -161,7 +161,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_snapshot_shown_variant_finds_the_mode_word(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_snap_shown.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_snap' / 'build.sh'), str(raw), '-DSNAP_SHOWN'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_snap' / 'build.sh'), str(raw), '-DSNAP_SHOWN'], check=True)
             out = Path(tmp) / 'SNS.BIN'
             runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_afsnap.py'), run_name='afsnaps')['main'](str(raw), str(out), True)
             parse = runpy.run_path(str(ROOT / 'research' / 'af' / 'parse_afsnap.py'), run_name='psnaps')
@@ -172,7 +172,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_snapshot_focus_variant_finds_the_style_word(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_snap_focus.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_snap' / 'build.sh'), str(raw), '-DSNAP_FOCUS'], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_snap' / 'build.sh'), str(raw), '-DSNAP_FOCUS'], check=True)
             out = Path(tmp) / 'SNF.BIN'
             runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_afsnap.py'), run_name='afsnapf')['main'](str(raw), str(out), False, True)
             parse = runpy.run_path(str(ROOT / 'research' / 'af' / 'parse_afsnap.py'), run_name='psnapf')
@@ -184,7 +184,7 @@ class AfLogModuleTest(unittest.TestCase):
     def test_touchflag_module_sets_only_the_flag(self):
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / 'af_touchflag.bin'
-            subprocess.run(['sh', str(ROOT / 'modules' / 'af_touchflag' / 'build.sh'), str(raw)], check=True)
+            subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / 'af_touchflag' / 'build.sh'), str(raw)], check=True)
             self.assertLess(raw.stat().st_size, 16384)
             out = Path(tmp) / 'TF.BIN'
             self.assertEqual(runpy.run_path(str(ROOT / 'research' / 'af' / 'emulate_aftouchflag.py'), run_name='aftf')['main'](str(raw), str(out)), 2)

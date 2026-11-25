@@ -1,4 +1,4 @@
-"""Unicorn: the AF snapshot module (modules/af_snap) on a stubbed camera.
+"""Unicorn: the AF snapshot module (research/af/modules/af_snap) on a stubbed camera.
 
 Usage: emulate_afsnap.py AF_SNAP.bin [OUT.BIN]
 Four tracking sessions; a "method" word is 1 in the first two (touch) and 0 in

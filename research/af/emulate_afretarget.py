@@ -1,4 +1,4 @@
-"""Unicorn: the AF retarget module (modules/af_retarget, v9) on a stubbed camera.
+"""Unicorn: the AF retarget module (research/af/modules/af_retarget, v9) on a stubbed camera.
 
 Usage: emulate_afretarget.py AF_RETARGET.bin [OUT.BIN]
 The module arms the face_hook cell (0xC1832D40) and runs once per detection

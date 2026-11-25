@@ -1,4 +1,4 @@
-"""Parse an AF touch-flag log (A:\\Z30\\TFnnnnnn.BIN, modules/af_touchflag, AFTFLG1).
+"""Parse an AF touch-flag log (A:\\Z30\\TFnnnnnn.BIN, research/af/modules/af_touchflag, AFTFLG1).
 
 Usage: parse_aftouchflag.py TFnnnnnn.BIN
 One line per IMU tick while tracking, collapsed to the lines where something

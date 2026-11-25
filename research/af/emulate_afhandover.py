@@ -1,4 +1,4 @@
-"""Unicorn: the AF handover module (modules/af_handover, v7) on a stubbed camera.
+"""Unicorn: the AF handover module (research/af/modules/af_handover, v7) on a stubbed camera.
 
 Usage: emulate_afhandover.py AF_HANDOVER.bin [OUT.BIN]
 The module arms the face_hook cell (0xC1832D40) and runs once per detection

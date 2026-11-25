@@ -22,7 +22,7 @@
 
 ## 第 1 步：只读记录（当前）
 
-- 模块：`modules/af_log/af_log.c`（SD 研究模块，3.8 KB）。它借原厂 IMU 任务（拍照模式下每 50 ms 一次，不需要陀螺仪模块）复制两段内存：`0xC237E1C8` 起 0x220 字节（包含检测结果 `0xC237E2E8`）和 `0xC237F578` 起 0x200 字节；有任何一个字变化才记一条（时间、tick、两段数据）。最多约 3900 条（每 50 ms 一条时约 3 分钟）。只读，不写相机里的任何东西。第 2 版的文件头是 `AFLOG2`。
+- 模块：`research/af/modules/af_log/af_log.c`（SD 研究模块，3.8 KB）。它借原厂 IMU 任务（拍照模式下每 50 ms 一次，不需要陀螺仪模块）复制两段内存：`0xC237E1C8` 起 0x220 字节（包含检测结果 `0xC237E2E8`）和 `0xC237F578` 起 0x200 字节；有任何一个字变化才记一条（时间、tick、两段数据）。最多约 3900 条（每 50 ms 一条时约 3 分钟）。只读，不写相机里的任何东西。第 2 版的文件头是 `AFLOG2`。
 - 固件：`python3 tools/build_af_log.py --source Z_30_0120.bin --output OUTDIR`，生成 `OUTDIR/EG209020.BIN` 和 `OUTDIR/Z30/CORE.ZMOD`。EG 是 `full` 去掉 `gyro-evr`（它占用 IMU 钩子），加上 SD 模块宿主和 IMU 钩子。
 - 解析：`python3 research/af/parse_aflog.py AFnnnnnn.BIN --words`，列出对焦框、人脸框的每次变化，以及哪些地址的字变过（第 1、2 版都能读）。
 - 验证：
@@ -58,7 +58,7 @@
 
 ## 第 3 步：扫描"只在追踪时才变的字"（当前）
 
-- 模块：`modules/af_scan/af_scan.c`（1.8 KB）。它扫描 `0xC2300000` 起 1 MB，每个 IMU tick（50 ms）扫 64 KB，16 个 tick 扫完一轮。每个字和上一轮比较，变了就按当时的 `0xC237F688` 记到"追踪"或"非追踪"；追踪时还记下最小值和最大值。申请约 4 MB 内存，结果最后一次写成 `Z30/SCnnnnnn.BIN`（约 3 MB）。只读。
+- 模块：`research/af/modules/af_scan/af_scan.c`（1.8 KB）。它扫描 `0xC2300000` 起 1 MB，每个 IMU tick（50 ms）扫 64 KB，16 个 tick 扫完一轮。每个字和上一轮比较，变了就按当时的 `0xC237F688` 记到"追踪"或"非追踪"；追踪时还记下最小值和最大值。申请约 4 MB 内存，结果最后一次写成 `Z30/SCnnnnnn.BIN`（约 3 MB）。只读。
 - 构建：`python3 tools/build_af_log.py --source Z_30_0120.bin --output OUTDIR --module scan`（研究 EG 和第 1、2 步相同，只换 `CORE.ZMOD`）。
 - 解析：`python3 research/af/parse_afscan.py SCnnnnnn.BIN`，列出追踪时常变、非追踪时几乎不变的字，按相邻地址分组，并给出追踪时的取值范围。
 - 验证：Unicorn `research/af/emulate_afscan.py`（`tests/test_af_log.py`）。
@@ -117,7 +117,7 @@
 
 真实按键的整条路径都在 UI 任务里：输入状态（0x18C 字节的按键位图）由 `0x102F0D14` 写进 16 格的输入环形缓冲区（`0xC2008EA0`，每格 0x190 字节），`0x102F1AB6` 读出按键码，`0x1045933E` 把它转成事件，最后交给 `0x103CE96E`。原厂没有"从别的任务投递按键"的入口。QEMU 的全部菜单检查都是在开机任务的空闲循环（`0x100531BC`）里直接调用 `0x103CE96E` 发按键，也就是从非 UI 任务调用，所以模块用同样的调用方式。
 
-- 模块：`modules/af_handover/af_handover.c`（1.9 KB）。每个 IMU tick（50 ms）检查以下条件，连续 5 次（约 0.25 秒）都成立就按一次 OK：
+- 模块：`research/af/modules/af_handover/af_handover.c`（1.9 KB）。每个 IMU tick（50 ms）检查以下条件，连续 5 次（约 0.25 秒）都成立就按一次 OK：
   - 正在追踪（`F688`=1）；
   - 主体数量为 1–5；
   - 人脸状态**正好是 1**（检测到但没被采用；257 = 0x101 表示已被采用，不能只看低字节，Unicorn 测试抓到过这个错误）；
@@ -226,7 +226,7 @@ Load → Run（显示 `Handover armed, Run=save`），回到拍照取景，对�
 
 ## 第 8 版：方法 B 实验，不按键，直接改追踪器位置（af_retarget）
 
-- 模块：`modules/af_retarget/af_retarget.c`（2.1 KB），同样挂在检测结果写入点（`face_hook`）。
+- 模块：`research/af/modules/af_retarget/af_retarget.c`（2.1 KB），同样挂在检测结果写入点（`face_hook`）。
 - 触发规则和第 7 版相同：先开始追踪、之后才识别到主体（人脸或宠物），累计 3 次更新就触发；开始时已有主体则阻止；每次追踪只触发一次。
 - 触发后不按任何键，而是在接下来主体仍被检测到的 6 次更新里，把人脸中心换算成网格位置，写进 `0xC23AA028` 和 `0xC23AA02C`。
 - 要回答的问题：追踪器是把这个字当作下一帧的搜索中心（框会跳到人脸并跟住），还是只当输出（下一帧被改回去，框不动）。如果框跳过去后又回到原物体，说明模板没换，还需要找重新取模板的入口。
@@ -279,7 +279,7 @@ Load → Run（显示 `Retarget armed, Run=save`），回到拍照取景，对�
 
 ## 第 10 版：找画面 1 那个框的位置变量（af_scan 的 box 变体）
 
-- `modules/af_scan/af_scan.c` 加了 `-DSCAN_BOX` 变体：扫描 `0xC2300000` 起 1 MB，把"框已显示、还没追踪"（`F684` = 1、`F688` = 0，画面 1）当作关键状态。框的位置只在用方向键移动它时才变，所以在关键状态里变过至少 3 次、其他时候最多变 2 次的字都会列出来。文件头第 7 个字 = 1。
+- `research/af/modules/af_scan/af_scan.c` 加了 `-DSCAN_BOX` 变体：扫描 `0xC2300000` 起 1 MB，把"框已显示、还没追踪"（`F684` = 1、`F688` = 0，画面 1）当作关键状态。框的位置只在用方向键移动它时才变，所以在关键状态里变过至少 3 次、其他时候最多变 2 次的字都会列出来。文件头第 7 个字 = 1。
 - 构建：`python3 tools/build_af_log.py --source Z_30_0120.bin --output OUTDIR --module scan-box`。EG 和 `--module retarget` 相同（`full` 去掉 gyro-evr，加模块宿主、IMU 钩子和检测钩子），所以两个模块可以换着用，只换 `Z30/CORE.ZMOD`。
 - 解析：`python3 research/af/parse_afscan.py SCnnnnnn.BIN`，第 3 版解析器认得这个变体。
 - Unicorn：`emulate_afscan.py --box`，测试 `test_box_scan_counts_the_shown_not_tracking_state`：只在画面 1 时变的字被找到；一直在变的字不会被列出；追踪中的变化不计入关键状态。
@@ -311,7 +311,7 @@ Load → Run（显示 `Scanning, Run=save`），回到拍照取景，对焦区�
 
 ## 第 11 版：对比触摸开始和按键开始的追踪（af_snap）
 
-- 模块：`modules/af_snap/af_snap.c`（1.9 KB，只读）。每次追踪开始（`F688` 0→1）后 300 ms，把两段内存（`0xC2360000` 起 0x60000：AF 记录、UI 副本、追踪器结构体、AF 消息；`0xC1810000` 起 0x20000：UI 状态）分 8 个 tick 复制下来，最多 8 次追踪。文件 `Z30/SNnnnnnn.BIN`，头 `AFSNAP1`，约 4 MB。
+- 模块：`research/af/modules/af_snap/af_snap.c`（1.9 KB，只读）。每次追踪开始（`F688` 0→1）后 300 ms，把两段内存（`0xC2360000` 起 0x60000：AF 记录、UI 副本、追踪器结构体、AF 消息；`0xC1810000` 起 0x20000：UI 状态）分 8 个 tick 复制下来，最多 8 次追踪。文件 `Z30/SNnnnnnn.BIN`，头 `AFSNAP1`，约 4 MB。
 - 解析：`python3 research/af/parse_afsnap.py SNnnnnnn.BIN 3,3,2`，按顺序分组（例如 3 次 OK、3 次触摸、2 次半按），列出组内不变、组间不同的字。
 - 构建：`python3 tools/build_af_log.py --source Z_30_0120.bin --output OUTDIR --module snap`。EG 和 retarget / scan-box 相同，只换 `CORE.ZMOD`。
 - Unicorn（`research/af/emulate_afsnap.py`，`tests/test_af_log.py`）：4 次追踪各复制一次，解析器只找出那个按开始方式变化的字。
@@ -339,7 +339,7 @@ Load → Run（显示 `Snapshots armed, Run=save`），拍照取景，自动区�
 
 ## 第 12 版：逐帧记录"触摸追踪升级为人脸框"的那一刻（af_log 第 5 版）
 
-- `modules/af_log/af_log.c` 加了 `-DLOG5` 变体（`AFLOG5`）：IMU 每 50 ms 采样 12 段（`D590` 0x40、人脸状态、主体数、`F080` 0x30、`F560` 0x30、人脸框 `F620`、`F680`、`0xC2387200` 0x90、`AF38`、`B020`、追踪器 `0xC23A9FE0` 0x60、`0xC181E4C0`），有变化才记，最多约 8000 条（约 6–7 分钟）。
+- `research/af/modules/af_log/af_log.c` 加了 `-DLOG5` 变体（`AFLOG5`）：IMU 每 50 ms 采样 12 段（`D590` 0x40、人脸状态、主体数、`F080` 0x30、`F560` 0x30、人脸框 `F620`、`F680`、`0xC2387200` 0x90、`AF38`、`B020`、追踪器 `0xC23A9FE0` 0x60、`0xC181E4C0`），有变化才记，最多约 8000 条（约 6–7 分钟）。
 - 构建：`python3 tools/build_af_log.py --source Z_30_0120.bin --output OUTDIR --module log5`（EG 同 retarget / snap）。
 - 解析：`python3 research/af/parse_aflog.py AFnnnnnn.BIN --words`。
 - 要找的是：触摸追踪时人物走近、框变细的那一刻变化的字；半按追踪时人物走近，同样的字没有变化。
@@ -405,7 +405,7 @@ Load → Run（显示 `Logging…`），拍照取景，自动区域 AF，开始�
 
 ## 第 14 版：给半按 / OK 开始的追踪也打上"触摸开始"标志（af_touchflag）
 
-- 模块：`modules/af_touchflag/af_touchflag.c`（1.8 KB）。追踪开始（`F688` 0→1）2 个 IMU tick（100 ms）后，如果 `0xC18C7240` 还是 0，就写 1；每次追踪只写一次，**除此之外不写任何东西**，不按任何键。追踪期间每个 tick 记一条（AF 工作、主体数、人脸状态、标志、追踪器模式、追踪器是否在跑）。文件 `Z30/TFnnnnnn.BIN`，头 `AFTFLG1`。
+- 模块：`research/af/modules/af_touchflag/af_touchflag.c`（1.8 KB）。追踪开始（`F688` 0→1）2 个 IMU tick（100 ms）后，如果 `0xC18C7240` 还是 0，就写 1；每次追踪只写一次，**除此之外不写任何东西**，不按任何键。追踪期间每个 tick 记一条（AF 工作、主体数、人脸状态、标志、追踪器模式、追踪器是否在跑）。文件 `Z30/TFnnnnnn.BIN`，头 `AFTFLG1`。
 - 解析：`python3 research/af/parse_aftouchflag.py TFnnnnnn.BIN`。看半按追踪中人物进入时，模式有没有从 0x202 变成 0x203。
 - 构建：`--module touchflag`（EG 同 retarget）。
 - Unicorn（`research/af/emulate_aftouchflag.py`）：3 次追踪里，第 1、3 次（按键开始）在开始后第 2 个 tick 写 1；第 2 次（原厂触摸已经写了 1）不写；不追踪时不写；除了这个标志，模块没有写相机的任何内存。

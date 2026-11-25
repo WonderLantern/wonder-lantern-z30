@@ -1,4 +1,4 @@
-"""Parse A:\\Z30\\AFnnnnnn.BIN written by modules/af_log (read-only AF record log, v1 to v9).
+"""Parse A:\\Z30\\AFnnnnnn.BIN written by research/af/modules/af_log (read-only AF record log, v1 to v9).
 
 Usage: parse_aflog.py AFnnnnnn.BIN [--words]
 Prints every change of the AF box (+0x90) and face box (+0xA8) of the record at

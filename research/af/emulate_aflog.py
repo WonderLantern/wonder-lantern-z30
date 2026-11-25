@@ -1,6 +1,6 @@
-"""Unicorn: the AF log module (modules/af_log) init / Run / IMU tick / save on a stubbed camera.
+"""Unicorn: the AF log module (research/af/modules/af_log) init / Run / IMU tick / save on a stubbed camera.
 
-Usage: emulate_aflog.py AF_LOG.bin (raw payload from modules/af_log/build.sh)
+Usage: emulate_aflog.py AF_LOG.bin (raw payload from research/af/modules/af_log/build.sh)
 """
 import struct, sys
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE

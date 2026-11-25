@@ -1,4 +1,4 @@
-"""Unicorn: the AF scan module (modules/af_scan) on a stubbed camera.
+"""Unicorn: the AF scan module (research/af/modules/af_scan) on a stubbed camera.
 
 Usage: emulate_afscan.py AF_SCAN.bin [OUT.BIN]
 One word changes only while 0xC237F688 (tracking) is 1, another changes all the

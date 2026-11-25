@@ -1,4 +1,4 @@
-"""Compare AF snapshots (A:\\Z30\\SNnnnnnn.BIN from modules/af_snap).
+"""Compare AF snapshots (A:\\Z30\\SNnnnnnn.BIN from research/af/modules/af_snap).
 
 Usage: parse_afsnap.py SNnnnnnn.BIN GROUPS [--show N]
        parse_afsnap.py SNnnnnnn.BIN shown [--show N]

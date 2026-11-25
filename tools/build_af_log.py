@@ -1,6 +1,6 @@
 """Build the AF-log research kit: an EG with the SD module host and the IMU-task hook,
-plus Z30/CORE.ZMOD from modules/af_log, modules/af_scan (--module scan) or
-modules/af_handover (--module handover) or modules/af_retarget (--module retarget);
+plus Z30/CORE.ZMOD from research/af/modules/af_log, research/af/modules/af_scan (--module scan) or
+research/af/modules/af_handover (--module handover) or research/af/modules/af_retarget (--module retarget);
 the ZMOD needs arm-none-eabi-gcc. log and scan share one EG; handover and
 retarget each need their own.
 
@@ -53,7 +53,7 @@ def main():
         research = [f for f in features if f != 'gyro-evr']
         image, report = build(extract_eg(a.source.read_bytes()), research, module_host=True, imu_hook=True)
     report['container_sha256'] = CONTAINER_SHA256
-    report['research'] = 'af-log: read-only AF record sampling (modules/af_log)'
+    report['research'] = 'af-log: read-only AF record sampling (research/af/modules/af_log)'
     a.output.mkdir(parents=True, exist_ok=True)
     eg, meta = a.output / 'EG209020.BIN', a.output / 'EG209020.json'
     if eg.exists() or meta.exists():
@@ -69,7 +69,7 @@ def main():
         extra = {'scan-box': ['-DSCAN_BOX'], 'log5': ['-DLOG5'], 'log6': ['-DLOG6'], 'log7': ['-DLOG7'], 'snap-shown': ['-DSNAP_SHOWN'], 'snap-focus': ['-DSNAP_FOCUS'], 'log8': ['-DLOG8'], 'log9': ['-DLOG9'], 'log10': ['-DLOG10'], 'log12': ['-DLOG12']}.get(a.module, [])
         if a.module == 'log11':
             extra = ['-DLOG11', '-DTRK3D_GET=' + report['features']['tracking3d_control']['functions']['trk3d_get'] + 'u']
-        subprocess.run(['sh', str(ROOT / 'modules' / name / 'build.sh'), str(raw), *extra], check=True)
+        subprocess.run(['sh', str(ROOT / 'research' / 'af' / 'modules' / name / 'build.sh'), str(raw), *extra], check=True)
         (a.output / 'Z30').mkdir(exist_ok=True)
         subprocess.run([sys.executable, str(ROOT / 'tools' / 'prepare_module.py'), '--code', str(raw),
                         '--output', str(a.output / 'Z30' / 'CORE.ZMOD')], check=True)
