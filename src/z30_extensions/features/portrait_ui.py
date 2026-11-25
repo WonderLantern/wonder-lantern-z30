@@ -936,8 +936,9 @@ def add(plan):
         raise ValueError('Draw log layout differs between the page and the hooks')
     if control['request_capacity'] != REQ_CAPACITY:
         raise ValueError('Request trace layout differs between the page and the hooks')
-    f = {'get': int(plan.features['shutter_sound']['functions']['get'], 16) & ~1}
+    f = {'get': int(plan.features['menu_framework']['functions']['get'], 16) & ~1}
     im = plan.image
+    banner = getattr(plan, 'banner_hooks', None)   # ready_banner.prepare_hooks (card builds)
     if im.read(ORIENTATION, 8) != bytes.fromhex('ec48c16804200129'):
         raise ValueError('Unexpected native orientation getter')
     if im.read(TEXT_CALL, len(TEXT_EXPECTED)) != TEXT_EXPECTED:
@@ -1179,7 +1180,9 @@ def add(plan):
         entry = plan.address
         # r4 widget, r8 = container + 0x9C. Add r4 once to the list when the container is the
         # live-view one and the widget has a draw function; then the stock window, with its cbz.
-        code = assemble(f'''push {{r0-r3,r12,lr}};mrs r0,apsr;push {{r0,r1}};
+        # The ready banner keeps a few of the drawn widgets too, portrait on or off.
+        banner_record = f"mov r0,r4;mov r1,r8;{n(banner['record'])}" if banner else ''
+        code = assemble(f'''push {{r0-r3,r12,lr}};mrs r0,apsr;push {{r0,r1}};{banner_record}
             ldr r0,[r4,#0x4c];cmp r0,#0;beq skip;{c('r0',LIVE_CONTAINER + 0x9C)}cmp r8,r0;bne skip;
             {n(f['get'])}cmp r0,#0;beq skip;{c('r1',control['state_offset'])}ldr r2,[r0,r1];cmp r2,#1;bne skip;
             {c('r1',control['state_offset'] + control['widget_offset'])}add r0,r0,r1;ldr r2,[r0];
