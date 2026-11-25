@@ -134,7 +134,8 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
     if wireless and bitrate:
         raise ValueError('Wireless research menu and bitrate menu currently share one owned page slot')
     bitrate = bitrate or wireless or precapture_probe or lut_sd or cmos_dump
-    grouped = bool(modules or bitrate or aspect or zebra or stamp or portrait or nef or gyro or trk3d or afcol)
+    # A menu tab is always grouped, so its root has the status page even without feature pages.
+    grouped = bool(menu_tab or modules or bitrate or aspect or zebra or stamp or portrait or nef or gyro or trk3d or afcol)
     if not (sound or grouped):
         raise ValueError('The extension menu needs the shutter sound or at least one feature page')
     if sound:

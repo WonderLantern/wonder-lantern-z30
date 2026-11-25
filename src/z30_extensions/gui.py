@@ -138,7 +138,9 @@ def output_problem(mode, output):
 
 def run_build(mode, source, presets, output):
     """Build and describe the result for the page; raises ValueError/OSError on failure."""
-    kit = card.write_kit(source, presets, output, patch_only=mode == 'patch', loader_only=mode == 'loader')
+    # GUI kits always put the extension menu in the eighth menu tab (with its status page).
+    kit = card.write_kit(source, presets, output, patch_only=mode == 'patch', loader_only=mode == 'loader',
+                         menu_tab=True)
     return dict(kind=mode, folder=str(output), files=[str(p) for p in kit['written']],
                 sha256=kit['resident_sha256'], resident_id=f'{kit["resident"].identity:#010x}',
                 patch=str(output / card.PATCH_PATH), patch_bytes=kit['patch_bytes'])

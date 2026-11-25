@@ -2,6 +2,7 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from z30_extensions import gui
@@ -60,6 +61,13 @@ class GuiHelperTests(unittest.TestCase):
 
     def test_every_preset_has_english_label(self):
         self.assertEqual(set(gui.PRESET_LABELS_EN), set(gui.PRESETS))
+
+    def test_run_build_always_uses_the_menu_tab(self):
+        kit = dict(written=[], resident_sha256='x', resident=SimpleNamespace(identity=1), patch_bytes=1)
+        for mode in gui.MODES:
+            with patch('z30_extensions.card.write_kit', return_value=kit) as write_kit:
+                gui.run_build(mode, Path('eg.bin'), ['focal-length'], Path('out'))
+            self.assertIs(write_kit.call_args.kwargs['menu_tab'], True)
 
     def test_build_to_files_refuses_existing_output(self):
         with tempfile.TemporaryDirectory() as folder:

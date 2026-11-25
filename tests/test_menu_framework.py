@@ -156,6 +156,19 @@ class MenuFrameworkTests(unittest.TestCase):
         self.assertIn('Settings row count with the extension entry', [e['name'] for e in plain['edits']])
         self.assertFalse(report['features']['menu_framework']['pages']['955']['back_icon'])
 
+    def test_menu_tab_always_has_the_status_page(self):
+        # A tab build brings the framework even without feature pages (GUI kits always
+        # have the tab): the root holds the status page, plus the sound group with sound.
+        from z30_extensions.build import build
+        self.assertNotIn('menu_framework', build(self.stock, 'focal-length')[1]['features'])
+        for preset, rows in (('focal-length', ['status']), (['liveview-dual', 'focal-length'], ['status']),
+                             ('shutter-sound', ['status', 'sound'])):
+            features = build(self.stock, preset, menu_tab=True)[1]['features']
+            self.assertIn('menu_tab', features)
+            menu = features['menu_framework']
+            self.assertEqual([row['key'] for row in menu['menu_categories']], rows)
+            self.assertEqual(menu['status_page']['rows'], ['card', 'version', 'features', 'settings'])
+
     def test_menu_tab_icons(self):
         from z30_extensions.features.menu import tab as menu_tab
         icons = menu_tab.icon_files()

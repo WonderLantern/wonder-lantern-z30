@@ -86,7 +86,7 @@
 
 ## 菜单左侧第 8 个标签（构建选项 `menu_tab`，2026-11-24）
 
-用户反馈扩展功能的入口太杂、不好找，所以把扩展菜单做成菜单左侧标签栏的第 8 个标签。目前是选项：`build(..., menu_tab=True)`，卡文件用 `tools/build_card.py --menu-tab`。默认关闭，默认构建与以前逐字节相同。实机：2026-11-24、11-25 两次上机发现的按键和色条问题已修正（见下文）；2026-11-25 在 `output/card-banner-v1-categories` 上确认第 8 个标签能进入根页和分类页（见[根页分类](#根页分类2026-11-25)）。研究过程见 [menu-tab-research.md](menu-tab-research.md)。
+用户反馈扩展功能的入口太杂、不好找，所以把扩展菜单做成菜单左侧标签栏的第 8 个标签。目前是选项：`build(..., menu_tab=True)`，卡文件用 `tools/build_card.py --menu-tab`。默认关闭，默认构建与以前逐字节相同。GUI 打包程序总是打开它（2026-11-25，见下文“总带状态页”）。实机：2026-11-24、11-25 两次上机发现的按键和色条问题已修正（见下文）；2026-11-25 在 `output/card-banner-v1-categories` 上确认第 8 个标签能进入根页和分类页（见[根页分类](#根页分类2026-11-25)）。研究过程见 [menu-tab-research.md](menu-tab-research.md)。
 
 | 部分 | 做法（`features/menu/tab.py`） |
 | --- | --- |
@@ -116,6 +116,17 @@ QEMU（`tools/probe_menu_tabs_qemu.py`，`full` 加 `menu_tab`）：
 - 几次运行在按键步骤遇到 QEMU 偶发的 `T02` 停止，重跑通过。
 
 单元测试：`tests/test_menu_framework.py`（选项默认关闭、编辑项、根页没有返回箭头、不加设定行、图标文件），`tests/test_card_loader.py`（卡文件在 Unicorn 中加载后标签栏为 8 行、设定菜单仍为 38 行，行数最后写）。
+
+### GUI 总带标签和状态页（2026-11-25）
+
+用户要求 GUI 打包程序打出的卡文件总有第 8 个标签，即使所选功能都没有菜单页，也要有状态页。
+
+- `gui.run_build` 总是传 `menu_tab=True`。命令行 `tools/build_card.py` 不变，仍要加 `--menu-tab` 才有标签。
+- `menu_tab` 现在总会带上菜单框架（`build.py`），框架把它当作有分组（`grouped`），所以根页总有"状态"一行。只选 `focal-length`、`liveview-dual` 这类没有菜单页的功能时，根页只有"状态"；只选 `shutter-sound` 时，根页是"状态"和"快门声音"（以前不带状态页、根页直接列声音行）。
+- 只改卡文件 `WL.PATCH`，常驻 EG 不变（`0x67f308e7`）。不带 `menu_tab` 的构建与以前逐字节相同；`full` 加 `menu_tab` 也不变（本来就有分组）。
+- 单元测试：`test_menu_tab_always_has_the_status_page`、`test_gui.test_run_build_always_uses_the_menu_tab`。
+- QEMU（`probe_menu_tabs_qemu.py`，只选 `focal-length` 加 `menu_tab`，简体和英文）：8 个标签正常；第 8 个标签打开根页，只有"状态"一行；进入状态页（卡文件、版本、功能 1 项、设置）再返回根页；第 8 个标签上的右键、确定等 4 个事件都进根页，设定标签照常打开设定菜单。
+- 2026-11-25 实机（`output/card-gui-tab`，GUI 打包流程，`date-stamp liveview-dual focal-length`，常驻 id `0x67f308e7`）：用户确认正常。
 
 ## 字节一致
 

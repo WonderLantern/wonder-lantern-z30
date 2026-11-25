@@ -109,7 +109,8 @@ python patch.py liveview-dual m900 mtp-fast --card --patch-only --source "Z_30_0
 
 - `.[sound]` installs the Keystone assembler.
 - Without presets the builder shows a multi-select menu: entries 1–19 are `full`, the sixteen features above and the two optional presets; press Enter for `full`. Separate several presets with spaces; repeated features are applied once.
-- `tools/build_card.py` does the same with a few extra options, such as `--menu-tab` (the extension menu as an eighth tab on the left of the menu) and `--no-banner` (no live-view ready banner).
+- Card files from the GUI packaging program always have the eighth tab. Even when no selected feature has a menu page, the tab holds the Status page.
+- `tools/build_card.py` does the same with a few extra options, such as `--menu-tab` (the extension menu as an eighth tab on the left of the menu; the GUI always turns it on) and `--no-banner` (no live-view ready banner).
 - **macOS:** if you see `fail to load the dynamic library` after installation, run this in the Python environment used for building:
 
 ```bash
@@ -141,7 +142,7 @@ Without `--card` the command line writes the features straight into one complete
 
 ### Menus and language
 
-- **Menu entry:** new features live in **Setup menu → Extensions** (Simplified Chinese 自定义菜单, Traditional 自訂選單). A sound-only build names the entry `Shutter sound`. Built with `--menu-tab`, the menu is an eighth tab (lantern icon) on the left of the menu instead.
+- **Menu entry:** new features live in **Setup menu → Extensions** (Simplified Chinese 自定义菜单, Traditional 自訂選單). A sound-only build names the entry `Shutter sound`. Built with the GUI, or with `--menu-tab` on the command line, the menu is an eighth tab (lantern icon) on the left of the menu instead.
 - **Root page:** the first row is Status (whether the card file loaded, version, feature count, whether settings were saved); below it the features are grouped by purpose, each feature page inside its category page ([notes](docs/menu-framework.md#根页分类2026-11-25), Chinese).
 - **Direct rows:** Photo aspect, Photo zebra and Date stamp are also listed at the end of the photo shooting menu, and Video bitrate at the end of the video shooting menu; press up once from the first row to reach them. Direct rows show `--` on the right. These direct rows are verified in QEMU only.
 - **Language:** menus follow the stock **Language** setting and show Simplified Chinese, Traditional Chinese or English; other languages show English.

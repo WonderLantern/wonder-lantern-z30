@@ -124,7 +124,8 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         # Diagnostic readout of the ready banner in the status page's version row.
         from .features.card.ready_banner import prepare_debug
         plan.banner_debug = prepare_debug(plan)
-    if module_host or 'shutter-sound' in features or any(name in features for name in MENU_FEATURES):
+    # The menu tab always brings the framework: its root has at least the status page.
+    if menu_tab or module_host or 'shutter-sound' in features or any(name in features for name in MENU_FEATURES):
         from .features.menu.framework import add
         add(plan, sound='shutter-sound' in features, menu_tab=menu_tab, modules=module_host, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, stamp='date-stamp' in features, portrait='portrait-ui' in features,
