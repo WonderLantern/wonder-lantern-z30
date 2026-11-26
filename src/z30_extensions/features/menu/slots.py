@@ -16,6 +16,13 @@ STOCK_SLOTS = frozenset((*range(14), *range(20, 25), 26, 30, 31, 40, 59, 70, *ra
 BLOCKS = dict(sound_group=(117, 1), zebra=(118, 8), stamp=(126, 19), sound=(145, 28),
               nef=(178, 9), modules=(216, 8), video=(224, 11), aspect=(235, 17), portrait=(200, 11), gyro=(41, 13), trk3d=(60, 9), afcol=(32, 7),
               grain=(90, 9),
+              # Handheld page (experimental): title, root label, 4 row labels; 2 values.
+              handheld=(14, 6), handheld_values=(54, 2),
+              # Benchmark page (experimental): title; root label + 2 row labels; 3 row labels; 1 value.
+              bench_title=(25, 1), bench=(27, 3), bench_rows=(56, 3), bench_value=(69, 1),
+              # Linux page (experimental): scattered single free slots.
+              linux_title=(71, 1), linux_root=(75, 1), linux_row0=(76, 1), linux_row1=(78, 1),
+              linux_row2=(83, 1), linux_row3=(99, 1), linux_value=(115, 1),
               category=(173, 4),  # one title per category page (menu_framework.CATEGORIES)
               # The status page: title, root value, 4 labels, 4 values (menu_framework.STATUS_SLOTS).
               status=(211, 4), status2=(252, 4), status3=(187, 2))

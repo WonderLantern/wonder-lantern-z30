@@ -8,13 +8,15 @@ from .platform.z30_120 import BASE
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot',
            'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'film-grain', 'portrait-ui',
            'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length', 'nef-menu', 'nef-uncompressed', 'nef-compressed',
-           'battery-percent')
+           'battery-percent', 'handheld', 'bench', 'linux')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'video-rot',
                  'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'film-grain', 'date-stamp', 'portrait-ui',
                  'gyro-evr', '3d-tracking', 'af-frame-colour', 'focal-length', 'nef-menu', 'nef-uncompressed', 'nef-compressed',
-                 'battery-percent')
-EXPERIMENTAL_FEATURES = ('battery-percent',)  # opt-in builds, not part of full
+                 'battery-percent', 'handheld', 'bench', 'linux')
+# Opt-in builds, not part of full. handheld (Game Boy emulator), bench (CPU
+# benchmark) and linux (Linux handoff) live on the experimental branch.
+EXPERIMENTAL_FEATURES = ('battery-percent', 'handheld', 'bench', 'linux')
 NEF_FIXED_FEATURES = ('nef-uncompressed', 'nef-compressed')
 NEF_COMPRESSION_FEATURES = ('nef-menu',) + NEF_FIXED_FEATURES
 FULL_FEATURES = tuple(name for name in FEATURE_ORDER
@@ -23,7 +25,7 @@ MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound')
 # Features with a page in the extension menu. Any of them (or the shutter sound)
 # brings the menu framework; none of them brings the shutter sound any more.
 MENU_FEATURES = ('bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'date-stamp', 'portrait-ui', 'nef-menu',
-                 'gyro-evr', '3d-tracking', 'af-frame-colour', 'film-grain')
+                 'gyro-evr', '3d-tracking', 'af-frame-colour', 'film-grain', 'handheld', 'bench', 'linux')
 
 
 def resolve_presets(preset='full'):
@@ -132,6 +134,7 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
             grain='film-grain' in features,
             nef='nef-menu' in features,
             gyro='gyro-evr' in features, trk3d='3d-tracking' in features, afcol='af-frame-colour' in features,
+            handheld='handheld' in features, bench='bench' in features, linux='linux' in features,
             aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
             aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial,

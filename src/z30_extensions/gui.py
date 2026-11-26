@@ -38,6 +38,9 @@ PRESET_LABELS_EN = {
     'focal-length': 'Show the focal length for every CPU lens in photo live view (stock: power zoom only); always on; included in full',
     'film-grain': 'Film grain on JPEGs (FUJI400 / HP5, strength 1-6, ported from Wonder Lantern Z5), off by default in the camera menu; included in full',
     'battery-percent': 'Experimental: battery icon with the charge in percent in photo live view (red at 20% and below); always on; not in full',
+    'linux': 'Experimental: boot a Linux kernel from the card (Z30/LINUX) from the extension menu, taking the camera over until the battery is pulled; with a dry run; not in full',
+    'bench': 'Experimental: a CPU benchmark in the extension menu (clock, integer, VFP/NEON, memory bandwidth and latency), full results in Z30/BENCH.TXT; not in full',
+    'handheld': 'Experimental: a Game Boy emulator in the extension menu running Z30/GAME.GB from the card (a built-in demo without it); not in full',
     'nef-menu': 'Experimental: choose NEF compression (lossless/compressed/uncompressed) in the extension menu, saved to WL-NEF.CFG; included in full, all three choices confirmed on the camera',
     'date-stamp': 'Film-style date stamp on JPEGs, five formats, four colors and an optional glow, turned for portrait, off by default; included in full',
     'gyro-evr': 'Gyro e-VR: in-body gyro stabilization in movie mode when electronic VR is on; yaw, pitch and roll, cooperates with lens VR; Extensions menu Standard/Enhanced/Native crop/OFF; included in full',
@@ -55,7 +58,7 @@ PRESET_TITLES = {
         'portrait-ui': '竖拍显示', 'gyro-evr': '陀螺仪电子防抖', '3d-tracking': '3D 跟踪',
         'af-frame-colour': '对焦框颜色', 'focal-length': '焦距显示', 'nef-menu': 'NEF 压缩菜单',
         'nef-uncompressed': 'NEF 固定未压缩', 'nef-compressed': 'NEF 固定压缩',
-        'battery-percent': '电量百分比', 'film-grain': '胶片颗粒',
+        'battery-percent': '电量百分比', 'film-grain': '胶片颗粒', 'handheld': '掌机', 'bench': '跑分', 'linux': 'Linux',
     },
     'en': {
         'full': 'Everything', 'liveview-dual': 'Histogram + level', 'shutter-sound': 'Custom shutter sound',
@@ -65,7 +68,7 @@ PRESET_TITLES = {
         'portrait-ui': 'Portrait layout', 'gyro-evr': 'Gyro e-VR', '3d-tracking': '3D tracking',
         'af-frame-colour': 'AF frame colours', 'focal-length': 'Focal length', 'nef-menu': 'NEF compression menu',
         'nef-uncompressed': 'NEF fixed uncompressed', 'nef-compressed': 'NEF fixed compressed',
-        'battery-percent': 'Battery percent', 'film-grain': 'Film grain',
+        'battery-percent': 'Battery percent', 'film-grain': 'Film grain', 'handheld': 'Handheld', 'bench': 'Benchmark', 'linux': 'Linux',
     },
 }
 

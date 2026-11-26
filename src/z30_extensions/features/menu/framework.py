@@ -27,7 +27,7 @@ CATEGORIES = (('photo', 'Photo', ('aspect', 'zebra', 'stamp', 'grain', 'nef')),
               ('focus', 'Focus & display', ('trk3d', 'afcol', 'portrait')),
               ('video', 'Video', ('bitrate', 'gyro')),
               ('sound', None, ('sound',)),
-              ('lab', 'Experimental', ('modules',)))
+              ('lab', 'Experimental', ('modules', 'handheld', 'bench', 'linux')))
 # Each category page keeps one page number and one title slot whatever the build holds.
 CATEGORY_PAGES = {key: 970 + i for i, key in enumerate(key for key, title, _ in CATEGORIES if title)}
 CATEGORY_TITLE_SLOTS = {key: BLOCKS['category'][0] + i for i, key in enumerate(CATEGORY_PAGES)}
@@ -120,7 +120,7 @@ def seed_record(plan, menu_object, callback, name):
         plan.edit(record, struct.pack('<I', callback | 1), name)
 
 
-def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, grain=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, cmos_dump=False, cmos_trace=False, cmos_spi=False, cmos_window=False, lut_sd=False, lut_cube_text=None, lut_size=17,
+def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=False, zebra=False, stamp=False, grain=False, portrait=False, nef=False, gyro=False, trk3d=False, afcol=False, handheld=False, bench=False, linux=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, cmos_dump=False, cmos_trace=False, cmos_spi=False, cmos_window=False, lut_sd=False, lut_cube_text=None, lut_size=17,
         build_tag='dev', resident_id=None, feature_count=None):
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
@@ -135,7 +135,7 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
         raise ValueError('Wireless research menu and bitrate menu currently share one owned page slot')
     bitrate = bitrate or wireless or precapture_probe or lut_sd or cmos_dump
     # A menu tab is always grouped, so its root has the status page even without feature pages.
-    grouped = bool(menu_tab or modules or bitrate or aspect or zebra or stamp or grain or portrait or nef or gyro or trk3d or afcol)
+    grouped = bool(menu_tab or modules or bitrate or aspect or zebra or stamp or grain or portrait or nef or gyro or trk3d or afcol or handheld or bench or linux)
     if not (sound or grouped):
         raise ValueError('The extension menu needs the shutter sound or at least one feature page')
     if sound:
@@ -172,7 +172,7 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
                      route=sizes['route'] + 64, action=sizes['action'] + 128)
     # Research builds keep their single-purpose page inside the custom menu only.
     present = {key for key, on in dict(modules=modules, bitrate=bitrate, aspect=aspect, zebra=zebra, stamp=stamp, grain=grain,
-               portrait=portrait, nef=nef, gyro=gyro, trk3d=trk3d, afcol=afcol, sound=sound and grouped).items() if on}
+               portrait=portrait, nef=nef, gyro=gyro, trk3d=trk3d, afcol=afcol, handheld=handheld, bench=bench, linux=linux, sound=sound and grouped).items() if on}
     root_keys, categories = root_layout(present) if grouped else ([], [])
     card = bool(getattr(plan, 'card', False))
     status = None
@@ -319,6 +319,18 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
         # Also a direct photo-menu row and a row of the focus category.
         from ..photo import af_frame_colour_ui as au_col
         register('afcol', au_col, au_col.ROWS, restore=('afcol_restore',))
+    if handheld:
+        # Game Boy emulator (features/experimental/handheld.py).
+        from ..experimental import handheld as hh
+        register('handheld', hh, hh.ROWS, value_slot=hh.STATUS_SLOT)
+    if bench:
+        # CPU benchmark (features/experimental/bench.py).
+        from ..experimental import bench as bm
+        register('bench', bm, bm.ROWS, value_slot=bm.STATUS_SLOT)
+    if linux:
+        # Linux handoff (features/experimental/linuxboot.py).
+        from ..experimental import linuxboot as lb
+        register('linux', lb, lb.ROWS, value_slot=lb.STATUS_SLOT)
     by_key = {page['key']: page for page in pages}
     # Scan stock row IDs now: direct rows need theirs before the row hook assembles.
     used = set()
@@ -558,16 +570,23 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
         is_root = index == PAGE_INDEX
         is_sound_group = grouped and sound and index == SOUND_GROUP_INDEX
         is_module = modules and index == mh.PAGE_INDEX
+        # A page module may name each row's value column (None: label only).
+        row_values = next((getattr(p['module'], 'VALUE_SLOTS', None) for p in pages if p['index'] == index), None)
+        # ... and each row's label slot, when its free slots are not contiguous.
+        row_labels = next((getattr(p['module'], 'LABEL_SLOTS', None) for p in pages if p['index'] == index), None)
         controls = bytearray()
         for i in range(count):
             control = bytearray(entry)
-            label_slot = row_slots[index][i][0] if index in row_slots else label+i
+            label_slot = (row_slots[index][i][0] if index in row_slots else
+                          row_labels[i] if row_labels else label+i)
             struct.pack_into('<I', control, 0, label_slot)
             struct.pack_into('<I', control, 16, 0x1209)
             if index in row_slots:
                 value_slot = row_slots[index][i][1]
             elif is_module:
                 value_slot = mh.STATUS_SLOT if i == 2 else mh.EMPTY_SLOT
+            elif row_values:
+                value_slot = EMPTY_SLOT if row_values[i] is None else row_values[i]
             elif is_root or is_sound_group:
                 value_slot = value+i if i<2 else EMPTY_SLOT
             else:
@@ -609,6 +628,8 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
                 has_value = row < 2
             elif is_module:
                 has_value = row == 2
+            elif row_values:
+                has_value = row_values[row] is not None
             else:
                 has_value = None
             if has_value is None:
