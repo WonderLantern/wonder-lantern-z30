@@ -1,0 +1,28 @@
+#!/bin/sh
+# Minimal udhcpc hook script for Z30 Linux (BusyBox ip + /tmp/resolv.conf)
+[ -n "$interface" ] || exit 1
+
+case "$1" in
+    deconfig)
+        ip addr flush dev "$interface" 2>/dev/null
+        ip link set "$interface" up
+        ;;
+    bound|renew)
+        ip addr flush dev "$interface" 2>/dev/null
+        ip addr add "$ip/${mask:-24}" dev "$interface"
+        if [ -n "$router" ]; then
+            ip route del default dev "$interface" 2>/dev/null || true
+            for r in $router; do
+                ip route add default via "$r" dev "$interface"
+                break
+            done
+        fi
+        if [ -n "$dns" ]; then
+            : > /tmp/resolv.conf
+            for d in $dns; do
+                echo "nameserver $d" >> /tmp/resolv.conf
+            done
+        fi
+        ;;
+esac
+exit 0
