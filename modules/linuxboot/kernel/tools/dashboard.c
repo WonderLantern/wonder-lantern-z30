@@ -310,6 +310,231 @@ static void show_klog(int start_row, int max_lines)
 	}
 }
 
+struct mc_player {
+	char name[20];
+	int x, y, z;
+	int hp, food;
+};
+
+struct mc_info {
+	int running;
+	char version[16];
+	int protocol;
+	int port;
+	int pid;
+	long uptime;
+	unsigned long ticks;
+	unsigned int world_time;
+	int online;
+	int max_players;
+	int clients;
+	int blocks;
+	int max_blocks;
+	int mobs;
+	unsigned long long rx_bytes;
+	int view_dist;
+	char seed[16];
+	int nplayers;
+	struct mc_player players[8];
+};
+
+static void read_mc_info(struct mc_info *mc)
+{
+	memset(mc, 0, sizeof(*mc));
+	snprintf(mc->version, sizeof mc->version, "26.3");
+	mc->protocol = 777;
+	mc->port = 25565;
+	mc->max_players = 16;
+	mc->max_blocks = 20000;
+	snprintf(mc->seed, sizeof mc->seed, "-");
+
+	FILE *f = fopen("/tmp/mc_status", "r");
+	if (!f)
+		return;
+	char line[160];
+	while (fgets(line, sizeof line, f)) {
+		size_t n = strlen(line);
+		while (n && (line[n - 1] == '\n' || line[n - 1] == '\r'))
+			line[--n] = 0;
+		if (!strncmp(line, "version=", 8))
+			snprintf(mc->version, sizeof mc->version, "%s", line + 8);
+		else if (!strncmp(line, "protocol=", 9))
+			mc->protocol = atoi(line + 9);
+		else if (!strncmp(line, "port=", 5))
+			mc->port = atoi(line + 5);
+		else if (!strncmp(line, "pid=", 4))
+			mc->pid = atoi(line + 4);
+		else if (!strncmp(line, "uptime=", 7))
+			mc->uptime = atol(line + 7);
+		else if (!strncmp(line, "ticks=", 6))
+			mc->ticks = strtoul(line + 6, NULL, 10);
+		else if (!strncmp(line, "world_time=", 11))
+			mc->world_time = (unsigned int)strtoul(line + 11, NULL, 10);
+		else if (!strncmp(line, "online=", 7))
+			mc->online = atoi(line + 7);
+		else if (!strncmp(line, "max_players=", 12))
+			mc->max_players = atoi(line + 12);
+		else if (!strncmp(line, "clients=", 8))
+			mc->clients = atoi(line + 8);
+		else if (!strncmp(line, "blocks=", 7))
+			mc->blocks = atoi(line + 7);
+		else if (!strncmp(line, "max_blocks=", 11))
+			mc->max_blocks = atoi(line + 11);
+		else if (!strncmp(line, "mobs=", 5))
+			mc->mobs = atoi(line + 5);
+		else if (!strncmp(line, "rx_bytes=", 9))
+			mc->rx_bytes = strtoull(line + 9, NULL, 10);
+		else if (!strncmp(line, "view_dist=", 10))
+			mc->view_dist = atoi(line + 10);
+		else if (!strncmp(line, "seed=", 5))
+			snprintf(mc->seed, sizeof mc->seed, "%s", line + 5);
+		else if (!strncmp(line, "player=", 7) && mc->nplayers < 8) {
+			struct mc_player *pl = &mc->players[mc->nplayers];
+			if (sscanf(line + 7, "%19s %d %d %d %d %d",
+				   pl->name, &pl->x, &pl->y, &pl->z, &pl->hp, &pl->food) >= 4)
+				mc->nplayers++;
+		}
+	}
+	fclose(f);
+	if (mc->pid > 0) {
+		char ppath[48];
+		struct stat st;
+		snprintf(ppath, sizeof ppath, "/proc/%d", mc->pid);
+		if (stat(ppath, &st) == 0)
+			mc->running = 1;
+	}
+}
+
+static void show_mc_log(int start_row, int max_lines)
+{
+	char ring[8][96];
+	int count = 0;
+	FILE *f = fopen("/tmp/mc.log", "r");
+
+	if (f) {
+		char buf[192];
+		while (fgets(buf, sizeof buf, f)) {
+			size_t n = strlen(buf);
+			while (n && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
+				buf[--n] = 0;
+			if (!n)
+				continue;
+			snprintf(ring[count % max_lines], sizeof ring[0], "%.88s", buf);
+			count++;
+		}
+		fclose(f);
+	}
+	int shown = count < max_lines ? count : max_lines;
+	int first = count < max_lines ? 0 : (count % max_lines);
+	for (int i = 0; i < max_lines; i++) {
+		printf("\033[%d;1H", start_row + i);
+		if (i < shown) {
+			int idx = (first + i) % max_lines;
+			printf(" \033[0;37m%s\033[0m\033[K", ring[idx]);
+		} else {
+			printf("\033[K");
+		}
+	}
+}
+
+static int read_dash_mode(void)
+{
+	char mode[32];
+	read_line("/tmp/dash.mode", mode, sizeof mode, "sys");
+	return (!strcmp(mode, "mc") || !strcmp(mode, "minecraft")) ? 1 : 0;
+}
+
+static const char *mc_day_phase(unsigned int wt)
+{
+	unsigned int t = wt % 24000U;
+	if (t < 12000U)
+		return "DAY";
+	if (t < 13800U)
+		return "SUNSET";
+	if (t < 22200U)
+		return "NIGHT";
+	return "SUNRISE";
+}
+
+static void draw_mc_page(const struct mc_info *mc, int p0, int p1,
+			 unsigned long mem_used, unsigned long mem_tot,
+			 int has_ip, const char *wlan_ip)
+{
+	long mup = mc->running ? mc->uptime : 0;
+	int mem_pm = mem_tot ? (int)((mem_used * 1000UL) / mem_tot) : 0;
+	int blk_pm = mc->max_blocks ? (int)(((long long)mc->blocks * 1000LL) / mc->max_blocks) : 0;
+	int pl_pm = mc->max_players ? (mc->online * 1000) / mc->max_players : 0;
+
+	/* Row 1: Header */
+	printf("\033[1;1H\033[1;37;42m  NIKON Z30  |  MINECRAFT %-6s SERVER (bareiron, proto %d)       UP %02ld:%02ld:%02ld  \033[0m\033[K",
+	       mc->version, mc->protocol, mup / 3600, (mup / 60) % 60, mup % 60);
+	draw_rule(2);
+
+	/* Rows 3-10: Two-column MC status */
+	printf("\033[3;1H \033[1;32m[ SERVER STATUS ]\033[0m\033[45G\033[0;36m|\033[0m \033[1;36m[ WORLD & COMPUTE ]\033[0m\033[K");
+
+	printf("\033[4;1H STAT %s\033[0m",
+	       mc->running ? "\033[1;32m[ONLINE]" : "\033[1;31m[STOPPED]");
+	if (mc->running)
+		printf("  PID %-5d  TICKS %-7lu", mc->pid, mc->ticks);
+	else
+		printf("  run: mc-ctl start");
+	printf("\033[45G\033[0;36m|\033[0m CPU0 ");
+	draw_bar(20, p0, p0 > 700 ? "\033[1;31m" : "\033[1;32m");
+	printf(" %3d.%d%%\033[K", p0 / 10, p0 % 10);
+
+	printf("\033[5;1H ADDR \033[1;33m%s:%d\033[0m\033[45G\033[0;36m|\033[0m CPU1 ",
+	       has_ip ? wlan_ip : "0.0.0.0", mc->port);
+	draw_bar(20, p1, p1 > 700 ? "\033[1;31m" : "\033[1;32m");
+	printf(" %3d.%d%%\033[K", p1 / 10, p1 % 10);
+
+	printf("\033[6;1H PLAY ");
+	draw_bar(20, pl_pm, "\033[1;32m");
+	printf(" %2d/%-2d\033[45G\033[0;36m|\033[0m MEM  ", mc->online, mc->max_players);
+	draw_bar(20, mem_pm, "\033[1;36m");
+	printf(" %3lu/%luM\033[K", mem_used, mem_tot);
+
+	printf("\033[7;1H BLCK ");
+	draw_bar(20, blk_pm, "\033[1;33m");
+	printf(" %d\033[45G\033[0;36m|\033[0m TIME %-7s (%u / 24000)\033[K",
+	       mc->blocks, mc_day_phase(mc->world_time), mc->world_time);
+
+	printf("\033[8;1H MOBS %-4d  CONNS %-4d  VIEW %d ch\033[45G\033[0;36m|\033[0m SEED 0x%s  (Java %s)\033[K",
+	       mc->mobs, mc->clients, mc->view_dist, mc->seed, mc->version);
+
+	printf("\033[9;1H RX   %llu KB total\033[45G\033[0;36m|\033[0m SAVE /tmp/mc/world.bin (tmpfs)\033[K",
+	       mc->rx_bytes / 1024ULL);
+
+	printf("\033[10;1H CTRL telnet %s -> dash sys\033[45G\033[0;36m|\033[0m CMD  mc-ctl start|stop|restart\033[K",
+	       has_ip ? wlan_ip : "<ip>");
+
+	draw_rule(11);
+
+	/* Rows 12-19: Online Players */
+	printf("\033[12;1H \033[1;33m[ ONLINE PLAYERS (%d/%d) ]\033[0m   NAME               POSITION (X, Y, Z)      HP    FOOD\033[K",
+	       mc->online, mc->max_players);
+	for (int i = 0; i < 6; i++) {
+		printf("\033[%d;1H", 13 + i);
+		if (i < mc->nplayers) {
+			const struct mc_player *pl = &mc->players[i];
+			printf("                             %-16s   (%5d, %3d, %5d)   %2d/20  %2d/20\033[K",
+			       pl->name, pl->x, pl->y, pl->z, pl->hp, pl->food);
+		} else if (i == 0 && mc->nplayers == 0) {
+			printf("                             \033[0;37m(waiting for Minecraft %s players...)\033[0m\033[K",
+			       mc->version);
+		} else {
+			printf("\033[K");
+		}
+	}
+
+	draw_rule(19);
+	printf("\033[20;1H \033[1;35m[ SERVER LOG (/tmp/mc.log) ]\033[0m\033[K");
+	show_mc_log(21, 8);
+
+	/* Row 30: Footer */
+	printf("\033[30;1H\033[1;37;40m  Z30-DASH [MC]  |  telnet: dash sys / dash toggle  |  mc-ctl start|stop  |  1s  \033[0m\033[K");
+}
+
 int main(void)
 {
 	struct cpu_stat prev[3], cur[3];
@@ -320,8 +545,11 @@ int main(void)
 	if (!uname(&u))
 		snprintf(rel, sizeof rel, "%s", u.release);
 	read_cpu(prev);
-	setvbuf(stdout, NULL, _IONBF, 0);
+	static char outbuf[16384];
+	setvbuf(stdout, outbuf, _IOFBF, sizeof outbuf);
 	printf("\033[2J\033[?25l");
+	fflush(stdout);
+	int prev_mode = -1;
 
 	for (;;) {
 		struct timespec ts;
@@ -336,6 +564,27 @@ int main(void)
 		read_mem(&mem_tot, &mem_used);
 		int mem_pm = mem_tot ? (int)((mem_used * 1000UL) / mem_tot) : 0;
 
+		struct stat st_tty, st_wlan;
+		int has_tty = (stat("/dev/ttyGS0", &st_tty) == 0);
+		int has_wlan = (stat("/sys/class/net/wlan0", &st_wlan) == 0);
+		char wlan_ip[32] = "";
+		int has_ip = has_wlan && read_wlan0_ip(wlan_ip, sizeof wlan_ip);
+
+		int mode = read_dash_mode();
+		if (mode != prev_mode) {
+			printf("\033[2J");
+			prev_mode = mode;
+		}
+
+		if (mode == 1) {
+			struct mc_info mc;
+			read_mc_info(&mc);
+			draw_mc_page(&mc, p0, p1, mem_used, mem_tot, has_ip, wlan_ip);
+			fflush(stdout);
+			sleep(1);
+			continue;
+		}
+
 		char load[64], udc_state[32], udc_speed[32], fs[32];
 		read_line("/proc/loadavg", load, sizeof load, "0.00 0.00 0.00");
 		char *sp = load;
@@ -349,11 +598,6 @@ int main(void)
 
 		read_line("/sys/class/udc/2aa00000.usb/state", udc_state, sizeof udc_state, "n/a");
 		read_line("/sys/class/udc/2aa00000.usb/current_speed", udc_speed, sizeof udc_speed, "none");
-		struct stat st_tty, st_wlan;
-		int has_tty = (stat("/dev/ttyGS0", &st_tty) == 0);
-		int has_wlan = (stat("/sys/class/net/wlan0", &st_wlan) == 0);
-		char wlan_ip[32] = "";
-		int has_ip = has_wlan && read_wlan0_ip(wlan_ip, sizeof wlan_ip);
 		int has_sd = sd_mounted(fs, sizeof fs);
 
 		unsigned long irq_tmr = 0, irq_usb = 0;
@@ -431,8 +675,9 @@ int main(void)
 		printf("\033[20;1H \033[1;35m[ KERNEL LOG ]\033[0m\033[K");
 		show_klog(21, 8);
 
-		/* Row 30: Footer */
-		printf("\033[30;1H\033[1;37;40m  Z30-DASH  |  USB Serial 0525:A4A6  |  1s refresh  |  Pull battery to return to Nikon  \033[0m\033[K");
+		/* Row 30: Footer (keep <= 89 cols so row 30 never wraps and scrolls fbcon) */
+		printf("\033[30;1H\033[1;37;40m  Z30-DASH [SYS]  |  telnet: dash mc / toggle  |  wifi-ctl  |  Pull battery to exit  \033[0m\033[K");
+		fflush(stdout);
 
 		sleep(1);
 	}

@@ -47,12 +47,13 @@ fi
 #  - Enable SoC clock gate in CRG (0x0428100C divider + 0x0428123C W1C gate):
 #      SD0 (z30,cd-inv): CRG+0x00C[20:16]=0x11 (50 MHz), CRG+0x23C=0x10 (bit 4)
 #      SD1 (z30,sdio):   hold ARM926 in reset (CRG+0x05C bit 0 = 1),
-#                        if WL_REG_ON (GPIO 0x5b = 0x04282014 bit 14) is HIGH, pulse LOW 100ms -> HIGH 200ms
-#                        to cleanly hard-reset BCM43455 into 1-bit SDIO init state,
+#                        configure WL_REG_ON (GPIO 0x5b = 0x04282014 bit 14, dir 0x04282114 bit 14)
+#                        as output and pulse LOW 100ms -> HIGH 200ms to cold-boot/reset BCM43455
+#                        into 1-bit SDIO init state (handoff already powered the EX MCU rail),
 #                        CRG+0x00C[28:24]=0x11 (50 MHz), CRG+0x23C=0x40 (bit 6)
 #  - MLB_WP_CD_LED_SET: SD0 needs BIT(1) (0x6); SD1 needs 0x00030204 (stock 0x102AA29E)
 #  - MLB_CDR_SET: both SD0 and SD1 use 1 (stock 0x102AA298 / 0x102AA2FC)
-if ! grep -q 'z30-wl-reset' "$src/drivers/mmc/host/sdhci-milbeaut.c"; then
+if ! grep -q 'z30-wl-reset2' "$src/drivers/mmc/host/sdhci-milbeaut.c"; then
   python3 - "$src/drivers/mmc/host/sdhci-milbeaut.c" <<'PYEOF'
 import sys
 from pathlib import Path
@@ -104,6 +105,34 @@ crg_hook = (
     '\t\t\t\twritel(0x10u, crg + 0x23c);\n'
     '\t\t\t}\n'
     '\t\t\tif (device_property_read_bool(dev, "z30,sdio")) {\n'
+    '\t\t\t\t/* z30-wl-reset2: stop ARM926, drive WL_REG_ON LOW 100ms -> HIGH 200ms, enable SD1 clock */\n'
+    '\t\t\t\twritel(readl(crg + 0x05c) | 1u, crg + 0x05c);\n'
+    '\t\t\t\twritel(readl(crg + 0x1114) | BIT(14), crg + 0x1114);\n'
+    '\t\t\t\twritel(0x40000000u, crg + 0x1014);\n'
+    '\t\t\t\tmsleep(100);\n'
+    '\t\t\t\twritel(0x40004000u, crg + 0x1014);\n'
+    '\t\t\t\tmsleep(200);\n'
+    '\t\t\t\tv = (v & ~0x1f000000u) | 0x11000000u;\n'
+    '\t\t\t\twritel(v, crg + 0x00c);\n'
+    '\t\t\t\twritel(0x40u, crg + 0x23c);\n'
+    '\t\t\t\tudelay(100);\n'
+    '\t\t\t}\n'
+    '\t\t\tiounmap(crg);\n'
+    '\t\t}\n'
+    '\t}\n'
+    '\tsdhci_milbeaut_init(host);'
+)
+old_v2 = (
+    '\tif (device_property_read_bool(dev, "z30,cd-inv") || device_property_read_bool(dev, "z30,sdio")) {\n'
+    '\t\tvoid __iomem *crg = ioremap(0x04281000, 0x1300);\n'
+    '\t\tif (crg) {\n'
+    '\t\t\tu32 v = readl(crg + 0x00c);\n'
+    '\t\t\tif (device_property_read_bool(dev, "z30,cd-inv")) {\n'
+    '\t\t\t\tv = (v & ~0x001f0000u) | 0x00110000u;\n'
+    '\t\t\t\twritel(v, crg + 0x00c);\n'
+    '\t\t\t\twritel(0x10u, crg + 0x23c);\n'
+    '\t\t\t}\n'
+    '\t\t\tif (device_property_read_bool(dev, "z30,sdio")) {\n'
     '\t\t\t\t/* z30-wl-reset: stop ARM926, pulse WL_REG_ON if powered, enable SD1 clock */\n'
     '\t\t\t\twritel(readl(crg + 0x05c) | 1u, crg + 0x05c);\n'
     '\t\t\t\tif (readl(crg + 0x1014) & BIT(14)) {\n'
@@ -145,7 +174,9 @@ old_v1 = (
     '\tsdhci_milbeaut_init(host);'
 )
 old_crg = '\tif (device_property_read_bool(dev, "z30,cd-inv")) { void __iomem *crg = ioremap(0x04281000, 0x300); if (crg) { writel(0x00110000, crg + 0x00c); writel(0x10, crg + 0x23c); iounmap(crg); } }\n\tsdhci_milbeaut_init(host);'
-if old_v1 in s:
+if old_v2 in s:
+    s = s.replace(old_v2, crg_hook, 1)
+elif old_v1 in s:
     s = s.replace(old_v1, crg_hook, 1)
 elif old_crg in s:
     s = s.replace(old_crg, crg_hook, 1)
@@ -291,10 +322,13 @@ mkdir -p "$out/bin"
 "${cross}gcc" -static -O2 -Wall -Wextra -o "$out/bin/z30-dash" "$here/tools/dashboard.c"
 "${cross}strip" "$out/bin/htop" "$out/bin/cmatrix" "$out/bin/tty-clock" "$out/bin/z30-mandel" "$out/bin/z30-dash"
 tr -d '\r' < "$here/tools/neofetch.sh" > "$out/bin/neofetch"
+tr -d '\r' < "$here/tools/dash.sh" > "$out/bin/dash"
+tr -d '\r' < "$here/tools/mc_ctl.sh" > "$out/bin/mc-ctl"
+tr -d '\r' < "$here/tools/wifi_ctl.sh" > "$out/bin/wifi-ctl"
 tr -d '\r' < "$here/tools/rc_init.sh" > "$out/rc_init.sh"
 tr -d '\r' < "$here/tools/udhcpc.script" > "$out/udhcpc.script"
 tr -d '\r' < "$here/tools/power.sh" > "$out/power.sh"
-chmod 755 "$out/bin/neofetch" "$out/rc_init.sh" "$out/udhcpc.script" "$out/power.sh"
+chmod 755 "$out/bin/neofetch" "$out/bin/dash" "$out/bin/mc-ctl" "$out/bin/wifi-ctl" "$out/rc_init.sh" "$out/udhcpc.script" "$out/power.sh"
 
 cat > "$out/initramfs.list" <<EOF
 dir /dev 755 0 0
@@ -320,6 +354,14 @@ dir /lib 755 0 0
 dir /lib/firmware 755 0 0
 dir /lib/firmware/brcm 755 0 0
 EOF
+
+# Include prebuilt static soft-float bareiron MC server if present in $out/bin.
+if [ -x "$out/bin/bareiron" ]; then
+  echo "file /bin/bareiron $out/bin/bareiron 755 0 0" >> "$out/initramfs.list"
+fi
+echo "file /bin/dash $out/bin/dash 755 0 0" >> "$out/initramfs.list"
+echo "file /bin/mc-ctl $out/bin/mc-ctl 755 0 0" >> "$out/initramfs.list"
+echo "file /bin/wifi-ctl $out/bin/wifi-ctl 755 0 0" >> "$out/initramfs.list"
 
 # Include prebuilt static soft-float wpa_supplicant / wpa_cli if present in $out/bin.
 if [ -x "$out/bin/wpa_supplicant" ]; then

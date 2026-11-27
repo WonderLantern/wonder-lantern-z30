@@ -39,6 +39,7 @@ typedef uint64_t u64; typedef uint32_t u32; typedef uint16_t u16; typedef uint8_
 #define WDT 0x0426c000u               /* ARM SP805 */
 #define EX_MCUMG_VTBL 0xc18e5270u     /* McuMg service vtable ptr (0xc18e5228 + 0x48) */
 #define EX_HB_PARAMS 0xc2a1234cu      /* McuMg heartbeat config: {enable, interval|(timeout<<8), mode} */
+#define EX_WL_PWR_CB 0xc1811a68u      /* EXMCU wireless power-rail callback ptr (0xc1811a58 + 0x10) */
 #define LCD 0x20144000u               /* display controller, LCD instance */
 /* SD host controllers: Socionext Milbeaut (F_SDH30) SDHCI 3.0 with bridge registers at
  * +0x200 (stock init 0x102AA25E). 0: card slot (IRQ 230), 1: inferred SDIO Wi-Fi (IRQ 233). */
@@ -311,6 +312,18 @@ static int prepare(void) {
     return 1;
 }
 
+static void enable_wifi_rail(void) {
+    /* Murata 1MW / BCM43455 VBAT/VDDIO rail is gated by EX MCU (PowMgCyc).
+     * Stock 0x103c7c70 queries EX (cmd 4) and, if off, sends EXMCU wireless
+     * power-on (cmd 0 -> channel cb 0x1027c491) and waits for EX ACK.
+     * Skip under QEMU (skip_wdt) or if the EXMCU callback is unregistered.
+     * Wait 300 ms for rail + 32 kHz LPO to settle (matching stock 0x103c7d04);
+     * Linux then drives WL_REG_ON (GPIO 0x5b = 0x04282014 bit 14) on its own. */
+    if (L.skip_wdt || !rd(EX_WL_PWR_CB)) return;
+    if (FN(0x103c7c71u, u32 (*)(void))())
+        FN(0x1021994bu, void (*)(u32))(300u);
+}
+
 static void disable_ex_heartbeat(void) {
     /* EX MCU (Cortex-M, McuMgCy2 1 s timer) pings EG on EXMCU channel 1 (cmd 0x0b)
      * and triggers NVIC_SystemReset (~16 s) if EG stops replying. Sending channel 1
@@ -326,6 +339,7 @@ static void boot(void) {
     L.error = E_NONE;
     if (!prepare()) { L.phase = P_ERROR; return; }
     L.phase = P_BOOTING;
+    enable_wifi_rail();
     disable_ex_heartbeat();
     if (!park_core1()) { L.phase = P_ERROR; return; }
     /* From here on this camera belongs to Linux: no way back but a restart. */
