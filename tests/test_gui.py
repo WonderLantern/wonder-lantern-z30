@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import tempfile
 import unittest
@@ -5,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from z30_extensions import gui
+from z30_extensions import gui, sound_wav
 from z30_extensions.cli import build_to_files
 
 
@@ -102,6 +103,66 @@ class GuiHelperTests(unittest.TestCase):
                 build_to_files(source, ['m900'], output, extracted_eg=True)
             self.assertEqual(output.read_bytes(), b'old')
             self.assertFalse(output.with_suffix('.json').exists())
+
+    def test_sound_wav_encode_validate_and_examples(self):
+        pcm = b'\x00\x00\xff\x7f\x00\x80'
+        wav = sound_wav.encode_canonical_wav(pcm)
+        self.assertEqual(len(wav), 44 + len(pcm))
+        self.assertEqual(sound_wav.validate_canonical_wav(wav), len(pcm))
+        with self.assertRaises(ValueError):
+            sound_wav.encode_canonical_wav(b'')
+        with self.assertRaises(ValueError):
+            sound_wav.encode_canonical_wav(b'\x00')
+        with self.assertRaises(ValueError):
+            sound_wav.encode_canonical_wav(b'\x00' * (sound_wav.MAX_DATA_BYTES + 2))
+        with self.assertRaises(ValueError):
+            sound_wav.validate_canonical_wav(wav[:24] + b'\x44\xac\x00\x00' + wav[28:])
+        for slot in (1, 2, 3, 4):
+            ex = sound_wav.example_wav(slot)
+            self.assertGreater(sound_wav.validate_canonical_wav(ex), 0)
+
+    def test_api_sound_endpoints(self):
+        with tempfile.TemporaryDirectory() as folder:
+            api = gui.Api()
+            api._base = Path(folder)
+            init = api.initial()
+            self.assertIn('sound', init['outputs'])
+
+            ex = api.example_sound(2)
+            self.assertTrue(ex['ok'])
+            raw_wav = base64.b64decode(ex['data_b64'])
+            self.assertGreater(sound_wav.validate_canonical_wav(raw_wav), 0)
+            self.assertFalse(api.example_sound(9)['ok'])
+
+            pcm = raw_wav[44:]
+            pcm_b64 = base64.b64encode(pcm).decode('ascii')
+            out_dir = Path(folder) / 'sound_out'
+
+            # Save to root slot SHUTTER.WAV
+            r1 = api.save_sound(str(out_dir), 'root', pcm_b64, overwrite=False)
+            self.assertTrue(r1['ok'])
+            self.assertEqual(r1['rel'], 'SHUTTER.WAV')
+            self.assertEqual((out_dir / 'SHUTTER.WAV').read_bytes(), raw_wav)
+
+            # Refuse overwrite by default
+            r2 = api.save_sound(str(out_dir), 'root', pcm_b64, overwrite=False)
+            self.assertFalse(r2['ok'])
+            self.assertEqual(r2['key'], 'sound_exists')
+
+            # Allow overwrite when requested
+            r3 = api.save_sound(str(out_dir), 'root', pcm_b64, overwrite=True)
+            self.assertTrue(r3['ok'])
+
+            # Save to numbered slot SHUTTER/3.WAV
+            r4 = api.save_sound(str(out_dir), '3', pcm_b64, overwrite=False)
+            self.assertTrue(r4['ok'])
+            self.assertEqual(r4['rel'], 'SHUTTER/3.WAV')
+            self.assertEqual((out_dir / 'SHUTTER' / '3.WAV').read_bytes(), raw_wav)
+
+            # Error cases
+            self.assertEqual(api.save_sound('', 'root', pcm_b64)['key'], 'need_folder')
+            self.assertEqual(api.save_sound(str(out_dir), '9', pcm_b64)['key'], 'sound_failed')
+            self.assertEqual(api.save_sound(str(out_dir), '1', '!!!not-b64!!!')['key'], 'sound_failed')
 
 
 if __name__ == '__main__':

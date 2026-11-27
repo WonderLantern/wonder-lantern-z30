@@ -25,7 +25,15 @@
   button, input { font: inherit; color: inherit; }
   .wrap { max-width: 1000px; margin: 0 auto; padding: 18px 36px 36px; }
 
-  header { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .header-right { display: flex; gap: 8px; }
+  .tabs { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .tab { background: transparent; border: 0; border-radius: 7px; padding: 6px 14px; cursor: pointer;
+    color: var(--muted); font-weight: 500; transition: background .15s, color .15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+  .tabpanel { display: none; }
+  .tabpanel.active { display: block; }
   .ghost { background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 12px;
     cursor: pointer; color: var(--muted); }
   .ghost:hover { color: var(--text); border-color: var(--faint); }
@@ -102,16 +110,53 @@
   .go.busy { opacity: 1 !important; background: repeating-linear-gradient(-45deg, var(--accent) 0 10px, var(--stripe) 10px 20px);
     background-size: 28px 28px; animation: slide .6s linear infinite; }
   @keyframes slide { to { background-position: 28px 0; } }
+  .dropzone { border: 1.5px dashed var(--line-2); border-radius: 10px; background: var(--bg); padding: 18px 16px;
+    text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: var(--panel-2); }
+  .dropzone .dz-title { font-weight: 600; font-size: 14px; }
+  .dropzone .dz-sub { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+  .examples span { color: var(--muted); font-size: 12.5px; }
+  .btn.sm { padding: 5px 11px; font-size: 12.5px; border-radius: 7px; }
+  .wave-wrap { position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; height: 136px; margin-bottom: 12px; }
+  .wave-wrap canvas { display: block; width: 100%; height: 100%; cursor: ew-resize; touch-action: none; }
+  .wave-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--faint); font-size: 13px; pointer-events: none; }
+  .ctrl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+  .ctrl-bar .spacer { flex: 1; }
+  .mono-stat { font: 12px/1.4 "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+    color: var(--muted); }
+  .mono-stat b { color: var(--text); font-weight: 600; }
+  .mono-stat .warn { color: var(--bad); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .toggle input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+  .slider-wrap { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .slider-wrap input[type=range] { width: 120px; accent-color: var(--accent); cursor: pointer; }
+  .slider-wrap code { font: 12px "Cascadia Mono", Consolas, monospace; color: var(--text); min-width: 46px; }
+  .slots { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 10px; }
+  .slot-btn { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 13px;
+    cursor: pointer; font: 12.5px "Cascadia Mono", Consolas, monospace; color: var(--muted); transition: border-color .15s; }
+  .slot-btn:hover { border-color: var(--faint); color: var(--text); }
+  .slot-btn.active { border-color: var(--accent); color: var(--text); background: var(--panel-2); font-weight: 600; }
+  .btn:disabled { opacity: .48; cursor: default; }
   ::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <button class="ghost" id="theme"></button>
-    <button class="ghost" id="lang"></button>
+    <div class="tabs" role="tablist">
+      <button class="tab active" id="tabBtnFirmware" data-tab="firmware" data-t="tab_firmware"></button>
+      <button class="tab" id="tabBtnSound" data-tab="sound" data-t="tab_sound"></button>
+    </div>
+    <div class="header-right">
+      <button class="ghost" id="theme"></button>
+      <button class="ghost" id="lang"></button>
+    </div>
   </header>
 
+  <div class="tabpanel active" id="tabFirmware">
   <section class="plain">
     <div class="head"><h2 data-t="source"></h2></div>
     <div class="row">
@@ -149,12 +194,82 @@
     <div class="actions"><button class="go" id="goPatch"></button></div>
     <div class="result" id="resultPatch"></div>
   </section>
+  </div>
+
+  <div class="tabpanel" id="tabSound">
+  <section class="card">
+    <div class="head"><span class="n">01</span><h2 data-t="snd_pick"></h2></div>
+    <input type="file" id="audioFile" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.opus,.webm" hidden>
+    <div class="dropzone" id="dropzone">
+      <div class="dz-title" data-t="snd_drop_title"></div>
+      <div class="dz-sub" data-t="snd_drop_sub"></div>
+    </div>
+    <div class="examples">
+      <span data-t="snd_examples"></span>
+      <button class="btn sm" data-ex="1" data-t="snd_ex1"></button>
+      <button class="btn sm" data-ex="2" data-t="snd_ex2"></button>
+      <button class="btn sm" data-ex="3" data-t="snd_ex3"></button>
+      <button class="btn sm" data-ex="4" data-t="snd_ex4"></button>
+    </div>
+    <div class="pill" id="soundSourceState"></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><span class="n">02</span><h2 data-t="snd_edit"></h2></div>
+    <div class="wave-wrap">
+      <canvas id="waveCanvas"></canvas>
+      <div class="wave-empty" id="waveEmpty" data-t="snd_wave_empty"></div>
+    </div>
+    <div class="ctrl-bar">
+      <button class="btn sm" id="btnAutoTrim" data-t="snd_autotrim" disabled></button>
+      <button class="btn sm" id="btnResetRange" data-t="snd_reset" disabled></button>
+      <span class="spacer"></span>
+      <span class="mono-stat" id="soundStats"></span>
+    </div>
+    <div class="ctrl-bar">
+      <label class="toggle"><input type="checkbox" id="sndNorm" checked><span data-t="snd_norm"></span></label>
+      <label class="toggle"><input type="checkbox" id="sndFade" checked><span data-t="snd_fade"></span></label>
+      <label class="slider-wrap">
+        <span data-t="snd_gain"></span>
+        <input type="range" id="sndGain" min="-12" max="12" step="0.5" value="0">
+        <code id="sndGainVal">0 dB</code>
+      </label>
+      <span class="spacer"></span>
+      <button class="btn sm" id="btnPlay8k" data-t="snd_play8k" disabled></button>
+      <button class="btn sm" id="btnPlayOrig" data-t="snd_playorig" disabled></button>
+    </div>
+    <div class="note" data-t="snd_edit_note"></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><span class="n">03</span><h2 data-t="snd_export"></h2></div>
+    <div class="row">
+      <label data-t="out_folder"></label>
+      <input id="soundOut" spellcheck="false">
+      <button class="btn" data-pick="soundOut" data-t="browse"></button>
+    </div>
+    <div class="slots" id="soundSlots">
+      <button class="slot-btn active" data-slot="root">SHUTTER.WAV</button>
+      <button class="slot-btn" data-slot="1">SHUTTER/1.WAV</button>
+      <button class="slot-btn" data-slot="2">SHUTTER/2.WAV</button>
+      <button class="slot-btn" data-slot="3">SHUTTER/3.WAV</button>
+      <button class="slot-btn" data-slot="4">SHUTTER/4.WAV</button>
+    </div>
+    <div class="ctrl-bar">
+      <label class="toggle"><input type="checkbox" id="sndOverwrite"><span data-t="snd_overwrite"></span></label>
+      <span class="spacer"></span>
+      <button class="go" id="goSound" disabled></button>
+    </div>
+    <div class="result" id="resultSound"></div>
+  </section>
+  </div>
 </div>
 <div class="tip" id="tip"></div>
 
 <script>
 const TEXT = {
   zh: {
+    tab_firmware: '固件打包', tab_sound: '快门音频',
     switch: 'English', theme_auto: '主题：跟随系统', theme_light: '主题：浅色', theme_dark: '主题：深色',
     source: '原厂固件', browse: '浏览…',
     loader: '打包加载器 EG 固件', patch: '打包功能卡文件',
@@ -179,8 +294,33 @@ const TEXT = {
     steps_loader: ['刷 EG209020.BIN（只需一次），先不放卡文件，确认 设置 → 固件版本 正常。'],
     steps_patch: ['把 Z30 文件夹复制到存储卡根目录（替换旧的 WL.PATCH），重启相机。',
                   '删掉卡上的 WL.PATCH 即恢复原厂行为。'],
+    snd_pick: '选择音频文件',
+    snd_drop_title: '点击选择音频，或把文件拖到这里',
+    snd_drop_sub: '支持 WAV / MP3 / M4A / FLAC / OGG，自动转为相机所需的 8 kHz 单声道 16-bit 标准 WAV',
+    snd_examples: '或载入内置示例：',
+    snd_ex1: '示例 1（轻脆）', snd_ex2: '示例 2（双响）', snd_ex3: '示例 3（柔和）', snd_ex4: '示例 4（电子音）',
+    snd_empty: '尚未载入音频',
+    snd_loaded: '已载入：{name} · {dur} s · {rate} Hz · {ch} 声道',
+    snd_decode_err: '无法解码该音频文件：{d}',
+    snd_edit: '裁剪与音效调整',
+    snd_wave_empty: '请先在上方载入音频文件或内置示例',
+    snd_autotrim: '自动去静音', snd_reset: '重置范围',
+    snd_norm: '音量归一化', snd_fade: '淡入淡出防爆音', snd_gain: '增益',
+    snd_play8k: '试听 8 kHz 效果', snd_playorig: '试听原声片段',
+    snd_edit_note: '拖动波形两侧黄线可调整起止位置，拖动中间区域可平移窗口；相机限制单段最长 1.08 秒，超出时自动钳位。',
+    snd_stats: '{start} – {end} ms · 选中 {dur} s（上限 1.08 s）· 约 {bytes} 字节',
+    snd_clipped: ' · 音量偏大已削波，建议调低增益',
+    snd_export: '导出到相机槽位',
+    snd_overwrite: '允许覆盖同名文件',
+    go_sound: '导出标准 WAV', saving_sound: '正在导出…',
+    sound_exists: '目标文件已存在（勾选“允许覆盖同名文件”可替换）：{d}',
+    sound_failed: '导出失败：{d}',
+    snd_done_meta: '8000 Hz · 单声道 · 16-bit PCM · 44 字节标准头 · {dur} ms · {bytes} 字节',
+    steps_sound: ['把生成的 {rel}（若在 SHUTTER 子目录里则连同 SHUTTER 文件夹一起）复制到存储卡根目录。',
+                  '在相机 扩展菜单 → 快门声音 中选择对应文件，开启本功能并打开相机静音拍摄即可生效。'],
   },
   en: {
+    tab_firmware: 'Firmware builder', tab_sound: 'Shutter sound',
     switch: '中文', theme_auto: 'Theme: system', theme_light: 'Theme: light', theme_dark: 'Theme: dark',
     source: 'Stock firmware', browse: 'Browse…',
     loader: 'Build the loader EG firmware', patch: 'Build the feature card file',
@@ -205,6 +345,30 @@ const TEXT = {
     steps_loader: ['Flash EG209020.BIN once; without the card file, check Setup > Firmware version.'],
     steps_patch: ['Copy the Z30 folder to the root of the memory card (replacing the old WL.PATCH) and restart.',
                   'Delete WL.PATCH from the card for stock behaviour.'],
+    snd_pick: 'Choose an audio file',
+    snd_drop_title: 'Click to choose audio, or drop a file here',
+    snd_drop_sub: 'Supports WAV / MP3 / M4A / FLAC / OGG; converts to the camera\'s 8 kHz mono 16-bit canonical WAV',
+    snd_examples: 'Or load a built-in example:',
+    snd_ex1: 'Example 1 (crisp)', snd_ex2: 'Example 2 (double)', snd_ex3: 'Example 3 (soft)', snd_ex4: 'Example 4 (tone)',
+    snd_empty: 'No audio loaded yet',
+    snd_loaded: 'Loaded: {name} · {dur} s · {rate} Hz · {ch} ch',
+    snd_decode_err: 'Could not decode this audio file: {d}',
+    snd_edit: 'Trim & adjust',
+    snd_wave_empty: 'Load an audio file or a built-in example above',
+    snd_autotrim: 'Auto-trim silence', snd_reset: 'Reset range',
+    snd_norm: 'Normalize volume', snd_fade: 'Anti-click fade', snd_gain: 'Gain',
+    snd_play8k: 'Preview 8 kHz', snd_playorig: 'Preview original',
+    snd_edit_note: 'Drag the yellow handles to trim, or drag inside the selection to slide it; camera limit is 1.08 s max.',
+    snd_stats: '{start} – {end} ms · {dur} s selected (1.08 s max) · ~{bytes} bytes',
+    snd_clipped: ' · clipping detected, lower gain',
+    snd_export: 'Export canonical WAV',
+    snd_overwrite: 'Allow overwriting existing file',
+    go_sound: 'Export WAV', saving_sound: 'Exporting…',
+    sound_exists: 'File already exists (tick "Allow overwriting" to replace): {d}',
+    sound_failed: 'Export failed: {d}',
+    snd_done_meta: '8000 Hz · mono · 16-bit PCM · 44-byte header · {dur} ms · {bytes} bytes',
+    steps_sound: ['Copy {rel} (with its SHUTTER folder if inside one) to the root of the memory card.',
+                  'In the camera Extensions menu > Shutter sound, pick the slot, enable the feature, and turn on Silent photography.'],
   },
 };
 const $ = id => document.getElementById(id);
@@ -239,6 +403,7 @@ function render() {
   }
   showSource(); showPatchFor(); summarize();
   for (const job in results) if (results[job]) showResult(job, results[job]);
+  renderSound();
 }
 
 let folderKey = 'for_program', folderCheck = 0;
@@ -315,6 +480,449 @@ async function build(job) {
   render(); showResult(job, r);
 }
 
+// ---- Shutter sound processor (Web Audio API -> 8 kHz mono 16-bit PCM) ----
+const MAX_SND_DUR = 1.08;
+const SND_RATE = 8000;
+const MAX_SND_SAMPLES = 8640;
+let activeTab = 'firmware';
+let audioCtx = null, sndBuf = null, sndMono = null, sndName = '', sndError = '';
+let selStart = 0, selEnd = 0, sndSlot = 'root', sndSaving = false, sndResult = null, sndClipped = false;
+let playSrc = null, playRaf = 0, playHead = -1;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  $('tabBtnFirmware').classList.toggle('active', tab === 'firmware');
+  $('tabBtnSound').classList.toggle('active', tab === 'sound');
+  $('tabFirmware').classList.toggle('active', tab === 'firmware');
+  $('tabSound').classList.toggle('active', tab === 'sound');
+  if (tab === 'sound') requestAnimationFrame(drawWave);
+}
+
+function stopPlayback() {
+  if (playSrc) { try { playSrc.stop(); } catch (e) {} playSrc = null; }
+  if (playRaf) { cancelAnimationFrame(playRaf); playRaf = 0; }
+  playHead = -1;
+  drawWave();
+}
+
+function mixToMono(buf) {
+  const len = buf.length, ch = buf.numberOfChannels, mono = new Float32Array(len);
+  for (let c = 0; c < ch; c++) {
+    const data = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += data[i] / ch;
+  }
+  return mono;
+}
+
+function autoTrimSelection() {
+  if (!sndBuf || !sndMono) return;
+  const dur = sndBuf.duration, sr = sndBuf.sampleRate, len = sndMono.length;
+  let peak = 0;
+  for (let i = 0; i < len; i++) { const a = Math.abs(sndMono[i]); if (a > peak) peak = a; }
+  if (peak < 1e-6) {
+    selStart = 0; selEnd = Math.min(dur, MAX_SND_DUR);
+  } else {
+    const thr = peak * 0.025;
+    let first = 0, last = len - 1;
+    while (first < len && Math.abs(sndMono[first]) < thr) first++;
+    while (last > first && Math.abs(sndMono[last]) < thr) last--;
+    selStart = Math.max(0, first / sr - 0.005);
+    selEnd = Math.min(dur, last / sr + 0.025);
+    if (selEnd - selStart > MAX_SND_DUR) selEnd = selStart + MAX_SND_DUR;
+    if (selEnd - selStart < 0.01) selEnd = Math.min(dur, selStart + 0.05);
+  }
+  sndClipped = false;
+  renderSound();
+}
+
+function resetSelection() {
+  if (!sndBuf) return;
+  selStart = 0;
+  selEnd = Math.min(sndBuf.duration, MAX_SND_DUR);
+  sndClipped = false;
+  renderSound();
+}
+
+async function loadAudioArrayBuffer(arrayBuf, name) {
+  stopPlayback();
+  sndError = ''; sndResult = null; $('resultSound').className = 'result';
+  try {
+    const ctx = getAudioCtx();
+    const decoded = await ctx.decodeAudioData(arrayBuf.slice(0));
+    if (!decoded || decoded.length === 0) throw new Error('Empty audio');
+    sndBuf = decoded;
+    sndMono = mixToMono(decoded);
+    sndName = name;
+    autoTrimSelection();
+  } catch (e) {
+    sndBuf = null; sndMono = null; sndName = '';
+    sndError = String(e && e.message ? e.message : e);
+    renderSound();
+  }
+}
+
+function b64ToArrayBuffer(b64) {
+  const bin = atob(b64), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
+function bytesToB64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
+function resampleSincFallback(mono, srcRate, startSec, targetLen) {
+  const out = new Float32Array(targetLen);
+  const ratio = srcRate / SND_RATE;
+  const cutoff = Math.min(0.45, 0.45 / Math.max(1, ratio));
+  const half = ratio > 1 ? Math.min(32, Math.ceil(8 * ratio)) : 8;
+  for (let i = 0; i < targetLen; i++) {
+    const center = (startSec + i / SND_RATE) * srcRate;
+    const cInt = Math.floor(center);
+    let acc = 0, wsum = 0;
+    for (let k = -half; k <= half; k++) {
+      const idx = cInt + k;
+      if (idx < 0 || idx >= mono.length) continue;
+      const x = idx - center;
+      const w = 0.54 + 0.46 * Math.cos(Math.PI * x / (half + 1));
+      const sinc = x === 0 ? 2 * cutoff : Math.sin(2 * Math.PI * cutoff * x) / (Math.PI * x);
+      const coeff = w * sinc;
+      acc += mono[idx] * coeff;
+      wsum += coeff;
+    }
+    out[i] = wsum > 1e-8 ? acc / wsum : 0;
+  }
+  return out;
+}
+
+async function renderCanonicalPcm() {
+  if (!sndBuf) throw new Error('No audio loaded');
+  const segDur = Math.min(MAX_SND_DUR, Math.max(1 / SND_RATE, selEnd - selStart));
+  const targetLen = Math.min(MAX_SND_SAMPLES, Math.max(1, Math.round(segDur * SND_RATE)));
+  let samples;
+  try {
+    const offline = new OfflineAudioContext(1, targetLen, SND_RATE);
+    const src = offline.createBufferSource();
+    src.buffer = sndBuf;
+    src.connect(offline.destination);
+    src.start(0, selStart, segDur);
+    const rendered = await offline.startRendering();
+    samples = new Float32Array(rendered.getChannelData(0));
+  } catch (e) {
+    samples = resampleSincFallback(sndMono, sndBuf.sampleRate, selStart, targetLen);
+  }
+  if ($('sndNorm').checked) {
+    let peak = 0;
+    for (let i = 0; i < samples.length; i++) { const a = Math.abs(samples[i]); if (a > peak) peak = a; }
+    if (peak > 1e-6) {
+      const scale = 0.89125 / peak; // -1 dBFS
+      for (let i = 0; i < samples.length; i++) samples[i] *= scale;
+    }
+  }
+  const gainDb = parseFloat($('sndGain').value) || 0;
+  if (gainDb !== 0) {
+    const gain = Math.pow(10, gainDb / 20);
+    for (let i = 0; i < samples.length; i++) samples[i] *= gain;
+  }
+  if ($('sndFade').checked && samples.length > 4) {
+    const fadeIn = Math.min(16, Math.floor(samples.length / 4));
+    const fadeOut = Math.min(40, Math.floor(samples.length / 4));
+    for (let i = 0; i < fadeIn; i++) samples[i] *= i / fadeIn;
+    for (let i = 0; i < fadeOut; i++) samples[samples.length - 1 - i] *= i / fadeOut;
+  }
+  const int16 = new Int16Array(samples.length);
+  let clipped = 0;
+  for (let i = 0; i < samples.length; i++) {
+    let v = samples[i];
+    if (v > 1 || v < -1) { clipped++; v = Math.max(-1, Math.min(1, v)); }
+    int16[i] = Math.max(-32768, Math.min(32767, Math.round(v * 32767)));
+  }
+  sndClipped = clipped > 0;
+  updateSoundStats();
+  return {int16, clipped};
+}
+
+function animatePlayhead(startSec, durSec) {
+  const ctx = getAudioCtx();
+  const t0 = ctx.currentTime;
+  const tick = () => {
+    const elapsed = ctx.currentTime - t0;
+    if (elapsed >= durSec || !playSrc) { playHead = -1; playRaf = 0; drawWave(); return; }
+    playHead = startSec + elapsed;
+    drawWave();
+    playRaf = requestAnimationFrame(tick);
+  };
+  playRaf = requestAnimationFrame(tick);
+}
+
+async function previewAudio(mode) {
+  if (!sndBuf) return;
+  stopPlayback();
+  const ctx = getAudioCtx();
+  if (mode === 'orig') {
+    const dur = Math.max(0.005, selEnd - selStart);
+    const src = ctx.createBufferSource();
+    src.buffer = sndBuf;
+    src.connect(ctx.destination);
+    src.onended = () => { if (playSrc === src) { playSrc = null; playHead = -1; drawWave(); } };
+    playSrc = src;
+    src.start(0, selStart, dur);
+    animatePlayhead(selStart, dur);
+  } else {
+    const {int16} = await renderCanonicalPcm();
+    const buf = ctx.createBuffer(1, int16.length, SND_RATE);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < int16.length; i++) ch[i] = int16[i] / 32768;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.onended = () => { if (playSrc === src) { playSrc = null; playHead = -1; drawWave(); } };
+    playSrc = src;
+    src.start(0);
+    animatePlayhead(selStart, int16.length / SND_RATE);
+  }
+}
+
+function drawWave() {
+  const canvas = $('waveCanvas');
+  if (!canvas || !canvas.offsetWidth) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  }
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  const colBg = cs.getPropertyValue('--bg').trim();
+  const colLine = cs.getPropertyValue('--line').trim();
+  const colMuted = cs.getPropertyValue('--faint').trim();
+  const colAccent = cs.getPropertyValue('--accent').trim();
+  const colText = cs.getPropertyValue('--text').trim();
+  const colInfo = cs.getPropertyValue('--info').trim();
+
+  g.fillStyle = colBg; g.fillRect(0, 0, w, h);
+  g.strokeStyle = colLine; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+  if (!sndBuf || !sndMono) return;
+
+  const dur = sndBuf.duration || 1;
+  const xStart = (selStart / dur) * w;
+  const xEnd = (selEnd / dur) * w;
+
+  // Dim unselected regions
+  g.fillStyle = document.documentElement.dataset.theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.42)';
+  g.fillRect(0, 0, xStart, h);
+  g.fillRect(xEnd, 0, w - xEnd, h);
+
+  // Waveform bars
+  const step = Math.max(1, Math.floor(sndMono.length / w));
+  const mid = h / 2, amp = h * 0.44;
+  for (let x = 0; x < w; x++) {
+    const i0 = Math.floor((x / w) * sndMono.length);
+    const i1 = Math.min(sndMono.length, i0 + step);
+    let mn = 0, mx = 0;
+    for (let i = i0; i < i1; i++) {
+      const v = sndMono[i];
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+    const inSel = x >= xStart && x <= xEnd;
+    g.fillStyle = inSel ? colText : colMuted;
+    const yTop = mid - mx * amp, yBot = mid - mn * amp;
+    g.fillRect(x, yTop, 1, Math.max(1, yBot - yTop));
+  }
+
+  // Selection borders & handles
+  g.fillStyle = colAccent;
+  g.fillRect(xStart - 1, 0, 2, h);
+  g.fillRect(xEnd - 1, 0, 2, h);
+  g.fillRect(Math.max(0, xStart - 5), 0, 10, 14);
+  g.fillRect(Math.min(w - 10, xEnd - 5), h - 14, 10, 14);
+
+  // Playhead
+  if (playHead >= 0) {
+    const xp = (playHead / dur) * w;
+    g.fillStyle = colInfo;
+    g.fillRect(xp - 1, 0, 2, h);
+  }
+}
+
+function updateSoundStats() {
+  const el = $('soundStats');
+  if (!sndBuf) { el.textContent = ''; return; }
+  const dur = Math.min(MAX_SND_DUR, Math.max(0, selEnd - selStart));
+  const samples = Math.min(MAX_SND_SAMPLES, Math.max(1, Math.round(dur * SND_RATE)));
+  const bytes = 44 + samples * 2;
+  const base = t('snd_stats', {
+    start: Math.round(selStart * 1000),
+    end: Math.round(selEnd * 1000),
+    dur: dur.toFixed(3),
+    bytes: bytes.toLocaleString(),
+  });
+  el.innerHTML = esc(base) + (sndClipped ? `<span class="warn">${esc(t('snd_clipped'))}</span>` : '');
+}
+
+function showSoundResult(r) {
+  sndResult = r;
+  const el = $('resultSound');
+  if (!r) { el.className = 'result'; return; }
+  if (!r.ok) {
+    el.className = 'result bad';
+    el.innerHTML = `<div class="top"><h3>${t('fail_title')}</h3></div><div>${esc(t(r.key, {d: r.detail || ''}))}</div>`;
+    return;
+  }
+  const meta = t('snd_done_meta', {dur: r.duration_ms, bytes: r.bytes.toLocaleString()});
+  el.className = 'result ok';
+  el.innerHTML = `<div class="top"><h3>${t('done')}</h3><button class="btn" data-open="${esc(r.folder)}">${t('open')}</button></div>
+    <div class="kv">${esc(r.file)}<br>${esc(meta)}</div>
+    <ol>${TEXT[lang].steps_sound.map(s => `<li>${esc(s.replace('{rel}', r.rel))}</li>`).join('')}</ol>`;
+  el.querySelector('[data-open]').onclick = e => api.open_folder(e.target.dataset.open);
+}
+
+function renderSound() {
+  const has = !!sndBuf;
+  $('waveEmpty').style.display = has ? 'none' : 'flex';
+  $('btnAutoTrim').disabled = !has;
+  $('btnResetRange').disabled = !has;
+  $('btnPlay8k').disabled = !has;
+  $('btnPlayOrig').disabled = !has;
+  const go = $('goSound');
+  go.textContent = t(sndSaving ? 'saving_sound' : 'go_sound');
+  go.classList.toggle('busy', sndSaving);
+  go.disabled = !has || sndSaving;
+  const st = $('soundSourceState');
+  if (sndError) {
+    st.className = 'pill bad';
+    st.textContent = t('snd_decode_err', {d: sndError});
+  } else if (has) {
+    st.className = 'pill ok';
+    st.textContent = t('snd_loaded', {
+      name: sndName, dur: sndBuf.duration.toFixed(2),
+      rate: sndBuf.sampleRate, ch: sndBuf.numberOfChannels,
+    });
+  } else {
+    st.className = 'pill';
+    st.textContent = t('snd_empty');
+  }
+  const gVal = parseFloat($('sndGain').value) || 0;
+  $('sndGainVal').textContent = (gVal > 0 ? '+' : '') + gVal.toFixed(1).replace(/\.0$/, '') + ' dB';
+  updateSoundStats();
+  drawWave();
+  if (sndResult) showSoundResult(sndResult);
+}
+
+async function exportSound() {
+  if (!sndBuf || sndSaving) return;
+  sndSaving = true; renderSound();
+  let r;
+  try {
+    const {int16} = await renderCanonicalPcm();
+    const bytes = new Uint8Array(int16.buffer, int16.byteOffset, int16.byteLength);
+    r = await api.save_sound($('soundOut').value, sndSlot, bytesToB64(bytes), $('sndOverwrite').checked);
+  } catch (e) {
+    r = {ok: false, key: 'sound_failed', detail: String(e)};
+  }
+  sndSaving = false;
+  renderSound();
+  showSoundResult(r);
+}
+
+function wireSound() {
+  $('tabBtnFirmware').onclick = () => switchTab('firmware');
+  $('tabBtnSound').onclick = () => switchTab('sound');
+  const dz = $('dropzone'), fi = $('audioFile');
+  dz.onclick = () => fi.click();
+  fi.onchange = async () => {
+    const f = fi.files && fi.files[0];
+    if (!f) return;
+    await loadAudioArrayBuffer(await f.arrayBuffer(), f.name);
+    fi.value = '';
+  };
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add('drag'); };
+  dz.ondragleave = () => dz.classList.remove('drag');
+  dz.ondrop = async e => {
+    e.preventDefault(); dz.classList.remove('drag');
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) await loadAudioArrayBuffer(await f.arrayBuffer(), f.name);
+  };
+  document.querySelectorAll('[data-ex]').forEach(b => b.onclick = async () => {
+    const r = await api.example_sound(Number(b.dataset.ex));
+    if (r && r.ok) await loadAudioArrayBuffer(b64ToArrayBuffer(r.data_b64), r.name);
+  });
+  $('btnAutoTrim').onclick = autoTrimSelection;
+  $('btnResetRange').onclick = resetSelection;
+  $('sndGain').oninput = () => { sndClipped = false; renderSound(); };
+  $('sndNorm').onchange = () => { sndClipped = false; renderSound(); };
+  $('sndFade').onchange = () => { sndClipped = false; renderSound(); };
+  $('btnPlay8k').onclick = () => previewAudio('8k');
+  $('btnPlayOrig').onclick = () => previewAudio('orig');
+  $('soundSlots').onclick = e => {
+    const b = e.target.closest('.slot-btn'); if (!b) return;
+    sndSlot = b.dataset.slot;
+    document.querySelectorAll('.slot-btn').forEach(x => x.classList.toggle('active', x === b));
+  };
+  $('goSound').onclick = exportSound;
+
+  // Waveform dragging
+  const canvas = $('waveCanvas');
+  let dragMode = null, dragAnchor = 0, dragOrigStart = 0, dragOrigEnd = 0;
+  const secFromEvent = e => {
+    const rect = canvas.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
+    return frac * (sndBuf ? sndBuf.duration : 0);
+  };
+  canvas.onpointerdown = e => {
+    if (!sndBuf) return;
+    const rect = canvas.getBoundingClientRect(), w = Math.max(1, rect.width), dur = sndBuf.duration;
+    const x = e.clientX - rect.left;
+    const xs = (selStart / dur) * w, xe = (selEnd / dur) * w;
+    if (Math.abs(x - xs) <= 10) dragMode = 'start';
+    else if (Math.abs(x - xe) <= 10) dragMode = 'end';
+    else if (x > xs && x < xe) dragMode = 'move';
+    else {
+      const clickSec = secFromEvent(e);
+      const span = Math.min(MAX_SND_DUR, selEnd - selStart || Math.min(dur, MAX_SND_DUR));
+      selStart = Math.max(0, Math.min(dur - span, clickSec - span / 2));
+      selEnd = Math.min(dur, selStart + span);
+      dragMode = 'move';
+    }
+    dragAnchor = secFromEvent(e); dragOrigStart = selStart; dragOrigEnd = selEnd;
+    canvas.setPointerCapture(e.pointerId);
+    sndClipped = false; renderSound();
+  };
+  canvas.onpointermove = e => {
+    if (!dragMode || !sndBuf) return;
+    const dur = sndBuf.duration, cur = secFromEvent(e), minSpan = Math.min(dur, 0.01);
+    if (dragMode === 'start') {
+      selStart = Math.max(0, Math.min(dur - minSpan, cur));
+      if (selEnd < selStart + minSpan) selEnd = Math.min(dur, selStart + minSpan);
+      if (selEnd - selStart > MAX_SND_DUR) selEnd = Math.min(dur, selStart + MAX_SND_DUR);
+    } else if (dragMode === 'end') {
+      selEnd = Math.max(minSpan, Math.min(dur, cur));
+      if (selStart > selEnd - minSpan) selStart = Math.max(0, selEnd - minSpan);
+      if (selEnd - selStart > MAX_SND_DUR) selStart = Math.max(0, selEnd - MAX_SND_DUR);
+    } else {
+      const span = dragOrigEnd - dragOrigStart;
+      const ns = Math.max(0, Math.min(dur - span, dragOrigStart + (cur - dragAnchor)));
+      selStart = ns; selEnd = ns + span;
+    }
+    sndClipped = false; renderSound();
+  };
+  canvas.onpointerup = canvas.onpointercancel = () => { dragMode = null; };
+  window.addEventListener('resize', () => { if (activeTab === 'sound') drawWave(); });
+}
+
 function wire() {
   $('lang').onclick = () => { lang = lang === 'zh' ? 'en' : 'zh'; render(); };
   $('theme').onclick = () => {
@@ -355,7 +963,8 @@ async function start(bridge) {
   lang = info.language;
   $('source').value = info.source;
   $('loaderOut').value = info.outputs.loader; $('patchOut').value = info.outputs.patch;
-  wire(); render(); checkSource(); checkPatchFolder();
+  $('soundOut').value = info.outputs.sound || '';
+  wire(); wireSound(); render(); checkSource(); checkPatchFolder();
 }
 
 let started = false;
@@ -365,13 +974,13 @@ setTimeout(() => {
   started = true;
   // Opened in a plain browser, without Python: canned answers to preview the layout.
   const presets = ['full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'video-rot', 'bitrate-slowmo-uncap',
-    'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'portrait-ui', 'gyro-evr', '3d-tracking',
+    'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'date-stamp', 'film-grain', 'portrait-ui', 'gyro-evr', '3d-tracking',
     'af-frame-colour', 'focal-length', 'nef-menu'];
   const dir = 'C:/WonderLanternZ30/output/';
   start({
     initial: async () => ({language: 'zh', presets, titles: {zh: {full: '全部功能'}, en: {full: 'Everything'}},
       labels: {zh: {}, en: {}}, source: 'C:/WonderLanternZ30/Z_30_0120.bin',
-      outputs: {loader: dir + 'card', patch: dir + 'card'}}),
+      outputs: {loader: dir + 'card', patch: dir + 'card', sound: dir + 'sound'}}),
     check_source: async () => 'ok',
     resolve: async st => ({ok: true, features: st.full ? presets.slice(1) : Object.keys(st).filter(k => st[k])}),
     build: async job => job === 'loader'
@@ -382,6 +991,13 @@ setTimeout(() => {
     next_kit: async () => dir + 'card-2', open_folder: async () => {}, choose_source: async () => null,
     folder_state: async () => 'none',
     choose_folder: async () => null,
+    example_sound: async slot => ({ok: false, key: 'sound_failed', detail: 'Preview mode'}),
+    save_sound: async (folder, slot, pcmB64) => {
+      const rel = slot === 'root' ? 'SHUTTER.WAV' : `SHUTTER/${slot}.WAV`;
+      const pcmLen = Math.floor(pcmB64.length * 3 / 4);
+      return {ok: true, folder, file: `${folder}/${rel}`, rel, bytes: pcmLen + 44,
+              samples: Math.floor(pcmLen / 2), duration_ms: Math.round(pcmLen / 16)};
+    },
   });
 }, 1500);
 </script>

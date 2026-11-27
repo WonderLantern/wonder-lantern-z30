@@ -1,5 +1,7 @@
 """Local firmware build GUI (pywebview page in gui_page.html); never connects to a camera
 or writes an SD card."""
+import base64
+import binascii
 import hashlib
 import locale
 import os
@@ -9,7 +11,7 @@ import threading
 from importlib.resources import files
 from pathlib import Path
 
-from . import card
+from . import card, sound_wav
 from .build import FULL_FEATURES, PRESETS, resolve_presets
 from .cli import PRESET_LABELS
 from .container import CONTAINER_SHA256, CONTAINER_SIZE
@@ -212,7 +214,8 @@ class Api:
             labels={'zh': PRESET_LABELS, 'en': PRESET_LABELS_EN},
             source=str(source) if source.is_file() else '',
             outputs={'loader': str(next_free_kit(self._base / 'output')),
-                     'patch': str(self.patch_folder())})
+                     'patch': str(self.patch_folder()),
+                     'sound': str(self._base / 'output' / 'sound')})
 
     def patch_folder(self):
         """The newest loader folder that has no card file yet, else a fresh folder."""
@@ -279,6 +282,40 @@ class Api:
             return dict(ok=False, key='failed', detail=str(error))
         finally:
             self._busy.release()
+
+    def example_sound(self, slot):
+        """Return one of the four synthesized example shutter WAVs as base64."""
+        try:
+            idx = int(slot)
+            wav = sound_wav.example_wav(idx)
+        except (TypeError, ValueError) as error:
+            return dict(ok=False, key='sound_failed', detail=str(error))
+        return dict(ok=True, name=f'example-{idx}.wav', data_b64=base64.b64encode(wav).decode('ascii'))
+
+    def save_sound(self, folder, slot, pcm_b64, overwrite=False):
+        """Encode and save 8 kHz mono 16-bit PCM bytes to the chosen camera WAV slot."""
+        folder = (folder or '').strip()
+        if not folder:
+            return dict(ok=False, key='need_folder')
+        try:
+            pcm = base64.b64decode(pcm_b64 or '', validate=True)
+            wav = sound_wav.encode_canonical_wav(pcm)
+            written = sound_wav.save_canonical_wav(Path(folder), str(slot), wav, overwrite=bool(overwrite))
+        except FileExistsError:
+            target = sound_wav.slot_path(Path(folder), str(slot))
+            return dict(ok=False, key='sound_exists', detail=str(target))
+        except (binascii.Error, ValueError, OSError) as error:
+            return dict(ok=False, key='sound_failed', detail=str(error))
+        samples = len(pcm) // sound_wav.SAMPLE_WIDTH
+        return dict(
+            ok=True,
+            folder=str(Path(folder)),
+            file=str(written),
+            rel=sound_wav.SOUND_SLOTS[str(slot)].as_posix(),
+            bytes=len(wav),
+            samples=samples,
+            duration_ms=round(samples * 1000 / sound_wav.SAMPLE_RATE),
+        )
 
     def open_folder(self, folder):
         if sys.platform == 'win32':
