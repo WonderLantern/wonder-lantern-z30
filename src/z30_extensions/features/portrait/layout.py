@@ -96,13 +96,27 @@ LIVE_CONTAINER, REDRAW_CALLBACK = 0xC2017AB8, 0x10453AFD
 MARK_ALL, REDRAW_NOW = 0x10454226, 0x10454218
 MARK_ALL_EXPECTED = bytes.fromhex('69f64db9')                    # b.w 102BD4C4
 REDRAW_NOW_EXPECTED = bytes.fromhex('2d4a743a126a02b1002101f0bebe')
-REPAINT_BY_MARKING = True
+# Photo live-view (VIEW_KIND 0) pure-UI full-page redraw: 0x1030B026(0) is the
+# Z30 equivalent of the Z 5's 0x1030D42A(0). Unlike 0x1030BB5A() (which only
+# updates 20 dynamic widget groups via 0x1032AE44), 0x1030B026(0) runs the full
+# stock redraw sequence: 0x1036999E (reset all 66 widget visibility flags),
+# 0x1036997A/0x1036994A (invert state diff cache), pass 1 (0x10325D60 + 0x103250D6),
+# pass 2 (0x10325D80 -> all 66 widget groups in 0x1073E950 + 0x103250D6), and
+# 0x1032427E (display refresh), with only 28 bytes of stack locals and no AF.
+# DRAW_BUSY (0xC18200B8 + 0x34) is the flag 0x10453CCE waits on before REDRAW_NOW;
+# skip and retry on the next update tick if non-zero.
+FULL_PAGE_REDRAW = 0x1030B026
+FULL_PAGE_REDRAW_EXPECTED = bytes.fromhex('2de9f04f0026054687b048f1')
+DRAW_BUSY = 0xC18200EC
+REPAINT_BY_FULL_REDRAW = True
+REPAINT_BY_MARKING = False
 REDRAW_IMMEDIATELY = False  # True hung the camera (v13)
 # v14 marked all 465 widgets of the container: QEMU stopped on a prefetch abort,
 # so some of them cannot be drawn in the current state. v15 records the widgets the
 # stock traversal really draws in that container (call site 102BD3F8) and, after a
 # turn, sets the flag (+0x44, as 102BD4C4 does) on those only. Leaving live view
 # empties the list; the stock redraw on return fills it again.
+# Kept enabled so ready_banner's DRAW_SITE recording hook remains wired.
 MARK_RECORDED = True
 # Draw function of the live-view widgets that only clear their box (camera, v17 snapshots).
 BACKGROUND_DRAW = 0x104B45DB
@@ -1028,6 +1042,8 @@ def add(plan):
     events = control['state_offset'] + control['event_offset']
     if im.read(MARK_ALL, 4) != MARK_ALL_EXPECTED or im.read(REDRAW_NOW, len(REDRAW_NOW_EXPECTED)) != REDRAW_NOW_EXPECTED:
         raise ValueError('Unexpected widget refresh entries')
+    if im.read(FULL_PAGE_REDRAW, len(FULL_PAGE_REDRAW_EXPECTED)) != FULL_PAGE_REDRAW_EXPECTED:
+        raise ValueError('Unexpected full-page redraw entry')
     if sum(1 for a in (0x10325074, 0x103254C0, 0x1032620C, 0x10326A88, 0x10326E88, 0x10327314)
            if im.words(a, 1)[0] == LIVE_CONTAINER) != 6:
         raise ValueError('Live-view container literals moved')
@@ -1058,6 +1074,25 @@ def add(plan):
             ldr r0,[sp,#8];cmp r0,#{ACTION_HALF};bne not_half;movs r1,#1;str r1,[r12,#8];b skip;
             not_half:cmp r0,#{ACTION_RELEASE};bne skip;str r0,[r12,#8];'''
             inject = ''
+        elif name == 'update' and REPAINT_BY_FULL_REDRAW:
+            # Pure-UI full-page redraw (0x1030BB5A()): called on the shooting UI task
+            # once R_REPAINT is set, in photo live view, not half-pressing, and while
+            # DRAW_BUSY (0xC18200EC) is clear so 0x10453CCE cannot self-wait.
+            # If R_PENDING is still 1, the first clear inside 0x1030BB5A expands to
+            # full-screen (720x480) before foreground widgets draw.
+            act = f'''
+            ldr r1,[r2,#{R_REPAINT}];cmp r1,#0;beq skip;
+            ldr r1,[r12,#8];cmp r1,#0;bne skip;
+            {c('r1',DRAW_BUSY)}ldr r1,[r1];cmp r1,#0;bne skip;
+            {c('r1',UI_SERVICE_PHASE)}ldrb r1,[r1];cmp r1,#1;beq phase_ok;cmp r1,#2;bne skip;
+            phase_ok:{c('r1',VIEW_KIND)}ldrb r1,[r1];cmp r1,#0;bne skip;
+            {c('r1',PHOTO_BACKEND)}ldr r1,[r1];cmp r1,#1;bne skip;
+            movs r1,#0;str r1,[r2,#{R_REPAINT}];
+            ldr r1,[r12,#12];adds r1,#1;str r1,[r12,#12];
+            movs r1,#1;str r1,[sp,#4];'''
+            inject = f'''cmp r1,#0;beq plain;
+            movs r0,#0;{n(FULL_PAGE_REDRAW)}
+            plain:'''
         elif name == 'update' and REPAINT_BY_MARKING:
             # v13 also called 10454218 (redraw now) here; it waits up to 10 s for the
             # drawing flag (10453CCE) inside an event the GUI is already handling, and

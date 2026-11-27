@@ -91,15 +91,15 @@ class Machine:
         u.mem_map(0xC1D41000, 0x1000)  # pose byte the event trace records
         u.mem_map(0xC6100000, 0x2000)  # fake widgets for the draw-record tests
         self.refreshes = []
-        def refresh(mu, address, size, data):  # 10454226 mark all / 10454218 redraw now
+        def refresh(mu, address, size, data):  # 10454226 mark all / 10454218 redraw now / 1030CB3C full-page redraw
             self.refreshes.append((address, mu.reg_read(UC_ARM_REG_R0), mu.reg_read(UC_ARM_REG_R1)))
             mu.reg_write(UC_ARM_REG_PC, mu.reg_read(UC_ARM_REG_LR))
-        for address in (pu.MARK_ALL, pu.REDRAW_NOW):
+        for address in (pu.MARK_ALL, pu.REDRAW_NOW, pu.FULL_PAGE_REDRAW):
             u.hook_add(UC_HOOK_CODE, refresh, begin=address, end=address)
         self.state_offset = state_offset
 
     def context(self, switch=1, present=True, phase=2, kind=0, backend=1, target=2, orientation=0, busy=(0, 0),
-                nav_state=0, nav_count=12):
+                nav_state=0, nav_count=12, draw_busy=0):
         u = self.u
         u.mem_write(STATE, bytes(0x100000))
         if present and self.state_offset is not None:
@@ -116,6 +116,7 @@ class Machine:
             u.mem_write(address, struct.pack('<I', value))
         u.mem_write(pu.NAV_TABLE, bytes([nav_state]))
         u.mem_write(pu.NAV_BLOCK, struct.pack('<2I', nav_count, 0))
+        u.mem_write(pu.DRAW_BUSY, struct.pack('<I', draw_busy))
         self.orientation = orientation
         self.set_calls.clear()
 
@@ -1188,19 +1189,21 @@ def main():
                      if pu.INJECT_HALF_PRESS else [[]] * (pu.HOLD_UPDATES + 3))
     injected = struct.unpack('<I', patched.u.mem_read(events_at + 12, 4))[0]
     held = struct.unpack('<I', patched.u.mem_read(events_at + 8, 4))[0]
-    passes = 1 if pu.INJECT_HALF_PRESS or not pu.REPAINT_BY_MARKING else (2 if pu.MARK_RECORDED else 1)  # no background flag left: the wait ends at once
-    ok = sequence == want_sequence and injected == passes and held == 0  # marking: background, then foreground pass
+    passes = 1 if pu.INJECT_HALF_PRESS or pu.REPAINT_BY_FULL_REDRAW or not pu.REPAINT_BY_MARKING else (2 if pu.MARK_RECORDED else 1)
+    ok = sequence == want_sequence and injected == passes and held == 0
     if not ok:
         failures.append(dict(test='inject_hold', sequence=sequence, injected=injected, held=held))
     inject_cases.append(dict(case='after_turn_held', sequence=sequence, passed=ok))
-    for label, state, repaint, pending, held, want in (
+    repaint_cases = (
             ('after_turn', {}, 1, 0, 0, [0x13, 0x00]),
+            ('after_turn_pending', {}, 1, 1, 0, [0x13, 0x00] if pu.REPAINT_BY_FULL_REDRAW else []),
+            ('draw_busy', dict(draw_busy=1), 1, 0, 0, [] if pu.REPAINT_BY_FULL_REDRAW else [0x13, 0x00]),
             ('nothing_changed', {}, 0, 0, 0, []),
-            ('clear_not_done', {}, 1, 1, 0, []),
             ('user_half_pressing', {}, 1, 0, 1, []),
             ('switch_off', dict(switch=0), 1, 0, 0, []),
             ('menu', dict(kind=3), 1, 0, 0, []),
-            ('playback', dict(phase=4), 1, 0, 0, [])):
+            ('playback', dict(phase=4), 1, 0, 0, []))
+    for label, state, repaint, pending, held, want in repaint_cases:
         patched.context(**state)
         patched.u.mem_write(pu.UI_TABLE, bytes(0x100))
         patched.u.mem_write(base + pu.R_PENDING, struct.pack('<2I', pending, repaint))
@@ -1227,17 +1230,19 @@ def main():
         patched.refreshes.clear()
         want_refresh = []
         if not pu.INJECT_HALF_PRESS:
-            if want and pu.REPAINT_BY_MARKING and not pu.MARK_RECORDED:
+            if want and pu.REPAINT_BY_FULL_REDRAW:
+                want_refresh = [(pu.FULL_PAGE_REDRAW, 0)]
+            elif want and pu.REPAINT_BY_MARKING and not pu.MARK_RECORDED:
                 want_refresh = [(pu.MARK_ALL, pu.LIVE_CONTAINER)] + (
                     [(pu.REDRAW_NOW, pu.LIVE_CONTAINER, pu.REDRAW_CALLBACK)] if pu.REDRAW_IMMEDIATELY else [])
             fired = bool(want)
             want = []
         else:
             fired = bool(want)
-        got_refresh = [(a, r0) if a == pu.MARK_ALL else (a, r0, r1) for a, r0, r1 in refreshed]
+        got_refresh = [(a, r0) if a in (pu.MARK_ALL, pu.FULL_PAGE_REDRAW) else (a, r0, r1) for a, r0, r1 in refreshed]
         ok = (dispatched == want and got_refresh == want_refresh and out['pc'] == update_resume
               and injected == int(fired) and left == (0 if fired else repaint))
-        if pu.MARK_RECORDED:
+        if pu.REPAINT_BY_MARKING and pu.MARK_RECORDED:
             # first pass: only the background widget; left counts down to the second pass
             ok = (dispatched == want and got_refresh == want_refresh and out['pc'] == update_resume
                   and injected == int(fired) and left == (2 + pu.PASS_GAP if fired else repaint)
