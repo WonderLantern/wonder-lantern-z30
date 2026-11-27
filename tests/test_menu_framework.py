@@ -67,7 +67,8 @@ class MenuFrameworkTests(unittest.TestCase):
         self.assertEqual([c['key'] for c in menu['menu_categories']], ['status', 'zebra'])
         names = [e['name'] for e in report['edits']]
         self.assertFalse(any(n.startswith('Sound hook') for n in names))
-        self.assertEqual(sum(n.startswith('Menu hook') for n in names), 3)
+        self.assertEqual(sum(n.startswith('Menu hook') for n in names), 4)
+        self.assertIn('Menu hook: touch_page', names)
 
     def test_root_lists_categories_and_single_pages(self):
         menu = self.build(['photo-zebra', 'bitrate-slowmo-uncap', 'aspect-profiles'])['features']['menu_framework']
