@@ -46,7 +46,8 @@ class NefCompressionTests(unittest.TestCase):
             load_immediate(0, 256)
 
     def test_menu_is_in_full_and_the_fixed_presets_are_not(self):
-        self.assertEqual(PRESETS[-4:], ('nef-menu', 'nef-uncompressed', 'nef-compressed', 'battery-percent'))
+        self.assertEqual(PRESETS[-7:], ('nef-menu', 'nef-uncompressed', 'nef-compressed', 'battery-percent',
+                                        'handheld', 'bench', 'linux'))
         self.assertEqual(resolve_presets('full')[1][-1], 'nef-menu')
         self.assertNotIn('nef-uncompressed', resolve_presets('full')[1])
         self.assertNotIn('nef-compressed', resolve_presets('full')[1])
