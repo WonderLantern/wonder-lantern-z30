@@ -303,4 +303,17 @@ def ui_code(f, strings, errors, anchor_table, template, child_templates, pages=(
         movs r1,#0;str r1,[r0,#{RESULT}];
         done:movs r0,#0;pop {{r4,pc}};
     """
+    # Stock touch dispatch (0x104759DC) loads r5 = [root + 8], assuming every menu
+    # page is a direct child of the tab bar (depth 2). Extension subpages (category,
+    # feature, popup) live at depth 3 or 4, so r5 stayed on the root page: touch DOWN
+    # skipped cursor movement on the active page while touch UP still posted 0x27E to
+    # it, activating the previously highlighted row instead of the touched one. When
+    # the active page (r8) is not the root tab bar (r0), use r8 directly so stale
+    # child pointers left after Back are ignored; stock depth-1/2 pages are unchanged.
+    code['touch_page']="""
+        cmp r8,r0;bne active_page;ldr r5,[r0,#8];b done;
+        active_page:mov r5,r8;
+        done:add.w fp,r4,#12;cmp r1,#1;
+        .balign 4;ldr.w pc,[pc,#0];.word 0x10475a61;
+    """
     return code

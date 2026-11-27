@@ -76,7 +76,7 @@ def root_layout(present):
 SLOT_ORDER = ('get', 'cas', 'validate', 'convert', 'load', 'start', 'stop', 'trigger', 'complete', 'open',
               'config', 'data', 'shot', 'ensure', 'labels', 'render', 'action', 'row', 'getter', 'route',
               'setup_init', 'show_error', 'save_settings', 'restore_settings', 'settings_close',
-              'dismiss_error', 'page_return')
+              'dismiss_error', 'page_return', 'touch_page')
 TEXT_ORDER = ('entry', 'title', 'files', 'switch', 'enable', 'file', 'preview', 'reload', 'off', 'on', 'none',
               'root', 'one', 'two', 'three', 'four', 'empty', 'current', 'missing', 'read', 'invalid', 'close',
               'busy', 'queue', 'audio', 'ok', 'save')
@@ -155,6 +155,7 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
     sizes.update(ensure=768, action=1024, getter=384, show_error=192)
     sizes['dismiss_error'] = 96
     sizes['page_return'] = 96
+    sizes['touch_page'] = 48
     if sound:
         sizes.update(shutter_sound.SIZES)
     sizes = {name: sizes[name] for name in SLOT_ORDER if name in sizes}
@@ -643,7 +644,8 @@ def add(plan, sound=True, menu_tab=False, modules=False, bitrate=False, aspect=F
                              'back_icon': not (menu_tab and is_root), 'header_object_id': hex(0xA18),
                              'ancestor_sidebar_visible': True, 'layout_flags': hex(header[0])}
     hooks = ((0x1045E33C, 'row', 8), (0x104571FE, 'getter', 12), (0x10072598, 'shot', 8),
-             (0x1006BEDE, 'config', 12), (0x1006BE90, 'data', 8), (0x103CE804, 'route', 8))
+             (0x1006BEDE, 'config', 12), (0x1006BE90, 'data', 8), (0x103CE804, 'route', 8),
+             (0x10475A58, 'touch_page', 8))
     for site, name, length in hooks:
         if name in f:
             plan.edit(site, jump(site, f[name], length),
