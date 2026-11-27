@@ -4,7 +4,7 @@
 #
 #   WonderLanternZ30-windows-x64.zip
 #   WonderLanternZ30-linux-x64.tar.gz
-#   WonderLanternZ30-macos-x64.zip     (x86_64; Apple silicon runs it through Rosetta 2)
+#   WonderLanternZ30-macos-arm64.zip   (Apple silicon native)
 #
 # The release version (the tag) is stamped into the program and shown on the
 # status page of every card file it builds.
@@ -48,8 +48,8 @@ jobs:
           # The oldest supported Ubuntu, so the program runs on older glibc too.
           - os: ubuntu-22.04
             tests: false
-          # keystone-engine 0.9.2 has macOS wheels for x86_64 only.
-          - os: macos-15-intel
+          # Apple silicon runner; libkeystone.dylib (0.9.2, ARM target) is built from source below.
+          - os: macos-15
             tests: false
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
@@ -73,6 +73,87 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 \
             libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xkb1 libxkbfile1 libnss3
+
+      # keystone-engine 0.9.2 has no macOS arm64 wheel on PyPI; build libkeystone.dylib
+      # (ARM target only) from the 0.9.2 source tag and repackage the official wheel for arm64.
+      - name: Restore Keystone arm64 wheel cache
+        if: runner.os == 'macOS'
+        id: keystone-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/keystone-wheel
+          key: keystone-0.9.2-macos-arm64-arm-only-v1
+
+      - name: Build Keystone 0.9.2 (macOS arm64)
+        if: runner.os == 'macOS' && steps.keystone-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/keystone-build"
+          WHEEL_DIR="$RUNNER_TEMP/keystone-wheel"
+          rm -rf "$WORK" "$WHEEL_DIR"
+          mkdir -p "$WORK" "$WHEEL_DIR"
+
+          git clone --depth 1 --branch 0.9.2 https://github.com/keystone-engine/keystone.git "$WORK/src"
+          cmake -S "$WORK/src" -B "$WORK/build" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DLLVM_TARGETS_TO_BUILD=ARM \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          cmake --build "$WORK/build" --target keystone -j "$(sysctl -n hw.ncpu)"
+
+          DYLIB="$(find "$WORK/build" -name 'libkeystone*.dylib' -type f | head -n 1)"
+          cp "$DYLIB" "$WORK/libkeystone.dylib"
+          install_name_tool -id '@loader_path/libkeystone.dylib' "$WORK/libkeystone.dylib"
+          lipo -info "$WORK/libkeystone.dylib" | grep -q 'arm64'
+
+          python -m pip download --no-deps --only-binary=:all: \
+            --platform macosx_10_9_x86_64 --python-version 3.14 \
+            -d "$WORK" keystone-engine==0.9.2
+
+          python - "$WORK" "$WHEEL_DIR" <<'PY'
+          import base64, hashlib, pathlib, sys, zipfile
+
+          work, wheel_dir = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+          src_whl = next(work.glob('keystone_engine-0.9.2-*.whl'))
+          dylib = (work / 'libkeystone.dylib').read_bytes()
+          dst_whl = wheel_dir / 'keystone_engine-0.9.2-py3-none-macosx_11_0_arm64.whl'
+
+          records = []
+          with zipfile.ZipFile(src_whl, 'r') as zin, zipfile.ZipFile(dst_whl, 'w', zipfile.ZIP_DEFLATED) as zout:
+              for item in zin.infolist():
+                  name = item.filename
+                  if name.endswith('/RECORD') or (name.startswith('keystone/libkeystone') and name.endswith('.dylib')):
+                      continue
+                  data = zin.read(name)
+                  if name.endswith('/WHEEL'):
+                      text = data.decode('utf-8')
+                      lines = [l for l in text.splitlines() if not l.startswith('Tag:')]
+                      lines.append('Tag: py3-none-macosx_11_0_arm64')
+                      data = ('\n'.join(lines) + '\n').encode('utf-8')
+                  zout.writestr(name, data)
+                  digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b'=').decode('ascii')
+                  records.append(f'{name},sha256={digest},{len(data)}')
+
+              zout.writestr('keystone/libkeystone.dylib', dylib)
+              digest = base64.urlsafe_b64encode(hashlib.sha256(dylib).digest()).rstrip(b'=').decode('ascii')
+              records.append(f'keystone/libkeystone.dylib,sha256={digest},{len(dylib)}')
+
+              record_name = next(i.filename for i in zin.infolist() if i.filename.endswith('/RECORD'))
+              records.append(f'{record_name},,')
+              zout.writestr(record_name, ('\n'.join(records) + '\n').encode('utf-8'))
+          print('Built wheel:', dst_whl)
+          PY
+
+      - name: Install Keystone 0.9.2 (macOS arm64)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install "$RUNNER_TEMP/keystone-wheel/keystone_engine-0.9.2-py3-none-macosx_11_0_arm64.whl"
+          python -c "from keystone import Ks, KS_ARCH_ARM, KS_MODE_THUMB, KS_MODE_V8; b, _ = Ks(KS_ARCH_ARM, KS_MODE_THUMB | KS_MODE_V8).asm('nop', as_bytes=True); assert b == b'\x00\xbf', b"
 
       - name: Install dependencies
         run: python -m pip install '.[gui-exe,verify]'
@@ -216,7 +297,7 @@ jobs:
             $rows = @(
               @('Windows 10/11', 'WonderLanternZ30-windows-x64.zip'),
               @('Linux x86-64', 'WonderLanternZ30-linux-x64.tar.gz'),
-              @('macOS 11+ (Intel; Apple silicon via Rosetta 2)', 'WonderLanternZ30-macos-x64.zip')
+              @('macOS 11+ (Apple silicon)', 'WonderLanternZ30-macos-arm64.zip')
             ) | ForEach-Object { "| $($_[0]) | ``$($_[1])`` | ``$($sums[$_[1]])`` |" }
             $tick = '`'
             $docs = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/blob/$env:TAG/docs"

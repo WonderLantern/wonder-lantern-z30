@@ -34,7 +34,7 @@ Download one archive from the [Releases page](https://github.com/WonderLantern/w
 | --- | --- | --- |
 | Windows 10/11 | `WonderLanternZ30-windows-x64.zip` | `WonderLanternZ30\WonderLanternZ30.exe` |
 | Linux x86-64 | `WonderLanternZ30-linux-x64.tar.gz` | `WonderLanternZ30/WonderLanternZ30` |
-| macOS 11 or later (Intel and Apple silicon) | `WonderLanternZ30-macos-x64.zip` | `WonderLanternZ30/WonderLanternZ30.app` |
+| macOS 11 or later (Apple silicon) | `WonderLanternZ30-macos-arm64.zip` | `WonderLanternZ30/WonderLanternZ30.app` |
 
 Check the archive's SHA-256 against the Release page if you like. **Extract the whole archive** before starting the program; do not run it from inside the archive.
 
@@ -75,7 +75,7 @@ The program is not code-signed, so each system asks once:
 | System | What to do |
 | --- | --- |
 | Windows | When SmartScreen warns, choose "More info → Run anyway". The window is drawn by the Microsoft Edge WebView2 runtime that comes with Windows 10/11 |
-| macOS | In Finder, **right-click `WonderLanternZ30.app` → Open** and confirm, or run `xattr -dr com.apple.quarantine WonderLanternZ30.app`. Apple silicon Macs run it through Rosetta 2 and offer to install it the first time |
+| macOS | In Finder, **right-click `WonderLanternZ30.app` → Open** and confirm, or run `xattr -dr com.apple.quarantine WonderLanternZ30.app` |
 | Linux | Run `tar -xzf WonderLanternZ30-linux-x64.tar.gz`, then `./WonderLanternZ30/WonderLanternZ30`; later a double-click in the file manager works too. The window is drawn by the bundled Qt WebEngine; the system only needs NSS (`libnss3`, present on desktops with Firefox or Chrome; `sudo apt install libnss3` on Ubuntu/Debian) |
 
 ## 2. The window
