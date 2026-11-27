@@ -7,13 +7,13 @@ cross-build); the release workflow runs this once per platform:
 
   Windows  dist/WonderLanternZ30-windows-x64.zip     WonderLanternZ30/WonderLanternZ30.exe
   Linux    dist/WonderLanternZ30-linux-x64.tar.gz    WonderLanternZ30/WonderLanternZ30
-  macOS    dist/WonderLanternZ30-macos-x64.zip       WonderLanternZ30/WonderLanternZ30.app
+  macOS    dist/WonderLanternZ30-macos-arm64.zip     WonderLanternZ30/WonderLanternZ30.app
 
 The window is pywebview: WebView2 (WinForms, pythonnet) on Windows, WebKit
 (Cocoa, PyObjC) on macOS and Qt WebEngine (PySide6, LGPL) on Linux. The macOS
-program is x86_64 because keystone-engine 0.9.2 has no arm64 wheel; Apple
-silicon runs it through Rosetta 2. dist/build.json names the program and the
-archive for the workflow.
+program is Apple silicon native (arm64), using a libkeystone.dylib compiled from
+Keystone 0.9.2 source. dist/build.json names the program and the archive for the
+workflow.
 
 --version is shown with the date on the status page of every card file the
 program builds (the release workflow passes the tag, e.g. v0.5.0). Without it
