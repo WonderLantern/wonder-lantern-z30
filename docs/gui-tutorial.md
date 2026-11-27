@@ -10,6 +10,9 @@
 > [!WARNING]
 > 修改固件有风险。开始前请保留一份未经修改的 `Z_30_0120.bin`，并确认自己知道如何通过 **设定菜单 → 固件版本** 升级固件——只要这个页面能进入，就能刷回原厂固件。
 
+> [!TIP]
+> 打包程序顶部还内置了 **「快门音频」** 独立标签页，可以把任意 MP3 / WAV / M4A 裁剪试听并一键导出为相机标准快门声，详细图文步骤见 **[自定义快门声音制作与使用教程](shutter-sound-tutorial.md)**。
+
 ## 整体流程
 
 ![整体流程：加载器只刷一次；以后每次换功能只打包卡文件、复制到存储卡、开机](images/gui-tutorial/11-workflow.png)
@@ -34,7 +37,7 @@
 | --- | --- | --- |
 | Windows 10/11 | `WonderLanternZ30-windows-x64.zip` | `WonderLanternZ30\WonderLanternZ30.exe` |
 | Linux x86-64 | `WonderLanternZ30-linux-x64.tar.gz` | `WonderLanternZ30/WonderLanternZ30` |
-| macOS 11 及以上（Intel 和 Apple 芯片） | `WonderLanternZ30-macos-x64.zip` | `WonderLanternZ30/WonderLanternZ30.app` |
+| macOS 11 及以上（Apple 芯片） | `WonderLanternZ30-macos-arm64.zip` | `WonderLanternZ30/WonderLanternZ30.app` |
 
 可以先核对 Release 页面列出的压缩包 SHA-256。**完整解压**后再运行，不要在压缩包里直接双击，程序需要旁边的其他文件。
 
@@ -75,7 +78,7 @@ WonderLanternZ30/
 | 系统 | 怎么做 |
 | --- | --- |
 | Windows | SmartScreen 提示“已保护你的电脑”时，点“更多信息 → 仍要运行”。界面由 Windows 10/11 自带的 Microsoft Edge WebView2 运行时显示 |
-| macOS | 在 Finder 里**右键 `WonderLanternZ30.app` → 打开**，弹窗里再点“打开”；或在终端运行 `xattr -dr com.apple.quarantine WonderLanternZ30.app`。Apple 芯片的 Mac 通过 Rosetta 2 运行，第一次会提示安装 |
+| macOS | 在 Finder 里**右键 `WonderLanternZ30.app` → 打开**，弹窗里再点“打开”；或在终端运行 `xattr -dr com.apple.quarantine WonderLanternZ30.app` |
 | Linux | 在终端运行 `tar -xzf WonderLanternZ30-linux-x64.tar.gz`，再运行 `./WonderLanternZ30/WonderLanternZ30`，以后也可以在文件管理器里双击。界面由程序自带的 Qt WebEngine 显示，只需要系统装有 NSS 库（`libnss3`，装了 Firefox 或 Chrome 的桌面一般都有；Ubuntu/Debian 上是 `sudo apt install libnss3`） |
 
 ## 2. 认识界面

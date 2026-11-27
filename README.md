@@ -7,8 +7,8 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的固件
 **新功能从存储卡上的补丁文件加载。** 相机里只需刷一次**加载器固件**；之后添加、去掉或更新功能，都只是换卡上的 `Z30/WL.PATCH`，不用再刷机。只有加载器本身有底层更新时，才需要再刷一次加载器（打包工具会明确提示）。
 
 > [!TIP]
-> ### 📖 [图形界面打包教程（图文）→](docs/gui-tutorial.md)
-> 第一次使用？跟着教程一步步完成：下载打包程序 → 校验原厂固件 → 打包并刷入加载器 → 打包功能卡文件并放到存储卡。
+> ### 📖 [图形界面打包教程（图文）→](docs/gui-tutorial.md) · 🔊 [自定义快门声音制作教程（图文）→](docs/shutter-sound-tutorial.md)
+> 第一次使用？跟着教程一步步完成：下载打包程序 → 校验原厂固件 → 打包并刷入加载器 → 打包功能卡文件并放到存储卡；想换个性快门声？打包程序内置「快门音频」工具，支持 MP3/WAV/M4A 拖拽裁剪、8 kHz 试听和一键导出标准 WAV。
 
 > [!WARNING]
 > 修改固件有风险。刷入加载器前请确认：
@@ -39,7 +39,7 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的固件
 | 预设 | 功能 | 说明 |
 | --- | --- | --- |
 | `liveview-dual` | 在水平仪页后新增“顶部信息＋直方图＋水平仪”全信息 DISP 页 | [文档](docs/liveview-full-info.md) |
-| `shutter-sound` | 从 SD 卡读取自定义电子快门声音，可开关、选择文件、预听、重新加载 | [文档](docs/shutter-sound.md) |
+| `shutter-sound` | 从 SD 卡读取自定义电子快门声音，可开关、选择文件、预听、重新加载 | [图文制作教程](docs/shutter-sound-tutorial.md) · [技术文档](docs/shutter-sound.md) |
 | `m900` | 启用原厂已有的 M 档长曝光路径，最长 900 秒 | — |
 | `mtp-fast` | 加速 MTP 属性列表查询，返回数据不变 | [验证](docs/verification.md) |
 | `video-rot` | 为新录像写入方向元数据，锁定开始录制时的方向 | [文档](docs/video-rotation.md) |
@@ -83,7 +83,7 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的固件
 
 每一步的截图和常见问题见 **[图形界面打包教程](docs/gui-tutorial.md)**。
 
-1. 从 [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) 按系统下载 `WonderLanternZ30-windows-x64.zip`、`WonderLanternZ30-linux-x64.tar.gz` 或 `WonderLanternZ30-macos-x64.zip`（Intel 和 Apple 芯片通用，后者经 Rosetta 2 运行），**完整解压**后再运行。
+1. 从 [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) 按系统下载 `WonderLanternZ30-windows-x64.zip`、`WonderLanternZ30-linux-x64.tar.gz` 或 `WonderLanternZ30-macos-arm64.zip`（Apple 芯片原生），**完整解压**后再运行。
 2. 把 `Z_30_0120.bin` 放进解压后的文件夹，或在程序里手动选择。
 3. 打开 `WonderLanternZ30`（Windows 是 `WonderLanternZ30.exe`，macOS 是 `WonderLanternZ30.app`），等待固件校验通过。界面可切换中文或英文、深色或浅色。
 4. **第一次：打包加载器固件。** 点“打包加载器 EG”，把 `output/card` 里的 `EG209020.BIN` 刷进相机（设定菜单 → 固件版本）。先不放卡文件，确认相机和原厂一样、固件版本页正常。
