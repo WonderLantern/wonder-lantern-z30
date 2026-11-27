@@ -60,6 +60,10 @@ enum { R_FIFO_CFG = 0x16, R_FIFO_COUNT = 0x2E, R_FIFO_DATA = 0x30, R_SPR = 0x4B,
 #define HP_CUTOFF (16667.0 / HP_TAU_US)   /* logged only */
 #define ZOOM_STD 0.93         /* standard: ~7.5% zoom for margin */
 #define ZOOM_ENH 0.916        /* enhanced: 1.2x the standard extra crop (0.902 = 1.4x tore the image on hardware) */
+#define ZOOM_STD_4K 0.95      /* 4K: lighter extra crop so warp + LDC (e.g. 12-28 PZ) never stalls */
+#define ZOOM_ENH_4K 0.94      /* 4K enhanced: well clear of the 0.916/0.902 warp stall threshold */
+#define ZOOM_STD_4K_UW 0.96   /* 4K ultra-wide (<= 15 mm, heavy barrel LDC): extra conservative */
+#define ZOOM_ENH_4K_UW 0.95
 #define ZOOM_NATIVE 1.0       /* stock crop only */
 /* Standard (RS) (product menu row 1): Standard + rolling-shutter (jelly)
  * correction. The top and bottom rows were exposed half a readout before / after
@@ -680,11 +684,23 @@ static void frame(const uint8_t *input, uint8_t *result, const uint8_t *meta, ui
 #ifdef EVR_PRODUCT
     P.t_evr = now;
 #endif
+    int32_t focal_mm = meta ? (int32_t)(*(const volatile uint16_t *)(meta + 0x258A)) : 0;
+    int is_4k = geom0 >= 3000;
+    int is_uw = focal_mm > 0 && focal_mm <= 15;
+    double roll_lim = ROLL_LIMIT;
+    if (is_4k) {
+        /* keep 4K horizontal-line vertical tilt within the 1080p (~80 px) line-buffer budget */
+        roll_lim = ROLL_LIMIT * (1866.0 / (double)geom0);
+        if (is_uw) roll_lim *= 0.75;
+    }
     double scx = 0, scy = 0, s0x = 0, s0y = 0;
     for (int i = 0; i < 4; i++) { scx += cx[i]; scy += cy[i]; s0x += cx[i + 4]; s0y += cy[i + 4]; }
     scx /= 4; scy /= 4; s0x /= 4; s0y /= 4;
     /* zoom: shrink each quad about its own centroid (stays inside the stock quad) */
-    double zoom = mode == M_NATIVE ? ZOOM_NATIVE : mode == M_ENH ? ZOOM_ENH : ZOOM_STD;
+    double zoom = mode == M_NATIVE ? ZOOM_NATIVE
+                : is_4k ? (mode == M_ENH ? (is_uw ? ZOOM_ENH_4K_UW : ZOOM_ENH_4K)
+                                         : (is_uw ? ZOOM_STD_4K_UW : ZOOM_STD_4K))
+                : (mode == M_ENH ? ZOOM_ENH : ZOOM_STD);
     for (int i = 0; i < 8; i++) {
         double ox = i < 4 ? scx : s0x, oy = i < 4 ? scy : s0y;
         cx[i] = (int32_t)(ox + (cx[i] - ox) * zoom);
@@ -709,8 +725,8 @@ static void frame(const uint8_t *input, uint8_t *result, const uint8_t *meta, ui
         int32_t ox = (int32_t)((scx - geom0 * 128.0) * gw), oy = (int32_t)((scy - geom1 * 128.0) * gw);
         for (int i = 0; i < 8; i++) { cx[i] -= ox; cy[i] -= oy; }
     }
-    double lo = SAFETY * 256.0, hix = (geom0 - SAFETY) * 256.0, hiy = (geom1 - SAFETY) * 256.0;
-    int32_t focal_mm = meta ? (int32_t)(*(const volatile uint16_t *)(meta + 0x258A)) : 0;
+    double safety = is_4k ? SAFETY * 2.0 : SAFETY;
+    double lo = safety * 256.0, hix = (geom0 - safety) * 256.0, hiy = (geom1 - safety) * 256.0;
     double dx = 0, dy = 0;
     int32_t ydev = 0, pdev = 0; uint32_t age = 0;
     /* how far the stock quad may move each way before a corner hits the margin */
@@ -755,8 +771,8 @@ static void frame(const uint8_t *input, uint8_t *result, const uint8_t *meta, ui
             G.lp_yaw += (yaw - G.lp_yaw) * k;      /* smooth path = low-pass of the angle */
             G.lp_pitch += (pitch - G.lp_pitch) * k;
             G.lp_roll += (rollv - G.lp_roll) * k; G.last_rollv = rollv;
-            if (rollv - G.lp_roll > ROLL_LIMIT) G.lp_roll = rollv - ROLL_LIMIT;
-            else if (rollv - G.lp_roll < -ROLL_LIMIT) G.lp_roll = rollv + ROLL_LIMIT;
+            if (rollv - G.lp_roll > roll_lim) G.lp_roll = rollv - roll_lim;
+            else if (rollv - G.lp_roll < -roll_lim) G.lp_roll = rollv + roll_lim;
             if (G.was_stale && G.gyro_ok) G.lp_roll = rollv - G.tgt_roll;
             G.tgt_roll = SGN_ROLL * (rollv - G.lp_roll);
             /* anti-windup: never ask for more than SOFT_LIMIT of the margin, so a pan
@@ -832,7 +848,7 @@ static void frame(const uint8_t *input, uint8_t *result, const uint8_t *meta, ui
         /* smooth roll limit: the largest rotation each way that keeps every corner
          * (after translation and shear) inside; clamp to 90% of it and feed it back
          * to the roll filter so a fast roll is followed, not dropped and re-taken */
-        double tp = ROLL_LIMIT, tn = ROLL_LIMIT;
+        double tp = roll_lim, tn = roll_lim;
         for (int i = 0; i < 8; i++) {
             double ux = cx[i] - qcx[i / 4], uy = cy[i] - qcy[i / 4], sh = (i & 2) ? 1.0 : -1.0;
             double nx = SHEAR(cx[i] + dx, sh * shx), ny = SHEAR(cy[i] + dy, sh * shy);
@@ -878,12 +894,20 @@ static void frame(const uint8_t *input, uint8_t *result, const uint8_t *meta, ui
         }
     }
     int clamped = 0;
-    for (int i = 0; i < 8; i++) {
+    int32_t off_x = rdi(result, 0x48) << 8, off_y = rdi(result, 0x4C) << 8;
+    int32_t wx[4], wy[4];
+    for (int i = 0; i < 4; i++) {
         double nx = cx[i] + dx, ny = cy[i] + dy;
         if (nx < lo) { nx = lo; clamped = 1; } else if (nx > hix) { nx = hix; clamped = 1; }
         if (ny < lo) { ny = lo; clamped = 1; } else if (ny > hiy) { ny = hiy; clamped = 1; }
-        wri(result, corner_off(i), (int32_t)nx);
-        wri(result, corner_off(i) + 4, (int32_t)ny);
+        wx[i] = (int32_t)nx; wy[i] = (int32_t)ny;
+        wri(result, corner_off(i), wx[i]);
+        wri(result, corner_off(i) + 4, wy[i]);
+    }
+    /* Stock 0x1010BE5C derives A0..D0 directly as A..D - (result[0x48..0x4C] << 8). */
+    for (int i = 0; i < 4; i++) {
+        wri(result, corner_off(i + 4), wx[i] - off_x);
+        wri(result, corner_off(i + 4) + 4, wy[i] - off_y);
     }
     STAT(G.mode_frames[mode]++);
     if (clamped) STAT(G.clamp_frames++);
