@@ -28,6 +28,8 @@
 !/src/z30_extensions/platform/menu_tab_strip.png
 # Screenshots for the GUI packaging tutorial (docs/gui-tutorial.md).
 !/docs/images/gui-tutorial/*.png
+# Screenshots for the shutter sound tutorial (docs/shutter-sound-tutorial.md).
+!/docs/images/sound-tutorial/*.png
 *.mp4
 
 # Inputs, build products, research dumps and vendor caches.

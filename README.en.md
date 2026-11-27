@@ -39,7 +39,7 @@ Design, log codes and camera records: [SD card loading](docs/card-loader.md) (Ch
 | Preset | What it does | Notes |
 | --- | --- | --- |
 | `liveview-dual` | Adds a full-information DISP page (top info + histogram + level) after the level page | [Doc](docs/liveview-full-info.md) |
-| `shutter-sound` | Custom electronic-shutter sound from the SD card, with on/off, file choice, preview and reload | [Doc](docs/shutter-sound.md) |
+| `shutter-sound` | Custom electronic-shutter sound from the SD card, with on/off, file choice, preview and reload | [Audio tutorial (ZH)](docs/shutter-sound-tutorial.md) · [Doc](docs/shutter-sound.md) |
 | `m900` | Enables the stock M-mode long-exposure path, up to 900 s | — |
 | `mtp-fast` | Faster MTP property-list queries with identical replies | [Verification](docs/verification.md) |
 | `video-rot` | Writes orientation metadata for new videos, locked when recording starts | [Doc](docs/video-rotation.md) |
@@ -83,7 +83,7 @@ You supply the firmware yourself; the repository contains neither stock firmware
 
 Screenshots of every step and common problems are in the **[GUI packaging tutorial](docs/gui-tutorial.en.md)**.
 
-1. Download `WonderLanternZ30-windows-x64.zip`, `WonderLanternZ30-linux-x64.tar.gz` or `WonderLanternZ30-macos-x64.zip` (Intel and Apple silicon, the latter through Rosetta 2) from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract the whole archive** before running it.
+1. Download `WonderLanternZ30-windows-x64.zip`, `WonderLanternZ30-linux-x64.tar.gz` or `WonderLanternZ30-macos-arm64.zip` (Apple silicon native) from [Releases](https://github.com/WonderLantern/wonder-lantern-z30/releases/latest) and **extract the whole archive** before running it.
 2. Put `Z_30_0120.bin` into the extracted folder, or choose it in the program.
 3. Open `WonderLanternZ30` (`WonderLanternZ30.exe` on Windows, `WonderLanternZ30.app` on macOS) and wait for the firmware check to pass. The interface switches between Chinese and English, dark and light.
 4. **First time: build the loader firmware.** Click "Build loader EG" and flash `EG209020.BIN` from `output/card` into the camera (Setup menu → Firmware version). Without a card file, check that the camera behaves as stock and the firmware version page works.
