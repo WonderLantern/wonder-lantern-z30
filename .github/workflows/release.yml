@@ -111,7 +111,7 @@ jobs:
           lipo -info "$WORK/libkeystone.dylib" | grep -q 'arm64'
 
           python -m pip download --no-deps --only-binary=:all: \
-            --platform macosx_10_9_x86_64 --python-version 3.14 \
+            --platform macosx_15_0_x86_64 --python-version 3.14 --abi none \
             -d "$WORK" keystone-engine==0.9.2
 
           python - "$WORK" "$WHEEL_DIR" <<'PY'
